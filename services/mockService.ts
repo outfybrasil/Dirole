@@ -1,0 +1,1032 @@
+
+import { Location, LocationType, Review, User, ActivityFeedItem, LocationEvent, GalleryItem, Report, FriendUser, FriendshipStatus, Invite } from '../types';
+import { BADGES, LEVEL_THRESHOLDS, DEFAULT_LOCATION_IMAGES } from '../constants';
+import { supabase } from './supabaseClient';
+
+// --- HAPTIC FEEDBACK ---
+export const triggerHaptic = (pattern: number | number[] = 10) => {
+  if (navigator.vibrate) {
+    navigator.vibrate(pattern);
+  }
+};
+
+// --- PUSH NOTIFICATIONS ---
+export const requestNotificationPermission = async () => {
+    if (!('Notification' in window)) return false;
+    
+    if (Notification.permission === 'default') {
+        const permission = await Notification.requestPermission();
+        return permission === 'granted';
+    }
+    return Notification.permission === 'granted';
+};
+
+export const sendLocalNotification = async (title: string, body: string, url: string = '/') => {
+    if (!('Notification' in window)) return;
+
+    if (Notification.permission === 'granted') {
+        try {
+            // Try to use Service Worker for notification (Better for Mobile/PWA)
+            if ('serviceWorker' in navigator) {
+                const registration = await navigator.serviceWorker.ready;
+                if (registration) {
+                    return registration.showNotification(title, {
+                        body,
+                        icon: '/icon.png', // Ensure you have an icon in public folder
+                        badge: '/badge.png', // Android status bar icon
+                        vibrate: [200, 100, 200],
+                        tag: 'dirole-notification',
+                        renotify: true,
+                        data: { url } // Critical for the click handler in sw.js
+                    } as any);
+                }
+            }
+
+            // Fallback to standard API
+            const options: any = {
+                body,
+                icon: '/icon.png', 
+                vibrate: [200, 100, 200],
+                tag: 'dirole-notification',
+                data: { url }
+            };
+            new Notification(title, options);
+        } catch (e) {
+            console.warn("Erro ao enviar notificação:", e);
+        }
+    }
+};
+
+const STORAGE_KEY = 'dirole_user_profile';
+
+// --- BLOCKING SYSTEM ---
+
+export const blockUser = async (blockerId: string, blockedId: string): Promise<boolean> => {
+    try {
+        const { error } = await supabase.from('blocked_users').insert({
+            blocker_id: blockerId,
+            blocked_id: blockedId
+        });
+        if (error) throw error;
+        return true;
+    } catch (e) {
+        console.error("Error blocking user:", e);
+        return false;
+    }
+};
+
+export const getBlockedUsers = async (userId: string): Promise<string[]> => {
+    try {
+        const { data } = await supabase
+            .from('blocked_users')
+            .select('blocked_id')
+            .eq('blocker_id', userId);
+        
+        return data ? data.map((b: any) => b.blocked_id) : [];
+    } catch (e) {
+        return [];
+    }
+};
+
+// --- USER PROFILE MANAGEMENT ---
+
+export const syncUserProfile = async (authId: string, meta: any): Promise<User | null> => {
+    try {
+        const { data: existing, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', authId)
+            .single();
+
+        if (existing) {
+            const user: User = {
+                id: existing.id,
+                name: existing.name,
+                nickname: existing.nickname,
+                email: existing.email,
+                age: existing.age,
+                gender: existing.gender,
+                avatar: existing.avatar,
+                points: existing.points,
+                xp: existing.xp,
+                level: existing.level,
+                badges: existing.badges || [],
+                favorites: existing.favorites || []
+            };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+            return user;
+        } 
+        
+        const newUser = {
+            id: authId,
+            name: meta.full_name || 'Novo Usuário',
+            nickname: meta.nickname || '',
+            email: meta.email || '',
+            age: meta.age || 0,
+            gender: meta.gender || '',
+            avatar: meta.avatar_url || '😎',
+            points: 0,
+            xp: 0,
+            level: 1,
+            badges: [],
+            favorites: []
+        };
+
+        const { error: insertError } = await supabase.from('profiles').insert(newUser);
+        if (insertError) throw insertError;
+
+        const user: User = newUser as User;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+        return user;
+
+    } catch (e) {
+        console.error("Erro ao sincronizar perfil:", e);
+        return {
+            id: authId,
+            name: meta.full_name || 'Usuario',
+            avatar: meta.avatar_url || '😎',
+            points: 0, xp: 0, level: 1, badges: [], favorites: []
+        };
+    }
+};
+
+export const getUserProfile = (): User | null => {
+  const stored = localStorage.getItem(STORAGE_KEY);
+  if (stored) {
+    const parsed = JSON.parse(stored);
+    if (!parsed.favorites) parsed.favorites = [];
+    if (!parsed.xp) parsed.xp = 0;
+    if (!parsed.level) parsed.level = 1;
+    if (!parsed.badges) parsed.badges = [];
+    return parsed;
+  }
+  return null;
+};
+
+export const saveUserProfileLocal = (name: string, avatar: string): User => {
+  const current = getUserProfile();
+  const newUser: User = {
+    id: `guest_${Math.random().toString(36).substr(2, 9)}`,
+    name,
+    avatar,
+    points: 0,
+    xp: 0,
+    level: 1,
+    badges: [],
+    favorites: []
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(newUser));
+  return newUser;
+};
+
+export const updateUserProgress = async (userId: string, pointsToAdd: number) => {
+    if (userId.startsWith('guest_')) return;
+
+    const local = getUserProfile();
+    if (local && local.id === userId) {
+        local.points += pointsToAdd;
+        local.xp += pointsToAdd;
+        
+        const nextLevel = LEVEL_THRESHOLDS.find(l => l.level === local.level + 1);
+        if (nextLevel && local.xp >= nextLevel.xp) {
+            local.level += 1;
+            triggerHaptic([50, 100, 50, 100]); 
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(local));
+    }
+
+    try {
+        const { data: currentRemote } = await supabase.from('profiles').select('points, xp, level').eq('id', userId).single();
+        
+        if (currentRemote) {
+            let newPoints = currentRemote.points + pointsToAdd;
+            let newXp = currentRemote.xp + pointsToAdd;
+            let newLevel = currentRemote.level;
+
+            const nextLvl = LEVEL_THRESHOLDS.find(l => l.level === newLevel + 1);
+            if (nextLvl && newXp >= nextLvl.xp) {
+                newLevel++;
+            }
+
+            await supabase.from('profiles').update({
+                points: newPoints,
+                xp: newXp,
+                level: newLevel,
+                updated_at: new Date()
+            }).eq('id', userId);
+        }
+    } catch (e) {
+        console.error("Erro ao salvar progresso na nuvem:", e);
+    }
+};
+
+export const toggleFavorite = async (locationId: string): Promise<User | null> => {
+  const user = getUserProfile();
+  if (!user) return null;
+  
+  triggerHaptic(15);
+  
+  const exists = user.favorites.includes(locationId);
+  let newFavorites = [];
+  
+  if (exists) {
+    newFavorites = user.favorites.filter(id => id !== locationId);
+  } else {
+    newFavorites = [...user.favorites, locationId];
+  }
+  
+  user.favorites = newFavorites;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
+
+  if (!user.id.startsWith('guest_')) {
+      try {
+          await supabase.from('profiles').update({
+              favorites: newFavorites
+          }).eq('id', user.id);
+      } catch (e) { console.error(e); }
+  }
+
+  return user;
+};
+
+// --- FRIENDSHIP SERVICES ---
+
+export const getSuggestedUsers = (): FriendUser[] => {
+    return [];
+};
+
+export const searchUsers = async (query: string, currentUserId: string): Promise<FriendUser[]> => {
+    if (!query || query.length < 2) return [];
+    if (currentUserId.startsWith('guest_')) return [];
+
+    const blockedIds = await getBlockedUsers(currentUserId);
+    let realUsers: FriendUser[] = [];
+
+    try {
+        const { data: profiles } = await supabase
+            .from('profiles')
+            .select('*')
+            .ilike('name', `%${query}%`)
+            .neq('id', currentUserId)
+            .limit(10);
+
+        if (profiles && profiles.length > 0) {
+            const filteredProfiles = profiles.filter((p: any) => !blockedIds.includes(p.id));
+
+            realUsers = await Promise.all(filteredProfiles.map(async (p: any) => {
+                const { data: friendship } = await supabase
+                    .from('friendships')
+                    .select('*')
+                    .or(`requester_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
+                    .or(`requester_id.eq.${p.id},receiver_id.eq.${p.id}`)
+                    .single();
+
+                let status = FriendshipStatus.NONE;
+                let fId = undefined;
+
+                if (friendship) {
+                    fId = friendship.id;
+                    if (friendship.status === 'accepted') status = FriendshipStatus.ACCEPTED;
+                    else if (friendship.requester_id === currentUserId) status = FriendshipStatus.PENDING_SENT;
+                    else status = FriendshipStatus.PENDING_RECEIVED;
+                }
+
+                return {
+                    id: p.id,
+                    name: p.name,
+                    avatar: p.avatar,
+                    points: p.points,
+                    xp: p.xp,
+                    level: p.level,
+                    badges: p.badges,
+                    favorites: p.favorites,
+                    friendshipStatus: status,
+                    friendshipId: fId
+                };
+            }));
+        }
+    } catch (e) {
+        console.warn("User search offline/error", e);
+    }
+
+    return realUsers;
+};
+
+export const getFriends = async (currentUserId: string): Promise<FriendUser[]> => {
+    if (currentUserId.startsWith('guest_')) return [];
+
+    try {
+        const blockedIds = await getBlockedUsers(currentUserId);
+
+        const { data: friendships } = await supabase
+            .from('friendships')
+            .select('*')
+            .or(`requester_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`);
+
+        if (friendships) {
+            const friendIds = friendships.map((f: any) => f.requester_id === currentUserId ? f.receiver_id : f.requester_id);
+            const safeFriendIds = friendIds.filter((id: string) => !blockedIds.includes(id));
+
+            if (safeFriendIds.length > 0) {
+                const { data: profiles } = await supabase.from('profiles').select('*').in('id', safeFriendIds);
+                
+                if (profiles) {
+                    return profiles.map((p: any) => {
+                        const f = friendships.find((fr: any) => fr.requester_id === p.id || fr.receiver_id === p.id);
+                        let status = FriendshipStatus.NONE;
+                        if (f.status === 'accepted') status = FriendshipStatus.ACCEPTED;
+                        else if (f.requester_id === currentUserId) status = FriendshipStatus.PENDING_SENT;
+                        else status = FriendshipStatus.PENDING_RECEIVED;
+
+                        return {
+                            id: p.id,
+                            name: p.name,
+                            avatar: p.avatar,
+                            points: p.points,
+                            xp: p.xp,
+                            level: p.level,
+                            badges: p.badges,
+                            favorites: p.favorites,
+                            friendshipStatus: status,
+                            friendshipId: f.id,
+                            lastCheckIn: undefined 
+                        };
+                    });
+                }
+            }
+        }
+    } catch (e) {
+        console.warn(e);
+    }
+    
+    return [];
+};
+
+export const sendFriendRequest = async (currentUserId: string, targetUserId: string): Promise<boolean> => {
+    if (currentUserId.startsWith('guest_')) return false;
+
+    try {
+        const { error } = await supabase.from('friendships').insert({
+            requester_id: currentUserId,
+            receiver_id: targetUserId,
+            status: 'pending'
+        });
+        if (!error) return true;
+    } catch (e) { console.warn(e); }
+    return true; 
+};
+
+export const respondToFriendRequest = async (friendshipId: string, accept: boolean): Promise<boolean> => {
+    try {
+        if (accept) {
+            await supabase.from('friendships').update({ status: 'accepted' }).eq('id', friendshipId);
+        } else {
+            await supabase.from('friendships').delete().eq('id', friendshipId);
+        }
+        return true;
+    } catch (e) { console.warn(e); }
+    return true;
+};
+
+// --- INVITES ---
+
+export const sendInvites = async (
+    fromUser: User, 
+    friendIds: string[], 
+    locationId: string, 
+    locationName: string, 
+    message?: string
+): Promise<boolean> => {
+    if (fromUser.id.startsWith('guest_')) return false;
+
+    try {
+        const invites = friendIds.map(friendId => ({
+            from_user_id: fromUser.id,
+            to_user_id: friendId,
+            location_id: locationId,
+            location_name: locationName,
+            message: message || "Bora pro rolê!",
+            status: 'pending'
+        }));
+
+        const { error } = await supabase.from('invites').insert(invites);
+        if (error) throw error;
+        return true;
+    } catch (e) {
+        console.error("Erro ao enviar convite:", e);
+        return true;
+    }
+};
+
+// --- REAL DATA SERVICE ---
+
+const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371e3; 
+  const φ1 = lat1 * Math.PI/180;
+  const φ2 = lat2 * Math.PI/180;
+  const Δφ = (lat2-lat1) * Math.PI/180;
+  const Δλ = (lon2-lon1) * Math.PI/180;
+
+  const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+          Math.cos(φ1) * Math.cos(φ2) *
+          Math.sin(Δλ/2) * Math.sin(Δλ/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R * c;
+};
+
+// OPEN STREET MAP / PHOTON FETCHING
+
+const determineOpenStatus = (type: LocationType): { isOpen: boolean, hours: string } => {
+    const hour = new Date().getHours();
+    let isOpen = false;
+    let hours = '';
+
+    switch(type) {
+        case LocationType.BALADA:
+            isOpen = hour >= 22 || hour < 6;
+            hours = '22:00 - 06:00';
+            break;
+        case LocationType.PUB:
+        case LocationType.BAR:
+            isOpen = hour >= 17 || hour < 2;
+            hours = '17:00 - 02:00';
+            break;
+        case LocationType.RESTAURANTE:
+            isOpen = (hour >= 11 && hour < 15) || (hour >= 18 && hour < 23);
+            hours = '11:00-15:00 • 18:00-23:00';
+            break;
+        default:
+            isOpen = hour >= 9 && hour < 20;
+            hours = '09:00 - 20:00';
+    }
+    return { isOpen, hours };
+};
+
+const mapExternalToLocation = (item: any, source: 'osm' | 'photon'): Location => {
+    let lat = 0; 
+    let lon = 0;
+    let name = '';
+    let address = '';
+    let type = LocationType.BAR; 
+    
+    if (source === 'osm') {
+        lat = item.lat || item.center?.lat;
+        lon = item.lon || item.center?.lon;
+        name = item.tags.name || 'Local Sem Nome';
+        
+        const street = item.tags['addr:street'] || item.tags.street || '';
+        const number = item.tags['addr:housenumber'] || '';
+        const city = item.tags['addr:city'] || item.tags.city || '';
+        const district = item.tags['addr:suburb'] || '';
+
+        if (street) {
+            address = `${street}${number ? ', ' + number : ''}`;
+            if (district) address += ` - ${district}`;
+        } else if (district) {
+            address = `${district}${city ? ', ' + city : ''}`;
+        } else if (city) {
+            address = `${city}, PR`;
+        } else {
+            address = 'Endereço no mapa';
+        }
+
+        const rawType = item.tags.amenity || item.tags.leisure || item.tags.shop || item.tags.cuisine;
+        const nameLower = name.toLowerCase();
+
+        if (['nightclub', 'dance', 'stripclub', 'casino'].includes(rawType)) {
+            type = LocationType.BALADA;
+        } 
+        else if (['pub', 'biergarten'].includes(rawType)) {
+            type = LocationType.PUB;
+        } 
+        else if (rawType === 'restaurant' || rawType === 'food_court') {
+            type = LocationType.RESTAURANTE;
+        }
+        else if (['bar', 'lounge', 'taproom', 'beverages', 'alcohol', 'tobacco'].includes(rawType)) {
+            type = LocationType.BAR;
+        } 
+        else if (rawType === 'fast_food') {
+            if (nameLower.includes('janela') || nameLower.includes('porks') || nameLower.includes('garden') || nameLower.includes('quintal') || nameLower.includes('bar')) {
+                type = LocationType.BAR;
+            } else if (nameLower.includes('burger') || nameLower.includes('pizza') || nameLower.includes('sushi')) {
+                type = LocationType.RESTAURANTE;
+            } else if (nameLower.includes('espetinho') || nameLower.includes('lanche') || nameLower.includes('dog')) {
+                type = LocationType.OUTRO;
+            } else {
+                type = LocationType.OUTRO;
+            }
+        }
+        else {
+            if (nameLower.includes('club') || nameLower.includes('boate')) type = LocationType.BALADA;
+            else if (nameLower.includes('pub')) type = LocationType.PUB;
+            else if (nameLower.includes('bistrô') || nameLower.includes('restaurante') || nameLower.includes('grill') || nameLower.includes('pizzaria')) type = LocationType.RESTAURANTE;
+            else type = LocationType.BAR; 
+        }
+    
+    } else if (source === 'photon') {
+        lat = item.geometry.coordinates[1];
+        lon = item.geometry.coordinates[0];
+        name = item.properties.name || 'Local';
+        const p = item.properties;
+        const street = p.street || p.road || '';
+        const number = p.housenumber || '';
+        const district = p.district || p.suburb || '';
+        const city = p.city || p.town || '';
+        if (street) {
+             address = `${street}, ${number}`;
+             if (district) address += ` - ${district}`;
+             else if (city) address += ` - ${city}`;
+        } else if (district) {
+             address = `${district}${city ? ', ' + city : ''}`;
+        } else {
+             address = `${city}, Brasil`;
+        }
+        if (!address || address.length < 3) address = 'Ver no mapa';
+        const osmValue = p.osm_value;
+        const nameLower = name.toLowerCase();
+        if (osmValue === 'nightclub' || osmValue === 'dance') type = LocationType.BALADA;
+        else if (osmValue === 'pub') type = LocationType.PUB;
+        else if (nameLower.includes('janela') || nameLower.includes('porks')) type = LocationType.BAR;
+        else if (osmValue === 'restaurant') type = LocationType.RESTAURANTE;
+        else if (nameLower.includes('restaurante') || nameLower.includes('bistrô')) type = LocationType.RESTAURANTE;
+        else type = LocationType.BAR;
+    }
+
+    const { isOpen, hours } = determineOpenStatus(type);
+
+    return {
+        id: `temp_${source}_${Date.now()}_${Math.floor(Math.random()*1000)}`,
+        name,
+        address,
+        type,
+        latitude: lat,
+        longitude: lon,
+        verified: true,
+        votesForVerification: 10,
+        imageUrl: DEFAULT_LOCATION_IMAGES[type] || DEFAULT_LOCATION_IMAGES[LocationType.OUTRO],
+        stats: { avgPrice: 0, avgCrowd: 0, avgGender: 0, avgVibe: 0, reviewCount: 0, lastUpdated: new Date() },
+        isOpen,
+        openingHours: hours,
+        reviews: []
+    };
+};
+
+const fetchFromOSM = async (lat: number, lng: number, radius: number = 15000): Promise<Location[]> => {
+  const query = `
+    [out:json][timeout:15];
+    (
+      node["amenity"~"bar|pub|nightclub|biergarten|lounge|taproom|stripclub|restaurant|fast_food|cafe"](around:${radius},${lat},${lng});
+      way["amenity"~"bar|pub|nightclub|biergarten|lounge|taproom|stripclub|restaurant|fast_food|cafe"](around:${radius},${lat},${lng});
+      node["shop"~"beverages|alcohol|tobacco"](around:${radius},${lat},${lng});
+    );
+    out center 40;
+  `;
+
+  try {
+    const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), 15000); 
+
+    const response = await fetch(url, { signal: controller.signal });
+    clearTimeout(id);
+
+    if (!response.ok) return [];
+    const text = await response.text();
+    if (text.trim().startsWith('<')) return []; 
+    const data = JSON.parse(text);
+    if (!data.elements) return [];
+
+    return data.elements.map((el: any) => mapExternalToLocation(el, 'osm')).filter((l: any) => l.name && l.name !== 'Local Sem Nome');
+  } catch (error) {
+    return [];
+  }
+};
+
+const fetchFromPhoton = async (lat: number, lng: number): Promise<Location[]> => {
+    try {
+        const url1 = `https://photon.komoot.io/api/?q=bar&lat=${lat}&lon=${lng}&limit=10&lang=pt`;
+        const url2 = `https://photon.komoot.io/api/?q=restaurante&lat=${lat}&lon=${lng}&limit=10&lang=pt`;
+        const url3 = `https://photon.komoot.io/api/?q=balada&lat=${lat}&lon=${lng}&limit=5&lang=pt`;
+        
+        const [res1, res2, res3] = await Promise.all([fetch(url1), fetch(url2), fetch(url3)]);
+        
+        const data1 = res1.ok ? await res1.json() : { features: [] };
+        const data2 = res2.ok ? await res2.json() : { features: [] };
+        const data3 = res3.ok ? await res3.json() : { features: [] };
+        
+        const allFeatures = [...data1.features, ...data2.features, ...data3.features];
+
+        return allFeatures
+            .filter((f: any) => {
+                const val = f.properties.osm_value;
+                if (val === 'supermarket' || val === 'convenience') return false; 
+                return true;
+            })
+            .map((f: any) => mapExternalToLocation(f, 'photon'));
+    } catch (e) {
+        return [];
+    }
+}
+
+export const searchLocations = async (query: string, userLat: number, userLng: number): Promise<Location[]> => {
+    if (!query || query.length < 2) return [];
+
+    let dbResults: Location[] = [];
+    try {
+        const { data } = await supabase
+            .from('locations')
+            .select('*')
+            .or(`name.ilike.%${query}%,nome.ilike.%${query}%`)
+            .limit(10);
+            
+        if (data) {
+             dbResults = data.map((row: any) => {
+                const { isOpen, hours } = determineOpenStatus(row.type as LocationType);
+                return {
+                    id: row.id,
+                    name: row.name || row.nome || 'Sem Nome',
+                    address: row.address || row.endereco || '',
+                    type: row.type as LocationType,
+                    latitude: row.latitude,
+                    longitude: row.longitude,
+                    imageUrl: row.image_url,
+                    verified: row.verified,
+                    votesForVerification: row.votes_for_verification,
+                    isOfficial: row.is_official,
+                    ownerId: row.owner_id,
+                    officialDescription: row.official_description,
+                    instagram: row.instagram,
+                    whatsapp: row.whatsapp,
+                    stats: {
+                        avgPrice: 0, avgCrowd: 0, avgGender: 0, avgVibe: 0, reviewCount: 0,
+                        lastUpdated: new Date(),
+                        ...(row.stats || {})
+                    },
+                    isOpen,
+                    openingHours: hours,
+                    reviews: [],
+                    distance: calculateDistance(userLat, userLng, row.latitude, row.longitude)
+                };
+             });
+        }
+    } catch (e) { console.warn(e); }
+
+    let apiResults: Location[] = [];
+    try {
+        const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&lat=${userLat}&lon=${userLng}&limit=20&lang=pt`;
+        const res = await fetch(url);
+        if (res.ok) {
+            const data = await res.json();
+            apiResults = data.features.map((f: any) => {
+                 const loc = mapExternalToLocation(f, 'photon');
+                 loc.distance = calculateDistance(userLat, userLng, loc.latitude, loc.longitude);
+                 return loc;
+            });
+        }
+    } catch (e) { console.warn(e); }
+
+    const merged = [...dbResults];
+    for (const apiLoc of apiResults) {
+        const isDuplicate = merged.some(dbLoc => 
+            dbLoc.name === apiLoc.name || 
+            (Math.abs(dbLoc.latitude - apiLoc.latitude) < 0.0005 && Math.abs(dbLoc.longitude - apiLoc.longitude) < 0.0005)
+        );
+        if (!isDuplicate) {
+            merged.push(apiLoc);
+        }
+    }
+
+    return merged.sort((a, b) => (a.distance || 0) - (b.distance || 0));
+};
+
+const generateFallbackLocations = (centerLat: number, centerLng: number, count: number = 10): Location[] => {
+    const types = [LocationType.BAR, LocationType.BALADA, LocationType.PUB, LocationType.RESTAURANTE];
+    const names = [
+        "Bar da Esquina", "Arena Show", "Pub Central", "Boteco do Amigo", "Club Neon",
+        "Lounge 42", "Taverna Rock", "Rooftop View", "Garden Beer", "Bistrô Sabor", "Cantina Italiana"
+    ];
+    
+    return Array.from({ length: count }).map((_, i) => {
+        const type = types[i % types.length];
+        const latOffset = (Math.random() - 0.5) * 0.08; 
+        const lngOffset = (Math.random() - 0.5) * 0.08;
+        const { isOpen, hours } = determineOpenStatus(type);
+
+        return {
+            id: `temp_fallback_${Date.now()}_${i}`,
+            name: `${names[i % names.length]} (Sugerido)`,
+            address: "Localização Aproximada",
+            type: type,
+            latitude: centerLat + latOffset,
+            longitude: centerLng + lngOffset,
+            imageUrl: DEFAULT_LOCATION_IMAGES[type],
+            verified: true,
+            votesForVerification: 10,
+            stats: { 
+                avgPrice: Number((Math.random() * 3).toFixed(1)), 
+                avgCrowd: Number((Math.random() * 3).toFixed(1)),
+                avgGender: Number((Math.random() * 3).toFixed(1)),
+                avgVibe: Number((1.5 + Math.random() * 1.5).toFixed(1)),
+                reviewCount: Math.floor(Math.random() * 50), 
+                lastUpdated: new Date() 
+            },
+            isOpen,
+            openingHours: hours,
+            reviews: []
+        };
+    });
+};
+
+export const getNearbyRoles = async (lat: number, lng: number): Promise<Location[]> => {
+  let dbLocations: Location[] = [];
+  try {
+      const { data, error } = await supabase.from('locations').select('*');
+      if (data) {
+         dbLocations = data.map((row: any) => {
+            const { isOpen, hours } = determineOpenStatus(row.type as LocationType);
+            return {
+                id: row.id,
+                name: row.name || row.nome, 
+                address: row.address || row.endereco,
+                type: row.type as LocationType,
+                latitude: row.latitude,
+                longitude: row.longitude,
+                imageUrl: row.image_url,
+                verified: row.verified,
+                votesForVerification: row.votes_for_verification,
+                isOfficial: row.is_official,
+                ownerId: row.owner_id,
+                officialDescription: row.official_description,
+                instagram: row.instagram,
+                whatsapp: row.whatsapp,
+                stats: {
+                    avgPrice: 0, avgCrowd: 0, avgGender: 0, avgVibe: 0, reviewCount: 0,
+                    lastUpdated: new Date(),
+                    ...(row.stats || {})
+                },
+                isOpen,
+                openingHours: hours,
+                reviews: []
+            };
+         });
+      }
+  } catch (e) {
+      console.warn("Database fetch failed", e);
+  }
+
+  const nearbyDB = dbLocations.filter(l => calculateDistance(lat, lng, l.latitude, l.longitude) < 30000);
+
+  let mergedLocations = [...nearbyDB];
+  try {
+      const [osmData, photonData] = await Promise.all([
+          fetchFromOSM(lat, lng, 15000), 
+          fetchFromPhoton(lat, lng)
+      ]);
+      const externalData = [...osmData, ...photonData];
+      const newFromMap = externalData.filter(extLoc => {
+          return !mergedLocations.some(dbLoc => 
+              dbLoc.name === extLoc.name || 
+              (Math.abs(dbLoc.latitude - extLoc.latitude) < 0.0005 && Math.abs(dbLoc.longitude - extLoc.longitude) < 0.0005)
+          );
+      });
+      const uniqueExternal = Array.from(new Map(newFromMap.map(item => [item.name, item])).values());
+      mergedLocations = [...mergedLocations, ...uniqueExternal];
+  } catch (e) { console.warn(e); }
+
+  if (mergedLocations.length < 10) {
+      const missingCount = 10 - mergedLocations.length;
+      const fallbacks = generateFallbackLocations(lat, lng, missingCount);
+      mergedLocations = [...mergedLocations, ...fallbacks];
+  }
+
+  return mergedLocations.map(loc => ({
+    ...loc,
+    distance: Math.round(calculateDistance(lat, lng, loc.latitude, loc.longitude))
+  })).sort((a, b) => (a.distance || 0) - (b.distance || 0));
+};
+
+export const createLocation = async (data: Omit<Location, 'id' | 'stats' | 'distance' | 'reviews' | 'verified' | 'votesForVerification' | 'isOpen' | 'openingHours'>): Promise<Location> => {
+  const isOfficial = !!data.isOfficial;
+  const isVerified = isOfficial; 
+
+  const defaultStats = { avgPrice: 0, avgCrowd: 0, avgGender: 0, avgVibe: 0, reviewCount: 0, lastUpdated: new Date() };
+  const finalImageUrl = data.imageUrl || DEFAULT_LOCATION_IMAGES[data.type] || DEFAULT_LOCATION_IMAGES[LocationType.OUTRO];
+  const { isOpen, hours } = determineOpenStatus(data.type);
+
+  try {
+      const payload: any = {
+        name: data.name,
+        address: data.address,
+        type: data.type,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        image_url: finalImageUrl,
+        verified: isVerified,
+        is_official: isOfficial,
+        stats: defaultStats,
+        votes_for_verification: isVerified ? 10 : 0
+      };
+
+      const { data: inserted, error } = await supabase.from('locations').insert(payload).select().single();
+      
+      if (error) {
+           console.warn("Erro ao criar local, tentando fallback...");
+           const hybridPayload = {
+               ...payload,
+               nome: payload.name, 
+               endereco: payload.address
+           };
+           delete hybridPayload.name;
+           delete hybridPayload.address;
+           const { data: retry } = await supabase.from('locations').insert(hybridPayload).select().single();
+           if (retry) return { ...data, imageUrl: finalImageUrl, id: retry.id, verified: retry.verified, votesForVerification: 0, stats: defaultStats, isOpen, openingHours: hours, reviews: [] };
+           throw error;
+      }
+      return { ...data, imageUrl: finalImageUrl, id: inserted.id, verified: inserted.verified, votesForVerification: inserted.votes_for_verification, stats: inserted.stats || defaultStats, isOpen, openingHours: hours, reviews: [] };
+  } catch (error) {
+      console.error("Falha crítica ao criar local:", error);
+      return {
+          ...data,
+          imageUrl: finalImageUrl,
+          id: `temp_manual_${Date.now()}`,
+          verified: isVerified,
+          votesForVerification: 0,
+          stats: defaultStats,
+          isOpen, openingHours: hours, reviews: []
+      };
+  }
+};
+
+export const verifyLocation = async (id: string): Promise<Location | null> => {
+    if (id.startsWith('temp_')) return null;
+    try {
+        const { data: loc } = await supabase.from('locations').select('votes_for_verification, verified, type').eq('id', id).single();
+        if (loc) {
+            const newCount = (loc.votes_for_verification || 0) + 1;
+            const newVerified = loc.verified || newCount >= 10;
+            const { isOpen, hours } = determineOpenStatus(loc.type as LocationType);
+            await supabase.from('locations').update({ votes_for_verification: newCount, verified: newVerified }).eq('id', id);
+            triggerHaptic(20);
+            return { ...loc, votesForVerification: newCount, verified: newVerified, isOpen, openingHours: hours } as any;
+        }
+    } catch (e) { console.warn(e); }
+    return null;
+}
+
+export const claimBusiness = async (locationId: string, ownerId: string, details: any): Promise<boolean> => {
+    if (locationId.startsWith('temp_')) return false;
+    try {
+        const { error } = await supabase.from('locations').update({
+            is_official: true,
+            verified: true,
+            owner_id: ownerId,
+            official_description: details.description,
+            instagram: details.instagram,
+            whatsapp: details.whatsapp
+        }).eq('id', locationId);
+        if (!error) {
+            triggerHaptic([50, 100, 50]); 
+            return true;
+        }
+    } catch (e) { console.warn(e); }
+    return false;
+}
+
+export const getReviewsForLocation = async (locationId: string): Promise<Review[]> => {
+    if (locationId.startsWith('temp_')) return [];
+    
+    const user = getUserProfile();
+    const blockedIds = user ? await getBlockedUsers(user.id) : [];
+
+    try {
+        const { data } = await supabase
+            .from('reviews')
+            .select('*')
+            .eq('location_id', locationId)
+            .order('created_at', { ascending: false });
+        if (data) {
+            const allReviews = data.map((r: any) => ({
+                id: r.id,
+                locationId: r.location_id,
+                userId: r.user_id,
+                userName: r.user_name,
+                userAvatar: r.user_avatar,
+                price: r.price ?? r.nota_preco ?? 0,
+                crowd: r.crowd ?? r.nota_lotacao ?? 0,
+                gender: r.gender ?? r.nota_genero ?? 0,
+                vibe: r.vibe ?? r.nota_vibe ?? 0,
+                comment: r.comment ?? r.comentario ?? '',
+                createdAt: new Date(r.created_at)
+            }));
+            return allReviews.filter((r: Review) => !blockedIds.includes(r.userId));
+        }
+    } catch (e) { console.warn(e); }
+    return [];
+}
+
+// ⚠️ ATENÇÃO: Esta função assume que você rodou o SQL de RESET do banco
+export const submitReview = async (review: Review, locationContext?: Location): Promise<boolean> => {
+  let finalLocationId = review.locationId;
+
+  // 1. SYNC TEMP LOCATION
+  if (review.locationId.startsWith('temp_')) {
+      if (!locationContext) return false;
+      try {
+          // Simplificado: apenas tenta criar com colunas novas. Se falhar, é erro de banco.
+          const payload = {
+              name: locationContext.name,
+              address: locationContext.address,
+              type: locationContext.type,
+              latitude: locationContext.latitude,
+              longitude: locationContext.longitude,
+              image_url: locationContext.imageUrl,
+              verified: true, 
+              votes_for_verification: 10,
+              stats: locationContext.stats 
+          };
+          const { data: newLoc } = await supabase.from('locations').insert(payload).select().single();
+          if (newLoc) finalLocationId = newLoc.id;
+          else {
+              // Fallback para banco antigo
+              const legacyPayload = { ...payload, nome: payload.name, endereco: payload.address };
+              delete (legacyPayload as any).name; delete (legacyPayload as any).address;
+              const { data: retry } = await supabase.from('locations').insert(legacyPayload).select().single();
+              if (retry) finalLocationId = retry.id;
+              else return false;
+          }
+      } catch (e) { return false; }
+  }
+
+  // 2. SUBMIT REVIEW - DIRECT & SIMPLE
+  // Apenas tenta inserir na tabela 'reviews'. Se falhar, é porque o usuário não rodou o SQL de fix.
+  const payload = {
+      location_id: finalLocationId,
+      user_id: review.userId,
+      user_name: review.userName,
+      user_avatar: review.userAvatar,
+      price: review.price || 0,
+      crowd: review.crowd || 0,
+      vibe: review.vibe || 0,
+      gender: review.gender || 0,
+      comment: review.comment || ''
+  };
+
+  try {
+      const { error } = await supabase.from('reviews').insert(payload);
+      
+      if (error) {
+          console.error("SQL Error on Insert:", error);
+          console.warn(">> O USUÁRIO PRECISA RODAR O SCRIPT SQL DE RESET <<");
+          alert("Erro de banco de dados. Por favor, execute o script SQL de correção.");
+          return false;
+      }
+
+      // Success! Update stats
+      await updateUserProgress(review.userId, 10);
+      
+      // Update aggregated stats on location
+      const { data: allReviews } = await supabase.from('reviews').select('*').eq('location_id', finalLocationId);
+      if (allReviews && allReviews.length > 0) {
+           const count = allReviews.length;
+           const avgCrowd = allReviews.reduce((acc: number, r: any) => acc + (r.crowd || 0), 0) / count;
+           const avgVibe = allReviews.reduce((acc: number, r: any) => acc + (r.vibe || 0), 0) / count;
+           const avgPrice = allReviews.reduce((acc: number, r: any) => acc + (r.price || 0), 0) / count;
+
+           await supabase.from('locations').update({
+               stats: { avgCrowd, avgVibe, avgPrice, reviewCount: count, lastUpdated: new Date() }
+           }).eq('id', finalLocationId);
+      }
+
+      triggerHaptic([50, 50]);
+      return true;
+
+  } catch (e) {
+      console.error(e);
+      return false;
+  }
+};
+
+export const getLeaderboard = async (scope: 'global' | 'friends' = 'global', currentUserId?: string): Promise<User[]> => {
+  try {
+      let query = supabase.from('profiles').select('*').order('points', { ascending: false });
+      if (scope === 'friends' && currentUserId) {
+          const { data: friendships } = await supabase.from('friendships').select('*').eq('status', 'accepted').or(`requester_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`);
+          const friendIds = friendships?.map((f: any) => f.requester_id === currentUserId ? f.receiver_id : f.requester_id) || [];
+          friendIds.push(currentUserId);
+          query = query.in('id', friendIds);
+      } else {
+          query = query.limit(20);
+      }
+      const { data } = await query;
+      if (data) return data.map((p: any) => ({ ...p, badges: p.badges || [], favorites: p.favorites || [] }));
+  } catch (e) { }
+  const localUser = getUserProfile();
+  return [localUser || { id: 'u1', name: 'Eu', avatar: '😎', points: 0, xp: 0, level: 1, badges: [], favorites: [] }];
+};
+
+export const generateMockActivity = (): ActivityFeedItem | null => { return null; };
+export const getEventsForLocation = async (location: Location): Promise<LocationEvent[]> => { return []; };
+export const getGalleryForLocation = async (locationId: string): Promise<GalleryItem[]> => { return []; };
+export const submitReport = async (report: Report): Promise<boolean> => {
+    try { await supabase.from('reports').insert({ target_id: report.targetId, target_type: report.targetType, reason: report.reason, details: report.details, reporter_id: report.reporterId }); return true; } catch (e) { return true; }
+};

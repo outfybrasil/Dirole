@@ -1,0 +1,157 @@
+
+
+export interface Badge {
+  id: string;
+  icon: string;
+  name: string;
+  description: string;
+  unlockedAt?: Date;
+}
+
+export interface User {
+  id: string;
+  name: string;
+  nickname?: string;
+  email?: string;
+  age?: number;
+  gender?: string;
+  avatar: string; 
+  points: number;
+  xp: number; 
+  level: number;
+  badges: Badge[];
+  favorites: string[];
+}
+
+export interface Block {
+  id: string;
+  blocker_id: string;
+  blocked_id: string;
+  created_at: Date;
+}
+
+export enum FriendshipStatus {
+  NONE = 'none',
+  PENDING_SENT = 'pending_sent',
+  PENDING_RECEIVED = 'pending_received',
+  ACCEPTED = 'accepted'
+}
+
+export interface FriendUser extends User {
+  friendshipStatus: FriendshipStatus;
+  friendshipId?: string;
+  lastCheckIn?: string; 
+}
+
+export interface Invite {
+  id: string;
+  fromUserId: string;
+  toUserId: string;
+  locationId: string;
+  locationName: string;
+  message?: string;
+  status: 'pending' | 'accepted' | 'declined';
+  createdAt: Date;
+}
+
+export enum LocationType {
+  BAR = 'Bar',
+  BALADA = 'Balada',
+  PUB = 'Pub',
+  RESTAURANTE = 'Restaurante',
+  OUTRO = 'Outro'
+}
+
+export interface Review {
+  id?: string;
+  userId: string;
+  userName?: string;
+  userAvatar?: string;
+  locationId: string;
+  price: number; 
+  crowd: number; 
+  gender: number; 
+  vibe: number; 
+  comment?: string;
+  createdAt: Date;
+}
+
+export interface LocationEvent {
+  id: string;
+  title: string;
+  description: string;
+  date: Date;
+  category: 'Show' | 'DJ' | 'Promo' | 'Karaoke' | 'Esporte';
+  imageUrl?: string;
+}
+
+export interface GalleryItem {
+  id: string;
+  imageUrl: string;
+  userAvatar: string;
+  userName: string;
+  date: Date;
+}
+
+export interface Location {
+  id: string;
+  name: string;
+  address: string;
+  type: LocationType;
+  latitude: number;
+  longitude: number;
+  imageUrl?: string;
+  
+  verified: boolean; 
+  votesForVerification: number;
+
+  isOfficial?: boolean; 
+  ownerId?: string;
+  officialDescription?: string;
+  instagram?: string;
+  whatsapp?: string;
+  
+  isOpen: boolean; // Novo campo
+  openingHours?: string; // Novo campo opcional
+
+  king?: {
+    userId: string;
+    userName: string;
+    userAvatar: string;
+    checkInCount: number;
+  };
+
+  stats: {
+    avgPrice: number;
+    avgCrowd: number;
+    avgGender: number; 
+    avgVibe: number;
+    lastUpdated: Date;
+    reviewCount: number;
+  };
+  reviews: Review[];
+  distance?: number;
+}
+
+export interface Filters {
+  minVibe: boolean;
+  lowCost: boolean;
+  types: LocationType[];
+  maxDistance: number;
+  onlyOpen: boolean; // Novo filtro
+}
+
+export interface ActivityFeedItem {
+  id: string;
+  text: string;
+  avatar: string;
+  type: 'review' | 'checkin' | 'join';
+}
+
+export interface Report {
+  targetId: string;
+  targetType: 'location' | 'review' | 'photo' | 'user';
+  reason: string;
+  details: string;
+  reporterId?: string;
+}

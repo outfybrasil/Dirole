@@ -1,0 +1,8 @@
+{
+  "name": "Dirole",
+  "description": "O termômetro do rolê: Encontre bares e festas bombando agora.",
+  "requestFramePermissions": [
+    "geolocation",
+    "camera"
+  ]
+}
