@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Location } from '../types';
 import { Thermometer } from './Thermometer';
@@ -13,7 +12,7 @@ interface ListViewProps {
 
 export const ListView: React.FC<ListViewProps> = ({ locations, onCheckIn, favorites, onToggleFavorite, onOpenDetails }) => {
   return (
-    <div className="pb-24 px-4 pt-4 space-y-4">
+    <div className="pb-24 px-4 pt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
       {locations.map((loc, index) => {
         const isFav = favorites.includes(loc.id);
         
@@ -21,7 +20,7 @@ export const ListView: React.FC<ListViewProps> = ({ locations, onCheckIn, favori
           <div 
             key={loc.id} 
             onClick={() => onOpenDetails(loc)}
-            className="glass-card rounded-2xl p-4 transition-all duration-300 hover:scale-[1.02] animate-fade-in relative group cursor-pointer border border-white/5 hover:border-dirole-primary/30"
+            className="glass-card rounded-2xl p-4 transition-all duration-300 hover:scale-[1.02] animate-fade-in relative group cursor-pointer border border-white/5 hover:border-dirole-primary/30 flex flex-col"
             style={{ animationDelay: `${index * 50}ms` }}
           >
             {/* Favorite Button with Pop Animation */}
@@ -43,8 +42,8 @@ export const ListView: React.FC<ListViewProps> = ({ locations, onCheckIn, favori
               }`}></i>
             </button>
 
-            <div className="flex gap-4">
-              <div className="relative">
+            <div className="flex gap-4 flex-1">
+              <div className="relative shrink-0">
                 <img 
                   src={loc.imageUrl} 
                   alt={loc.name} 
@@ -57,18 +56,20 @@ export const ListView: React.FC<ListViewProps> = ({ locations, onCheckIn, favori
                 )}
               </div>
               
-              <div className="flex-1 min-w-0 pt-1">
-                <div className="flex justify-between items-start mb-1 pr-6">
-                  <h3 className="font-bold text-lg leading-tight text-white truncate">{loc.name}</h3>
-                </div>
-                
-                <div className="flex items-center gap-2 mb-2">
-                   <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${loc.verified ? 'text-dirole-secondary bg-dirole-secondary/10 border-dirole-secondary/20' : 'text-slate-400 bg-slate-700/50 border-slate-600 border-dashed'}`}>
-                      {loc.verified ? loc.type : 'Não Verificado'}
-                   </span>
-                   <span className="text-xs text-slate-400">
-                      • {loc.distance ? `${(loc.distance / 1000).toFixed(1)} km` : '...'}
-                   </span>
+              <div className="flex-1 min-w-0 pt-1 flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-start mb-1 pr-6">
+                    <h3 className="font-bold text-lg leading-tight text-white truncate">{loc.name}</h3>
+                  </div>
+                  
+                  <div className="flex items-center gap-2 mb-2">
+                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${loc.verified ? 'text-dirole-secondary bg-dirole-secondary/10 border-dirole-secondary/20' : 'text-slate-400 bg-slate-700/50 border-slate-600 border-dashed'}`}>
+                        {loc.verified ? loc.type : 'Não Verificado'}
+                     </span>
+                     <span className="text-xs text-slate-400">
+                        • {loc.distance ? `${(loc.distance / 1000).toFixed(1)} km` : '...'}
+                     </span>
+                  </div>
                 </div>
                 
                 <Thermometer stats={loc.stats} compact />
@@ -76,7 +77,7 @@ export const ListView: React.FC<ListViewProps> = ({ locations, onCheckIn, favori
             </div>
             
             <div className="mt-4 pt-3 border-t border-white/10 flex gap-3">
-              <div className="flex-1 flex items-center justify-center text-[10px] text-slate-400 bg-white/5 rounded-xl border border-white/5">
+              <div className="flex-1 flex items-center justify-center text-[10px] text-slate-400 bg-white/5 rounded-xl border border-white/5 py-2">
                 <i className="fas fa-comment mr-1.5 text-dirole-primary"></i>
                 {loc.stats.reviewCount} avaliações
               </div>
@@ -95,7 +96,7 @@ export const ListView: React.FC<ListViewProps> = ({ locations, onCheckIn, favori
       })}
       
       {locations.length === 0 && (
-        <div className="text-center text-slate-500 mt-20 p-8 glass-panel rounded-3xl mx-4">
+        <div className="col-span-full text-center text-slate-500 mt-20 p-8 glass-panel rounded-3xl mx-4">
           <div className="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
             😶‍🌫️
           </div>

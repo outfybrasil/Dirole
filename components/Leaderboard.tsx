@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { getLeaderboard, getUserProfile, triggerHaptic } from '../services/mockService';
 import { User } from '../types';
@@ -30,7 +29,7 @@ export const Leaderboard: React.FC = () => {
   };
 
   return (
-    <div className="p-6 pb-24">
+    <div className="p-6 pb-24 w-full">
       <div className="text-center mb-6">
         <h2 className="text-3xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-yellow-400 via-orange-500 to-red-500 inline-block">
           Ranking Semanal
@@ -77,7 +76,7 @@ export const Leaderboard: React.FC = () => {
                     : 'glass-card border-white/5'
                 }`}
             >
-                <div className={`w-8 h-8 flex items-center justify-center rounded-full font-bold text-sm mr-3 border ${
+                <div className={`w-8 h-8 flex items-center justify-center rounded-full font-bold text-sm mr-3 border shrink-0 ${
                 index === 0 ? 'bg-yellow-500 text-black border-yellow-300' : 
                 index === 1 ? 'bg-slate-300 text-black border-slate-100' : 
                 index === 2 ? 'bg-orange-700 text-white border-orange-500' : 
@@ -86,7 +85,7 @@ export const Leaderboard: React.FC = () => {
                 {index + 1}
                 </div>
                 
-                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-xl border border-white/10 mr-3 shadow-sm overflow-hidden">
+                <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-xl border border-white/10 mr-3 shadow-sm overflow-hidden shrink-0">
                     {user.avatar?.startsWith('http') ? (
                     <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
                     ) : (
@@ -94,16 +93,16 @@ export const Leaderboard: React.FC = () => {
                     )}
                 </div>
 
-                <div className="flex-1">
+                <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                    <h3 className={`font-bold text-lg ${index === 0 ? 'text-yellow-400' : 'text-white'}`}>
+                    <h3 className={`font-bold text-lg truncate ${index === 0 ? 'text-yellow-400' : 'text-white'}`}>
                     {user.name} 
-                    {user.id === localUserId && <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-full text-white/70 ml-2 uppercase tracking-wide">Eu</span>}
                     </h3>
+                    {user.id === localUserId && <span className="text-[10px] bg-white/10 px-2 py-0.5 rounded-full text-white/70 uppercase tracking-wide shrink-0">Eu</span>}
                 </div>
-                <p className="text-xs text-slate-500">{Math.floor(user.points / 10)} check-ins realizados</p>
+                <p className="text-xs text-slate-500 truncate">{Math.floor(user.points / 10)} check-ins realizados</p>
                 </div>
-                <div className="text-right">
+                <div className="text-right shrink-0">
                 <span className="block text-2xl font-mono font-black text-transparent bg-clip-text bg-gradient-to-br from-dirole-primary to-dirole-secondary">
                     {user.points}
                 </span>

@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { signUpWithEmail, signInWithEmail } from '../services/supabaseClient';
 import { saveUserProfileLocal, triggerHaptic } from '../services/mockService';
 import { User } from '../types';
@@ -17,7 +16,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false); 
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
-  const [biometricAvailable, setBiometricAvailable] = useState(false);
 
   // Form Fields
   const [email, setEmail] = useState('');
@@ -34,21 +32,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   // EULA
   const [acceptedTerms, setAcceptedTerms] = useState(false);
 
-  // Check if running in iframe (security restriction for Credential API)
-  const isIframe = window.self !== window.top;
-
-  useEffect(() => {
-    const checkBio = async () => {
-        // Verifica suporte à API de Credenciais (Padrão Web para Biometria)
-        if (window.PublicKeyCredential || (window as any).PasswordCredential) {
-            // Em alguns navegadores, precisamos verificar se há credenciais salvas antes
-            // mas para UX, vamos assumir que está disponível se a API existir
-            setBiometricAvailable(true);
-        }
-    };
-    checkBio();
-  }, []);
-
   const resetForm = () => {
       setErrorMsg(null);
       setPassword('');
@@ -58,60 +41,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
       setAcceptedTerms(false);
   };
 
-  const handleBiometricLogin = async () => {
-    setIsLoading(true);
-    setErrorMsg(null);
-    triggerHaptic();
-
-    // Uso da Web Credential API (Chrome/Android/iOS Web)
-    try {
-        // Tenta recuperar uma senha salva no cofre do navegador/sistema
-        const cred: any = await navigator.credentials.get({
-            password: true,
-            mediation: 'required' // Isso força o prompt nativo do sistema (FaceID/TouchID)
-        } as any);
-
-        if (cred && cred.type === 'password') {
-             // Preenche estado e faz login automaticamente
-             setEmail(cred.id);
-             setPassword(cred.password);
-             await signInWithEmail(cred.id, cred.password);
-             // O listener no App.tsx cuidará do redirecionamento ao detectar a sessão
-        } else {
-            setIsLoading(false);
-        }
-    } catch (e) {
-        console.warn("Web Biometric login failed or cancelled", e);
-        if (isIframe) {
-            setErrorMsg("Biometria bloqueada neste ambiente de teste. Use senha.");
-        } else {
-             setErrorMsg("Não foi possível usar a biometria. Tente com senha.");
-        }
-        setIsLoading(false);
-    }
-  };
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setErrorMsg(null);
     try {
       await signInWithEmail(email, password);
-
-      // Salva a credencial para uso futuro com Biometria
-      // APENAS se não estiver em iframe (evita erro "Error storing creds")
-      if ((window as any).PasswordCredential && !isIframe) {
-          try {
-              const cred = new (window as any).PasswordCredential({
-                  id: email,
-                  password: password,
-                  name: email,
-                  iconURL: window.location.origin + '/icon.png'
-              });
-              await navigator.credentials.store(cred);
-          } catch(e) { console.warn("Error storing creds (likely security restriction)", e); }
-      }
-
+      // Login bem-sucedido será detectado pelo listener no App.tsx
     } catch (error: any) {
       console.error(error);
       setErrorMsg("Email ou senha incorretos.");
@@ -315,19 +251,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                         >
                             {isLoading ? <i className="fas fa-circle-notch fa-spin"></i> : 'Entrar'}
                         </button>
-                        
-                        {/* Biometric Button */}
-                        {biometricAvailable && (
-                            <button
-                                type="button"
-                                onClick={handleBiometricLogin}
-                                disabled={isLoading}
-                                className="w-full bg-white/5 border border-white/10 text-slate-300 font-bold py-3 rounded-xl hover:bg-white/10 flex items-center justify-center gap-2 transition-colors active:scale-95"
-                            >
-                                <i className="fas fa-fingerprint text-dirole-primary text-lg"></i>
-                                Entrar com Biometria
-                            </button>
-                        )}
                         
                         <div className="pt-4 border-t border-white/10">
                              <button

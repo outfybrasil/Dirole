@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { MapView } from './components/MapView';
 import { ListView } from './components/ListView';
@@ -195,9 +194,6 @@ function App() {
   }, [currentUser]);
 
   const fetchData = async (lat: number, lng: number) => {
-    // FIX: Removed the early return check (if !isRefreshing && isLoading) return; 
-    // This was preventing data fetch during manual GPS updates where isLoading is explicitly true
-    
     if (!isRefreshing) setIsLoading(true);
     
     setSearchOrigin({ lat, lng });
@@ -604,7 +600,7 @@ function App() {
       {/* MAIN CONTENT AREA WITH PULL TO REFRESH */}
       <div 
         ref={scrollContainerRef}
-        className="flex-1 relative w-full h-full min-h-0 overflow-y-auto overflow-x-hidden"
+        className="flex-1 relative w-full h-full min-h-0 overflow-y-auto overflow-x-hidden scroll-smooth"
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
@@ -669,7 +665,7 @@ function App() {
         )}
         
         {activeTab === 'list' && (
-          <div className="w-full min-h-full">
+          <div className="w-full min-h-full max-w-7xl mx-auto">
             {showFilters && (
                 <div className="animate-fade-in sticky top-0 z-40">
                     <FilterBar 
@@ -691,14 +687,14 @@ function App() {
         )}
 
         {activeTab === 'rank' && (
-          <div className="w-full min-h-full">
+          <div className="w-full min-h-full max-w-3xl mx-auto">
              <Leaderboard />
           </div>
         )}
       </div>
 
       {/* FLOATING ACTION BUTTONS */}
-      <div className="absolute bottom-24 right-4 z-[50] flex flex-col gap-4 items-end pointer-events-none">
+      <div className="absolute bottom-[calc(6rem+env(safe-area-inset-bottom))] right-4 z-[50] flex flex-col gap-4 items-end pointer-events-none">
         <div className="pointer-events-auto flex flex-col gap-4 items-end">
         {activeTab === 'map' && (
           <button
@@ -748,9 +744,9 @@ function App() {
         </div>
       </div>
 
-      {/* BOTÃO DE RECARREGAR (AGORA COMPACTO NO CANTO ESQUERDO) */}
+      {/* SEARCH HERE BUTTON */}
        {activeTab === 'map' && shouldShowSearchHere && !isRefreshing && (
-          <div className="absolute bottom-24 left-4 z-[50] pointer-events-auto animate-slide-up">
+          <div className="absolute bottom-[calc(6rem+env(safe-area-inset-bottom))] left-4 z-[50] pointer-events-auto animate-slide-up">
              <button
                 onClick={handleSearchHere}
                 disabled={isLoading}
@@ -761,7 +757,7 @@ function App() {
           </div>
        )}
 
-      <div className="h-[80px] bg-black/40 backdrop-blur-xl border-t border-white/5 grid grid-cols-3 pb-5 z-[50] shrink-0 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+      <div className="bg-black/40 backdrop-blur-xl border-t border-white/5 grid grid-cols-3 pb-[calc(1.25rem+env(safe-area-inset-bottom))] pt-3 z-[50] shrink-0 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
         <button 
           onClick={() => switchTab('map')}
           className="group flex flex-col items-center justify-center space-y-1 relative"
