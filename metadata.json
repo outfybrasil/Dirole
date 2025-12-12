@@ -1,5 +1,8 @@
 {
-  "name": "Minhas finanças",
-  "description": "Aplicativo de gestão financeira pessoal inteligente focado em insights, controle de orçamento e facilidade de registro.",
-  "requestFramePermissions": []
+  "name": "Dirole",
+  "description": "O termômetro do rolê: Encontre bares e festas bombando agora.",
+  "requestFramePermissions": [
+    "geolocation",
+    "camera"
+  ]
 }

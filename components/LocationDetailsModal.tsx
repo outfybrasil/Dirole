@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Location, Review, LocationEvent, GalleryItem } from '../types';
 import { Thermometer } from './Thermometer';
@@ -398,15 +397,15 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
   );
 
   return (
-    <div className="fixed inset-0 z-[500] flex items-end justify-center pointer-events-none">
+    <div className="fixed inset-0 z-[500] flex items-end sm:items-center justify-center pointer-events-none p-0 sm:p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm pointer-events-auto transition-opacity" onClick={onClose}></div>
 
-      <div className="bg-dirole-bg w-full max-w-lg rounded-t-3xl border-t border-white/10 shadow-2xl pointer-events-auto animate-slide-up flex flex-col max-h-[92vh]">
+      <div className="bg-dirole-bg w-full max-w-lg rounded-t-3xl sm:rounded-3xl border border-white/10 shadow-2xl pointer-events-auto animate-slide-up flex flex-col max-h-[92vh] sm:max-h-[85vh] overflow-hidden">
         
         <div className="relative h-44 shrink-0">
-          <img src={location.imageUrl} alt={location.name} className="w-full h-full object-cover rounded-t-3xl opacity-50" />
+          <img src={location.imageUrl} alt={location.name} className="w-full h-full object-cover sm:rounded-t-3xl opacity-50" />
           <div className="absolute inset-0 bg-gradient-to-t from-dirole-bg via-dirole-bg/60 to-transparent"></div>
-          <div className="absolute top-2 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-white/20 rounded-full"></div>
+          <div className="absolute top-2 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-white/20 rounded-full sm:hidden"></div>
           <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 bg-black/30 rounded-full flex items-center justify-center text-white backdrop-blur-md hover:bg-black/50 transition-colors">
             <i className="fas fa-times"></i>
           </button>
