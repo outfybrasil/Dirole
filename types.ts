@@ -1,157 +1,55 @@
+export type TransactionType = 'income' | 'expense';
 
-
-export interface Badge {
+export interface Transaction {
   id: string;
-  icon: string;
-  name: string;
+  groupId?: string; // Identificador para agrupar parcelas/recorrências da mesma série
+  amount: number;
+  category: string;
+  date: string; // ISO string YYYY-MM-DD
   description: string;
-  unlockedAt?: Date;
+  type: TransactionType;
+  isRecurring?: boolean; // Para identificar despesas fixas visualmente
+  isPaid?: boolean; // Status de pagamento (Pago/Recebido ou Pendente)
 }
 
-export interface User {
+export interface Budget {
+  id: string;
+  category: string;
+  limit: number;
+  spent: number;
+  cumulative: boolean; // Carry over support
+}
+
+export interface Goal {
   id: string;
   name: string;
-  nickname?: string;
-  email?: string;
-  age?: number;
-  gender?: string;
-  avatar: string; 
-  points: number;
-  xp: number; 
-  level: number;
-  badges: Badge[];
-  favorites: string[];
+  targetAmount: number;
+  currentAmount: number;
+  deadline: string;
 }
 
-export interface Block {
-  id: string;
-  blocker_id: string;
-  blocked_id: string;
-  created_at: Date;
-}
-
-export enum FriendshipStatus {
-  NONE = 'none',
-  PENDING_SENT = 'pending_sent',
-  PENDING_RECEIVED = 'pending_received',
-  ACCEPTED = 'accepted'
-}
-
-export interface FriendUser extends User {
-  friendshipStatus: FriendshipStatus;
-  friendshipId?: string;
-  lastCheckIn?: string; 
-}
-
-export interface Invite {
-  id: string;
-  fromUserId: string;
-  toUserId: string;
-  locationId: string;
-  locationName: string;
-  message?: string;
-  status: 'pending' | 'accepted' | 'declined';
-  createdAt: Date;
-}
-
-export enum LocationType {
-  BAR = 'Bar',
-  BALADA = 'Balada',
-  PUB = 'Pub',
-  RESTAURANTE = 'Restaurante',
-  OUTRO = 'Outro'
-}
-
-export interface Review {
-  id?: string;
-  userId: string;
-  userName?: string;
-  userAvatar?: string;
-  locationId: string;
-  price: number; 
-  crowd: number; 
-  gender: number; 
-  vibe: number; 
-  comment?: string;
-  createdAt: Date;
-}
-
-export interface LocationEvent {
+export interface Insight {
   id: string;
   title: string;
   description: string;
-  date: Date;
-  category: 'Show' | 'DJ' | 'Promo' | 'Karaoke' | 'Esporte';
-  imageUrl?: string;
+  type: 'opportunity' | 'warning' | 'debt' | 'info';
+  actionPlan?: string[]; // Lista de passos práticos sugeridos pela IA
 }
 
-export interface GalleryItem {
-  id: string;
-  imageUrl: string;
-  userAvatar: string;
-  userName: string;
-  date: Date;
-}
-
-export interface Location {
+export interface ShoppingItem {
   id: string;
   name: string;
-  address: string;
-  type: LocationType;
-  latitude: number;
-  longitude: number;
-  imageUrl?: string;
-  
-  verified: boolean; 
-  votesForVerification: number;
-
-  isOfficial?: boolean; 
-  ownerId?: string;
-  officialDescription?: string;
-  instagram?: string;
-  whatsapp?: string;
-  
-  isOpen: boolean; // Novo campo
-  openingHours?: string; // Novo campo opcional
-
-  king?: {
-    userId: string;
-    userName: string;
-    userAvatar: string;
-    checkInCount: number;
-  };
-
-  stats: {
-    avgPrice: number;
-    avgCrowd: number;
-    avgGender: number; 
-    avgVibe: number;
-    lastUpdated: Date;
-    reviewCount: number;
-  };
-  reviews: Review[];
-  distance?: number;
+  estimatedPrice: number;
+  quantity: number;
+  checked: boolean;
 }
 
-export interface Filters {
-  minVibe: boolean;
-  lowCost: boolean;
-  types: LocationType[];
-  maxDistance: number;
-  onlyOpen: boolean; // Novo filtro
-}
-
-export interface ActivityFeedItem {
-  id: string;
-  text: string;
-  avatar: string;
-  type: 'review' | 'checkin' | 'join';
-}
-
-export interface Report {
-  targetId: string;
-  targetType: 'location' | 'review' | 'photo' | 'user';
-  reason: string;
-  details: string;
-  reporterId?: string;
+export enum View {
+  DASHBOARD = 'dashboard',
+  QUICK_ADD = 'quick_add',
+  BUDGETS = 'budgets',
+  REPORTS = 'reports',
+  INSIGHTS = 'insights',
+  SHOPPING_LIST = 'shopping_list',
+  CALENDAR = 'calendar'
 }
