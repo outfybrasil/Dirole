@@ -15,9 +15,9 @@ export interface User {
   email?: string;
   age?: number;
   gender?: string;
-  avatar: string; 
+  avatar: string;
   points: number;
-  xp: number; 
+  xp: number;
   level: number;
   badges: Badge[];
   favorites: string[];
@@ -40,7 +40,7 @@ export enum FriendshipStatus {
 export interface FriendUser extends User {
   friendshipStatus: FriendshipStatus;
   friendshipId?: string;
-  lastCheckIn?: string; 
+  lastCheckIn?: string;
 }
 
 export interface Invite {
@@ -68,10 +68,10 @@ export interface Review {
   userName?: string;
   userAvatar?: string;
   locationId: string;
-  price: number; 
-  crowd: number; 
-  gender: number; 
-  vibe: number; 
+  price: number;
+  crowd: number;
+  gender: number;
+  vibe: number;
   comment?: string;
   createdAt: Date;
 }
@@ -101,16 +101,16 @@ export interface Location {
   latitude: number;
   longitude: number;
   imageUrl?: string;
-  
-  verified: boolean; 
+
+  verified: boolean;
   votesForVerification: number;
 
-  isOfficial?: boolean; 
+  isOfficial?: boolean;
   ownerId?: string;
   officialDescription?: string;
   instagram?: string;
   whatsapp?: string;
-  
+
   isOpen: boolean; // Novo campo
   openingHours?: string; // Novo campo opcional
 
@@ -124,7 +124,7 @@ export interface Location {
   stats: {
     avgPrice: number;
     avgCrowd: number;
-    avgGender: number; 
+    avgGender: number;
     avgVibe: number;
     lastUpdated: Date;
     reviewCount: number;
@@ -154,4 +154,22 @@ export interface Report {
   reason: string;
   details: string;
   reporterId?: string;
+}
+
+export interface RouteStop {
+  locationId: string;
+  locationName: string;
+  order: number;
+}
+
+export interface Route {
+  id: string;
+  creatorId: string;
+  creatorName: string;
+  creatorAvatar: string;
+  name: string;
+  description: string;
+  stops: RouteStop[];
+  likes: number;
+  completions: number; // How many people finished it
 }

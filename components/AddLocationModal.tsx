@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { LocationType, User } from '../types';
-import { createLocation } from '../services/mockService';
+import { createLocation, triggerHaptic, geocodeAddress } from '../services/mockService';
 import { LOCATION_ICONS } from '../constants';
 import { Camera, CameraResultType } from '@capacitor/camera';
 
@@ -15,9 +15,9 @@ interface AddLocationModalProps {
   currentUser: User | null;
 }
 
-export const AddLocationModal: React.FC<AddLocationModalProps> = ({ 
-  isOpen, 
-  onClose, 
+export const AddLocationModal: React.FC<AddLocationModalProps> = ({
+  isOpen,
+  onClose,
   onSuccess,
   userLat,
   userLng,
@@ -27,7 +27,7 @@ export const AddLocationModal: React.FC<AddLocationModalProps> = ({
   const [address, setAddress] = useState('');
   const [type, setType] = useState<LocationType>(LocationType.BAR);
   const [imageUrl, setImageUrl] = useState('');
-  
+
   // Owner Fields
   const [isOwner, setIsOwner] = useState(false);
   const [cnpj, setCnpj] = useState('');
@@ -41,29 +41,29 @@ export const AddLocationModal: React.FC<AddLocationModalProps> = ({
 
   const takePicture = async () => {
     try {
-        let permissions = await Camera.checkPermissions();
+      let permissions = await Camera.checkPermissions();
 
-        if (permissions.camera === 'prompt') {
-            permissions = await Camera.requestPermissions();
-        }
+      if (permissions.camera === 'prompt') {
+        permissions = await Camera.requestPermissions();
+      }
 
-        if (permissions.camera !== 'granted') {
-            alert('A permissão da câmera é necessária para tirar fotos.');
-            return;
-        }
+      if (permissions.camera !== 'granted') {
+        alert('A permissão da câmera é necessária para tirar fotos.');
+        return;
+      }
 
-        const image = await Camera.getPhoto({
-            quality: 90,
-            allowEditing: true,
-            resultType: CameraResultType.Uri
-        });
+      const image = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: true,
+        resultType: CameraResultType.Uri
+      });
 
-        if (image.webPath) {
-            setImageUrl(image.webPath);
-        }
+      if (image.webPath) {
+        setImageUrl(image.webPath);
+      }
     } catch (e) {
-        console.warn("Camera failed:", e);
-        alert("Não foi possível acessar a câmera.");
+      console.warn("Camera failed:", e);
+      alert("Não foi possível acessar a câmera.");
     }
   };
 
@@ -72,12 +72,26 @@ export const AddLocationModal: React.FC<AddLocationModalProps> = ({
     setIsSubmitting(true);
 
     try {
+      let finalLat = userLat;
+      let finalLng = userLng;
+
+      // Try to geocode the address for better accuracy with search bias
+      if (address.length > 5) {
+        const coords = await geocodeAddress(address, { lat: userLat, lng: userLng });
+        if (coords) {
+          finalLat = coords.lat;
+          finalLng = coords.lng;
+        } else {
+          console.warn("[AddLocation] Geocoding failed, falling back to marker position");
+        }
+      }
+
       const locationData: any = {
         name,
         address,
         type,
-        latitude: userLat,
-        longitude: userLng,
+        latitude: finalLat,
+        longitude: finalLng,
         imageUrl: imageUrl || `https://images.unsplash.com/photo-1572116469696-31de0f17cc34?q=80&w=400&auto=format&fit=crop`
       };
 
@@ -91,7 +105,7 @@ export const AddLocationModal: React.FC<AddLocationModalProps> = ({
       }
 
       await createLocation(locationData);
-      
+
       onSuccess();
       onClose();
       // Reset form
@@ -113,204 +127,217 @@ export const AddLocationModal: React.FC<AddLocationModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md transition-opacity">
-      <div className="bg-dirole-bg/95 w-full sm:w-[450px] rounded-t-3xl sm:rounded-3xl border border-white/10 p-6 animate-slide-up shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh]">
-        
-        {/* Decorative Background Blob */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-dirole-primary/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+    <div className="fixed inset-0 z-[500] flex items-end sm:items-center justify-center pointer-events-none">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] pointer-events-auto transition-opacity" onClick={onClose}></div>
+      <div className="bg-[#0f0518] w-full max-w-lg rounded-t-[2.5rem] sm:rounded-[2rem] border-t border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.8)] pointer-events-auto animate-slide-up flex flex-col max-h-[90vh] sm:max-h-[80vh] overflow-hidden relative isolate">
 
-        <div className="flex justify-between items-center mb-6 relative z-10 shrink-0">
+        {/* Grabber Handle */}
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1 bg-white/20 rounded-full z-50"></div>
+
+        {/* HEADER */}
+        <div className="p-8 pt-10 pb-4 relative z-10 flex justify-between items-start">
           <div>
-            <h2 className="text-2xl font-bold text-white">Novo Rolê</h2>
-            <p className="text-xs text-slate-400">Adicione um local e comece a votar</p>
+            <h2 className="text-2xl font-black text-white leading-tight tracking-tight uppercase italic">Novo Rolê</h2>
+            <div className="flex items-center gap-2 mt-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-dirole-primary animate-pulse"></div>
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                ADICIONAR LOCAL À COMUNIDADE
+              </p>
+            </div>
           </div>
-          <button 
-            onClick={onClose} 
-            className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-slate-400 hover:text-white hover:bg-white/10 transition-colors"
-          >
+          <button onClick={onClose} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition-all active:scale-90">
             <i className="fas fa-times"></i>
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5 relative z-10 overflow-y-auto pr-1">
-          
-          <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Nome do Local</label>
-            <input
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white placeholder-slate-600 focus:outline-none focus:border-dirole-primary focus:ring-1 focus:ring-dirole-primary transition-all"
-              placeholder="Ex: Bar do Beto"
-            />
-          </div>
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-8 pb-10 space-y-8 relative z-10 custom-scrollbar">
 
-          <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Endereço</label>
-            <div className="relative">
-                <i className="fas fa-map-marker-alt absolute left-3 top-3.5 text-slate-500"></i>
-                <input
+          <div className="space-y-6">
+            <div className="animate-fade-in" style={{ animationDelay: '100ms' }}>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Nome do Local</label>
+              <input
                 type="text"
                 required
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                className="w-full bg-black/20 border border-white/10 rounded-xl p-3 pl-10 text-white placeholder-slate-600 focus:outline-none focus:border-dirole-primary focus:ring-1 focus:ring-dirole-primary transition-all"
-                placeholder="Rua Exemplo, 123"
-                />
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-sm text-white placeholder-slate-700 focus:outline-none focus:border-dirole-primary focus:bg-white/10 transition-all font-medium shadow-inner"
+                placeholder="Ex: BAR DO BETO"
+              />
             </div>
-          </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Tipo de Rolê</label>
-            <div className="grid grid-cols-2 gap-3">
-              {Object.values(LocationType).map(t => (
-                <button
+            <div className="animate-fade-in" style={{ animationDelay: '200ms' }}>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Localização</label>
+              <div className="relative group">
+                <i className="fas fa-map-marker-alt absolute left-5 top-5 text-slate-500 group-focus-within:text-dirole-primary transition-colors"></i>
+                <input
+                  type="text"
+                  required
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl p-5 pl-14 text-sm text-white placeholder-slate-700 focus:outline-none focus:border-dirole-primary focus:bg-white/10 transition-all font-medium shadow-inner"
+                  placeholder="RUA EXEMPLO, 123"
+                />
+              </div>
+            </div>
+
+            <div className="animate-fade-in" style={{ animationDelay: '300ms' }}>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Tipo de Rolê</label>
+              <div className="grid grid-cols-2 gap-3">
+                {Object.values(LocationType).map(t => (
+                  <button
                     key={t}
                     type="button"
-                    onClick={() => setType(t)}
-                    className={`p-3 rounded-xl border text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
-                        type === t 
-                        ? 'bg-dirole-primary/20 border-dirole-primary text-white shadow-[0_0_15px_rgba(139,92,246,0.3)]' 
-                        : 'bg-black/20 border-white/5 text-slate-400 hover:bg-white/5'
-                    }`}
-                >
-                    <i className={`fas ${LOCATION_ICONS[t]}`}></i>
+                    onClick={() => { triggerHaptic(); setType(t); }}
+                    className={`p-4 rounded-2xl border text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-3 ${type === t
+                      ? 'bg-white text-black border-transparent shadow-[0_10px_20px_rgba(255,255,255,0.1)] scale-[1.02]'
+                      : 'bg-white/5 border-white/5 text-slate-500 hover:bg-white/10'
+                      }`}
+                  >
+                    <i className={`fas ${LOCATION_ICONS[t]} ${type === t ? 'text-dirole-primary' : 'text-slate-600'}`}></i>
                     {t}
-                </button>
-              ))}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          <div>
-            <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Foto da Fachada</label>
-            <div className="flex gap-2">
+            <div className="animate-fade-in" style={{ animationDelay: '400ms' }}>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Identidade Visual</label>
+              <div className="flex gap-3">
                 <button
-                    type="button"
-                    onClick={takePicture}
-                    className="bg-slate-800 border border-white/10 rounded-xl p-3 text-white hover:bg-slate-700 active:scale-95 transition-all"
+                  type="button"
+                  onClick={takePicture}
+                  className="bg-white/5 border border-white/10 rounded-2xl w-16 h-16 flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition-all shadow-inner shrink-0"
                 >
-                    <i className="fas fa-camera text-lg"></i>
+                  <i className="fas fa-camera text-xl"></i>
                 </button>
                 <input
-                    type="url"
-                    value={imageUrl}
-                    onChange={(e) => setImageUrl(e.target.value)}
-                    className="flex-1 bg-black/20 border border-white/10 rounded-xl p-3 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-dirole-primary transition-all"
-                    placeholder="Cole a URL ou tire uma foto"
+                  type="url"
+                  value={imageUrl}
+                  onChange={(e) => setImageUrl(e.target.value)}
+                  className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-5 text-xs text-white placeholder-slate-700 focus:outline-none focus:border-dirole-primary focus:bg-white/10 transition-all font-medium shadow-inner"
+                  placeholder="COLE A URL DA FOTO..."
                 />
-            </div>
-            {imageUrl && (
-                <div className="mt-2 h-20 w-full rounded-lg overflow-hidden border border-white/10">
-                    <img src={imageUrl} className="w-full h-full object-cover" alt="Preview" />
+              </div>
+              {imageUrl && (
+                <div className="mt-4 h-32 w-full rounded-2xl overflow-hidden border border-white/10 animate-scale-in">
+                  <img src={imageUrl} className="w-full h-full object-cover" alt="Preview" />
                 </div>
-            )}
-          </div>
+              )}
+            </div>
 
-          {/* Owner Toggle */}
-          <div className="border-t border-white/10 pt-4">
-              <div className="flex items-center justify-between mb-4">
-                  <div>
-                      <span className="text-sm font-bold text-white block">Sou o Proprietário</span>
-                      <span className="text-[10px] text-slate-400">Quero gerenciar a página oficial</span>
+            {/* Owner Toggle */}
+            <div className="pt-4 animate-fade-in" style={{ animationDelay: '500ms' }}>
+              <div className="flex items-center justify-between p-5 bg-white/[0.02] border border-white/5 rounded-[1.5rem] mb-6 shadow-inner">
+                <div className="flex items-center gap-4">
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl transition-all ${isOwner ? 'bg-yellow-500/10 text-yellow-500' : 'bg-slate-500/10 text-slate-500'}`}>
+                    <i className="fas fa-crown"></i>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsOwner(!isOwner)}
-                    className={`w-12 h-7 rounded-full transition-colors relative ${isOwner ? 'bg-yellow-500' : 'bg-slate-700'}`}
-                  >
-                      <div className={`w-5 h-5 bg-white rounded-full shadow-md absolute top-1 transition-transform ${isOwner ? 'left-6' : 'left-1'}`}></div>
-                  </button>
+                  <div>
+                    <span className="text-sm font-black text-white block uppercase tracking-tight">Sou o Proprietário</span>
+                    <p className="text-[10px] font-bold text-slate-500 mt-0.5 uppercase tracking-tighter">Gerenciar página oficial</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { triggerHaptic(); setIsOwner(!isOwner); }}
+                  className={`w-14 h-8 rounded-full transition-all relative ${isOwner ? 'bg-yellow-500 shadow-[0_0_15px_rgba(234,179,8,0.4)]' : 'bg-white/10'}`}
+                >
+                  <div className={`w-6 h-6 bg-white rounded-full shadow-lg absolute top-1 transition-all ${isOwner ? 'left-7' : 'left-1'}`}></div>
+                </button>
               </div>
 
               {isOwner && (
-                  <div className="space-y-4 animate-fade-in bg-yellow-500/5 p-4 rounded-xl border border-yellow-500/10">
-                      
-                      <div className="p-2 bg-yellow-900/20 border border-yellow-500/20 rounded-lg flex gap-2">
-                         <i className="fas fa-info-circle text-yellow-500 mt-0.5"></i>
-                         <p className="text-[10px] text-yellow-200">
-                             Simulação: Ao criar como proprietário, o local receberá o selo de <strong>Verificado</strong> e <strong>Oficial</strong> automaticamente.
-                         </p>
-                      </div>
+                <div className="space-y-6 animate-fade-in-up bg-yellow-500/[0.03] p-6 rounded-[2rem] border border-yellow-500/10 shadow-2xl mb-8">
 
-                      <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">CNPJ</label>
-                        <input
-                            type="text"
-                            required={isOwner}
-                            value={cnpj}
-                            onChange={(e) => setCnpj(e.target.value)}
-                            placeholder="00.000.000/0001-00"
-                            className="w-full bg-black/30 border border-white/10 rounded-xl p-2.5 text-sm text-white focus:border-yellow-500 focus:outline-none"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">WhatsApp</label>
-                        <input
-                            type="tel"
-                            required={isOwner}
-                            value={whatsapp}
-                            onChange={(e) => setWhatsapp(e.target.value)}
-                            placeholder="(41) 99999-9999"
-                            className="w-full bg-black/30 border border-white/10 rounded-xl p-2.5 text-sm text-white focus:border-yellow-500 focus:outline-none"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Instagram (Opcional)</label>
-                        <input
-                            type="text"
-                            value={instagram}
-                            onChange={(e) => setInstagram(e.target.value)}
-                            placeholder="usuario_sem_arroba"
-                            className="w-full bg-black/30 border border-white/10 rounded-xl p-2.5 text-sm text-white focus:border-yellow-500 focus:outline-none"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-400 uppercase mb-1">Bio Oficial</label>
-                        <textarea
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            rows={3}
-                            placeholder="Descrição oficial do local..."
-                            className="w-full bg-black/30 border border-white/10 rounded-xl p-2.5 text-sm text-white focus:border-yellow-500 focus:outline-none resize-none"
-                        />
-                      </div>
-
-                  </div>
-              )}
-          </div>
-          
-          {!isOwner && (
-            <div className="flex items-start gap-3 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
-                <i className="fas fa-shield-alt mt-1 text-yellow-500"></i>
-                <div>
-                    <p className="text-xs text-yellow-500/90 font-bold mb-1">Moderação da Comunidade</p>
-                    <p className="text-[10px] text-slate-400 leading-relaxed">
-                        Este local aparecerá no mapa como <strong>"Não Verificado"</strong> até que outros usuários confirmem que ele existe.
+                  <div className="p-4 bg-yellow-500/5 border border-yellow-500/20 rounded-2xl flex gap-3">
+                    <i className="fas fa-info-circle text-yellow-500 mt-1"></i>
+                    <p className="text-[10px] text-yellow-200/70 font-bold uppercase tracking-wide leading-relaxed">
+                      O local receberá o selo de <strong className="text-yellow-500">Verificado</strong> e <strong className="text-yellow-500">Oficial</strong> automaticamente após verificação.
                     </p>
-                </div>
-            </div>
-          )}
+                  </div>
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className={`w-full mt-2 text-white font-bold py-4 rounded-xl shadow-lg active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
-                isOwner 
-                ? 'bg-gradient-to-r from-yellow-600 to-yellow-500 shadow-yellow-500/30' 
-                : 'bg-gradient-to-r from-dirole-primary to-dirole-secondary shadow-purple-500/30 hover:shadow-purple-500/50'
-            }`}
-          >
-            {isSubmitting ? (
-                <span className="flex items-center justify-center gap-2">
-                    <i className="fas fa-circle-notch fa-spin"></i> Criando...
-                </span>
-            ) : (isOwner ? 'Criar Local Oficial' : 'Criar Local')}
-          </button>
+                  <div>
+                    <label className="block text-[10px] font-black text-yellow-500/50 uppercase tracking-[0.2em] mb-3 ml-1">CNPJ</label>
+                    <input
+                      type="text"
+                      required={isOwner}
+                      value={cnpj}
+                      onChange={(e) => setCnpj(e.target.value)}
+                      placeholder="00.000.000/0001-00"
+                      className="w-full bg-yellow-500/5 border border-yellow-500/10 rounded-2xl p-4 text-sm text-white placeholder-yellow-900 focus:border-yellow-500 focus:outline-none transition-all font-medium shadow-inner"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black text-yellow-500/50 uppercase tracking-[0.2em] mb-3 ml-1">WhatsApp de Contato</label>
+                    <input
+                      type="tel"
+                      required={isOwner}
+                      value={whatsapp}
+                      onChange={(e) => setWhatsapp(e.target.value)}
+                      placeholder="(41) 99999-9999"
+                      className="w-full bg-yellow-500/5 border border-yellow-500/10 rounded-2xl p-4 text-sm text-white placeholder-yellow-900 focus:border-yellow-500 focus:outline-none transition-all font-medium shadow-inner"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-black text-yellow-500/50 uppercase tracking-[0.2em] mb-3 ml-1">Bio Oficial</label>
+                    <textarea
+                      value={description}
+                      onChange={(e) => setDescription(e.target.value)}
+                      rows={3}
+                      placeholder="FALE SOBRE SEU LOCAL, MÚSICA, CARDÁPIO..."
+                      className="w-full bg-yellow-500/5 border border-yellow-500/10 rounded-2xl p-4 text-sm text-white placeholder-yellow-900 focus:border-yellow-500 focus:outline-none resize-none transition-all font-medium shadow-inner"
+                    />
+                  </div>
+
+                </div>
+              )}
+            </div>
+
+            {!isOwner && (
+              <div className="flex items-start gap-4 p-5 bg-white/[0.02] border border-white/5 rounded-[1.5rem] animate-fade-in" style={{ animationDelay: '600ms' }}>
+                <div className="w-10 h-10 rounded-xl bg-slate-500/10 flex items-center justify-center text-slate-500 shrink-0">
+                  <i className="fas fa-shield-alt"></i>
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-white uppercase tracking-widest mb-1">Moderação Comunitária</p>
+                  <p className="text-[10px] text-slate-600 font-bold uppercase tracking-tight leading-relaxed">
+                    O local passará por aprovação da elite antes de ser listado como verificado.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="pt-4 animate-fade-in" style={{ animationDelay: '700ms' }}>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className={`w-full font-black py-5 rounded-[1.5rem] shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3 text-xs uppercase tracking-[0.2em] ${isOwner
+                  ? 'bg-yellow-500 text-black hover:bg-yellow-400'
+                  : 'bg-white text-black hover:bg-slate-200'
+                  }`}
+              >
+                {isSubmitting ? (
+                  <><div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin"></div> CRIANDO...</>
+                ) : (isOwner ? 'Publicar Página Oficial' : 'Confirmar Novo Local')}
+              </button>
+            </div>
+          </div>
         </form>
+
+        <style>{`
+          .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+          }
+          .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+          }
+          .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(139, 92, 246, 0.3);
+            border-radius: 10px;
+          }
+        `}</style>
       </div>
     </div>
   );

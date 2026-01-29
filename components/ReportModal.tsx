@@ -39,15 +39,15 @@ export const ReportModal: React.FC<ReportModalProps> = ({
     setIsSubmitting(true);
 
     const report: Report = {
-        targetId,
-        targetType,
-        reason,
-        details,
-        reporterId: currentUser?.id
+      targetId,
+      targetType,
+      reason,
+      details,
+      reporterId: currentUser?.id
     };
 
     await submitReport(report);
-    
+
     // Abre o cliente de email
     const subject = `Denúncia Dirole: ${targetType} - ${reason}`;
     const body = `Olá, gostaria de denunciar o seguinte item no app Dirole:
@@ -61,7 +61,7 @@ Detalhes Adicionais: ${details}
 Enviado por: ${currentUser?.name || 'Anônimo'} (${currentUser?.id || 'N/A'})`;
 
     const mailtoLink = `mailto:outfybrasil@gmail.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    
+
     window.location.href = mailtoLink;
 
     triggerHaptic([50, 50]);
@@ -71,71 +71,103 @@ Enviado por: ${currentUser?.name || 'Anônimo'} (${currentUser?.id || 'N/A'})`;
   };
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-      <div className="bg-dirole-bg w-full max-w-sm rounded-2xl border border-red-500/30 p-6 animate-slide-up shadow-2xl relative">
-        
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center border border-red-500/50">
-                <i className="fas fa-exclamation-triangle text-red-500 text-sm"></i>
+    <div className="fixed inset-0 z-[500] flex items-end sm:items-center justify-center pointer-events-none">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] pointer-events-auto transition-opacity" onClick={onClose}></div>
+      <div className="bg-[#0f0518] w-full max-w-lg rounded-t-[2.5rem] sm:rounded-[2rem] border-t border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.8)] pointer-events-auto animate-slide-up flex flex-col max-h-[90vh] sm:max-h-[80vh] overflow-hidden relative isolate">
+
+        {/* Grabber Handle */}
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1 bg-white/20 rounded-full z-50"></div>
+
+        {/* HEADER */}
+        <div className="p-8 pt-10 pb-4 relative z-10 flex justify-between items-start">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center border border-red-500/20 text-red-500 text-xl shadow-[0_0_20px_rgba(239,68,68,0.1)]">
+              <i className="fas fa-exclamation-triangle"></i>
+            </div>
+            <div>
+              <h2 className="text-2xl font-black text-white leading-tight tracking-tight uppercase italic">Denunciar</h2>
+              <div className="flex items-center gap-2 mt-0.5">
+                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                  ALERTA DE IRREGULARIDADE
+                </p>
               </div>
-              <h2 className="text-lg font-bold text-white">Denunciar</h2>
+            </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">
-            <i className="fas fa-times text-lg"></i>
+          <button onClick={onClose} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition-all active:scale-90">
+            <i className="fas fa-times"></i>
           </button>
         </div>
 
-        <div className="bg-slate-800/50 p-3 rounded-lg mb-4 text-xs text-slate-300 border border-white/5">
-            Denunciando: <span className="font-bold text-white">{targetName || targetType}</span>
-        </div>
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-8 pb-10 space-y-8 relative z-10 custom-scrollbar">
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-            
-            <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Motivo</label>
-                <div className="space-y-2">
-                    {REASONS.map(r => (
-                        <button
-                            key={r}
-                            type="button"
-                            onClick={() => setReason(r)}
-                            className={`w-full text-left p-3 rounded-xl text-xs font-medium transition-colors border ${
-                                reason === r 
-                                ? 'bg-red-500/20 border-red-500 text-white' 
-                                : 'bg-slate-800 border-white/5 text-slate-400 hover:bg-slate-700'
-                            }`}
-                        >
-                            {r}
-                        </button>
-                    ))}
-                </div>
+          <div className="p-5 rounded-[1.5rem] bg-white/[0.03] border border-white/5 animate-fade-in" style={{ animationDelay: '100ms' }}>
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Denunciando:</p>
+            <h3 className="text-sm font-black text-white uppercase tracking-tight">{targetName || targetType}</h3>
+          </div>
+
+          <div className="space-y-6">
+            <div className="animate-fade-in" style={{ animationDelay: '200ms' }}>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 ml-1">Selecione o Motivo</label>
+              <div className="grid grid-cols-1 gap-2">
+                {REASONS.map((r, idx) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => { triggerHaptic(); setReason(r); }}
+                    className={`w-full text-left p-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all border animate-fade-in-up ${reason === r
+                        ? 'bg-red-500/10 border-red-500/50 text-white ring-1 ring-red-500/30'
+                        : 'bg-white/5 border-white/5 text-slate-500 hover:bg-white/10 hover:border-white/10'
+                      }`}
+                    style={{ animationDelay: `${200 + (idx * 50)}ms` }}
+                  >
+                    {reason === r && <i className="fas fa-check-circle mr-3 text-red-500"></i>}
+                    {r}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div>
-                <label className="block text-xs font-bold text-slate-400 uppercase mb-2">Detalhes (Opcional)</label>
+            <div className="animate-fade-in" style={{ animationDelay: '500ms' }}>
+              <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4 ml-1">Detalhes (Opcional)</label>
+              <div className="bg-white/5 rounded-2xl border border-white/10 focus-within:border-red-500/50 focus-within:bg-white/10 transition-all shadow-inner overflow-hidden">
                 <textarea
-                    value={details}
-                    onChange={e => setDetails(e.target.value)}
-                    placeholder="Descreva o problema..."
-                    className="w-full bg-black/30 border border-white/10 rounded-xl p-3 text-white text-xs focus:border-red-500 focus:outline-none resize-none h-20"
+                  value={details}
+                  onChange={e => setDetails(e.target.value)}
+                  placeholder="DESCREVA O PROBLEMA ENCONTRADO..."
+                  className="w-full bg-transparent border-none p-5 text-sm text-white placeholder-slate-700 focus:outline-none focus:ring-0 resize-none h-32 font-medium"
                 ></textarea>
+              </div>
             </div>
+          </div>
 
+          <div className="pt-4 space-y-4 animate-fade-in" style={{ animationDelay: '600ms' }}>
             <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full bg-red-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-red-900/40 active:scale-95 transition-transform"
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full bg-red-600 text-white font-black py-5 rounded-[1.5rem] shadow-[0_10px_30px_rgba(220,38,38,0.2)] active:scale-95 transition-all text-xs uppercase tracking-[0.2em] hover:bg-red-500"
             >
-                {isSubmitting ? 'Processando...' : 'Enviar Denúncia'}
+              {isSubmitting ? 'PROCESSANDO...' : 'ENVIAR PARA MODERAÇÃO'}
             </button>
-            
-            <p className="text-[10px] text-slate-500 text-center">
-                Isso abrirá seu e-mail para envio oficial.
+
+            <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest text-center leading-relaxed px-10">
+              Uma formalização será aberta no seu e-mail para confirmação oficial da denúncia.
             </p>
+          </div>
 
         </form>
 
+        <style>{`
+          .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+          }
+          .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+          }
+          .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(239, 68, 68, 0.3);
+            border-radius: 10px;
+          }
+        `}</style>
       </div>
     </div>
   );

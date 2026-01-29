@@ -10,107 +10,122 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({ isOpen, 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-fade-in">
-      <div className="bg-dirole-bg w-full max-w-2xl rounded-3xl border border-white/10 p-8 shadow-2xl relative flex flex-col max-h-[90vh]">
-        <button 
-          onClick={onClose}
-          className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition-colors"
-        >
-          <i className="fas fa-times text-xl"></i>
-        </button>
+    <div className="fixed inset-0 z-[500] flex items-end sm:items-center justify-center pointer-events-none">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] pointer-events-auto transition-opacity" onClick={onClose}></div>
+      <div className="bg-[#0f0518] w-full max-w-2xl rounded-t-[2.5rem] sm:rounded-[2rem] border-t border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.8)] pointer-events-auto animate-slide-up flex flex-col max-h-[90vh] sm:max-h-[85vh] overflow-hidden relative isolate">
 
-        <h2 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
-          <i className="fas fa-shield-alt text-dirole-primary"></i>
-          Política de Privacidade
-        </h2>
-        <p className="text-xs text-slate-500 mb-6 font-mono">Última atualização: 25 de Novembro de 2025</p>
+        {/* Grabber Handle */}
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1 bg-white/20 rounded-full z-50"></div>
 
-        <div className="flex-1 overflow-y-auto pr-4 text-slate-300 space-y-6 text-sm leading-relaxed custom-scrollbar">
-          <section>
-            <p>
-              Bem-vindo ao <strong>Dirole</strong>. Nós respeitamos sua privacidade e estamos comprometidos em proteger seus dados pessoais. Esta política descreve como coletamos, usamos e compartilhamos suas informações.
+        {/* HEADER */}
+        <div className="p-8 pt-10 pb-6 relative z-10 flex justify-between items-start bg-white/[0.02]">
+          <div>
+            <h2 className="text-2xl font-black text-white leading-tight tracking-tight uppercase italic flex items-center gap-3">
+              <i className="fas fa-shield-alt text-dirole-primary"></i>
+              Privacidade
+            </h2>
+            <div className="flex items-center gap-2 mt-1">
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                ÚLTIMA ATUALIZAÇÃO: 25 DE NOVEMBRO DE 2025
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition-all active:scale-90">
+            <i className="fas fa-times"></i>
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-8 py-8 space-y-10 relative z-10 custom-scrollbar scroll-smooth">
+          <section className="animate-fade-in" style={{ animationDelay: '100ms' }}>
+            <p className="text-sm text-slate-400 font-medium leading-relaxed uppercase tracking-tight">
+              BEM-VINDO AO <strong className="text-white">DIROLE</strong>. NÓS RESPEITAMOS SUA PRIVACIDADE E ESTAMOS COMPROMETIDOS EM PROTEGER SEUS DADOS PESSOAIS. ESTA POLÍTICA DESCREVE COMO COLETAMOS, USAMOS E COMPARTILHAMOS SUAS INFORMAÇÕES.
             </p>
           </section>
 
-          <section>
-            <h3 className="text-white font-bold text-lg mb-2 text-dirole-secondary">1. Informações que Coletamos</h3>
-            <ul className="list-disc pl-5 space-y-2">
-              <li>
-                <strong>Geolocalização (GPS):</strong> Coletamos sua localização precisa (latitude/longitude) apenas quando o aplicativo está em uso (primeiro plano) para exibir locais próximos, calcular distâncias e permitir check-ins. Não rastreamos histórico em segundo plano.
-              </li>
-              <li>
-                <strong>Câmera e Fotos:</strong> Solicitamos acesso à câmera para funcionalidades específicas, como escanear QR Codes (Dirole ID) ou enviar fotos para a galeria dos locais.
-              </li>
-              <li>
-                <strong>Dados de Cadastro:</strong> Coletamos nome, e-mail, idade, gênero e foto de perfil para criar sua identidade única na comunidade.
-              </li>
-              <li>
-                <strong>Conteúdo Gerado (UGC):</strong> Avaliações, comentários e denúncias que você envia são armazenados em nossos servidores e exibidos publicamente (exceto denúncias).
-              </li>
-            </ul>
+          <section className="space-y-4 animate-fade-in" style={{ animationDelay: '200ms' }}>
+            <h3 className="text-[10px] font-black text-dirole-primary uppercase tracking-[0.3em]">1. Informações que Coletamos</h3>
+            <div className="space-y-3">
+              {[
+                { label: 'Geolocalização (GPS)', text: 'Coletamos sua localização precisa apenas quando o aplicativo está em uso para exibir locais próximos e permitir check-ins.' },
+                { label: 'Câmera e Fotos', text: 'Acesso necessário para escanear QR Codes (Dirole ID) ou enviar fotos para a galeria dos locais.' },
+                { label: 'Dados de Cadastro', text: 'Nome, e-mail, idade e foto de perfil para criar sua identidade única na comunidade.' },
+                { label: 'Conteúdo Gerado', text: 'Avaliações, comentários e denúncias enviadas são armazenados para funcionamento da rede.' }
+              ].map((item, idx) => (
+                <div key={idx} className="p-4 rounded-2xl bg-white/[0.02] border border-white/5 shadow-inner group hover:bg-white/[0.04] transition-all">
+                  <p className="text-[10px] font-black text-white uppercase tracking-wider mb-2">{item.label}</p>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight leading-relaxed">{item.text}</p>
+                </div>
+              ))}
+            </div>
           </section>
 
-          <section>
-            <h3 className="text-white font-bold text-lg mb-2 text-dirole-secondary">2. Como Usamos Suas Informações</h3>
-            <p>Utilizamos seus dados para:</p>
-            <ul className="list-disc pl-5 space-y-1 mt-2">
-              <li>Fornecer o serviço de "Termômetro Social" (lotação e vibe em tempo real).</li>
-              <li>Facilitar interações sociais (amizades, convites e ranking).</li>
-              <li>Garantir a segurança, combater spam e moderar conteúdo ofensivo.</li>
-              <li>Enviar notificações importantes sobre sua conta ou segurança.</li>
-            </ul>
-          </section>
-
-          <section>
-            <h3 className="text-white font-bold text-lg mb-2 text-dirole-secondary">3. Compartilhamento e Visibilidade</h3>
-            <ul className="list-disc pl-5 space-y-2">
-              <li><strong>Perfil Público:</strong> Seu nome, foto, nível e comentários são visíveis para outros usuários do aplicativo.</li>
-              <li><strong>Não Vendemos Dados:</strong> Não vendemos suas informações pessoais para terceiros.</li>
-              <li><strong>Serviços Terceiros:</strong> Utilizamos serviços confiáveis (como Google Maps para mapas e Supabase para banco de dados) que processam dados estritamente para a operação do app.</li>
-            </ul>
-          </section>
-
-          <section>
-            <h3 className="text-white font-bold text-lg mb-2 text-dirole-secondary">4. Exclusão de Dados (Seus Direitos)</h3>
-            <p className="mb-2">
-              Você tem total controle sobre seus dados. De acordo com as diretrizes da LGPD e Google Play Store:
-            </p>
-            <div className="bg-red-900/20 border border-red-500/30 p-3 rounded-lg">
-              <p className="text-white font-bold text-xs uppercase mb-1">Como Excluir sua Conta:</p>
-              <p>
-                Você pode excluir sua conta e todos os dados associados permanentemente a qualquer momento dentro do aplicativo. 
-                Vá em <strong>Perfil &gt; Excluir Minha Conta</strong>. Esta ação é imediata e irreversível.
+          <section className="space-y-4 animate-fade-in" style={{ animationDelay: '300ms' }}>
+            <h3 className="text-[10px] font-black text-dirole-primary uppercase tracking-[0.3em]">2. Uso das Informações</h3>
+            <div className="p-6 rounded-[1.5rem] bg-indigo-500/[0.03] border border-indigo-500/10 space-y-3">
+              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-tight leading-relaxed">
+                UTILIZAMOS SEUS DADOS PARA FORNECER O SERVIÇO DE "TERMÔMETRO SOCIAL", FACILITAR INTERAÇÕES (AMIZADES, CONVITES) E GARANTIR A SEGURANÇA DA COMUNIDADE.
               </p>
             </div>
           </section>
 
-          <section>
-            <h3 className="text-white font-bold text-lg mb-2 text-dirole-secondary">5. Conteúdo Impróprio e Bloqueio</h3>
-            <p>O Dirole mantém tolerância zero contra assédio ou conteúdo ofensivo.</p>
-            <ul className="list-disc pl-5 space-y-1 mt-2">
-              <li><strong>Denúncia:</strong> Utilize o botão de bandeira 🏳️ para reportar conteúdo inadequado.</li>
-              <li><strong>Bloqueio:</strong> Você pode bloquear usuários para deixar de ver o conteúdo deles imediatamente.</li>
-            </ul>
+          <section className="space-y-4 animate-fade-in" style={{ animationDelay: '400ms' }}>
+            <h3 className="text-[10px] font-black text-dirole-primary uppercase tracking-[0.3em]">3. Seus Direitos (LGPD - LEI 13.709/18)</h3>
+            <div className="grid grid-cols-1 gap-3">
+              {[
+                { label: 'Acesso e Correção', text: 'Você pode solicitar uma cópia dos seus dados ou corrigir informações incompletas.' },
+                { label: 'Eliminação e Bloqueio', text: 'Direito de excluir seus dados ou suspender o tratamento em casos específicos.' },
+                { label: 'Portabilidade', text: 'Solicitar a transferência dos dados para outro fornecedor de serviço.' },
+                { label: 'Revogação de Consentimento', text: 'Você pode retirar sua autorização de uso de dados a qualquer momento.' }
+              ].map((item, idx) => (
+                <div key={idx} className="p-4 rounded-2xl bg-indigo-500/[0.03] border border-indigo-500/10">
+                  <p className="text-[10px] font-black text-white uppercase tracking-wider mb-1">{item.label}</p>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight leading-relaxed">{item.text}</p>
+                </div>
+              ))}
+            </div>
+            <div className="p-6 rounded-[1.5rem] bg-red-500/5 border border-red-500/10 space-y-4 mt-4">
+              <div className="flex items-center gap-3 text-red-500">
+                <i className="fas fa-trash-alt"></i>
+                <p className="text-[10px] font-black uppercase tracking-widest">Exclusão Permanente</p>
+              </div>
+              <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight leading-relaxed">
+                A EXCLUSÃO DA CONTA EM <span className="text-white">PERFIL &gt; DADOS & PRIVACIDADE</span> ELIMINA DEFINITIVAMENTE SEUS DADOS DOS NOSSOS SERVIDORES EM ATÉ 30 DIAS (PRAZO LGPD).
+              </p>
+            </div>
           </section>
 
-          <section>
-            <h3 className="text-white font-bold text-lg mb-2 text-dirole-secondary">6. Contato</h3>
-            <p>
-              Para dúvidas sobre privacidade, solicitações de dados ou suporte, entre em contato conosco:
-              <br />
-              <a href="mailto:outfybrasil@gmail.com" className="text-dirole-primary hover:underline font-bold mt-1 inline-block">outfybrasil@gmail.com</a>
-            </p>
+          <section className="space-y-4 animate-fade-in" style={{ animationDelay: '500ms' }}>
+            <h3 className="text-[10px] font-black text-dirole-primary uppercase tracking-[0.3em]">4. Contato</h3>
+            <div className="p-6 rounded-[1.5rem] bg-white/[0.02] border border-white/5 flex flex-col items-center justify-center text-center">
+              <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest mb-4">DÚVIDAS OU SUPORTE?</p>
+              <a href="mailto:outfybrasil@gmail.com" className="px-6 py-3 rounded-xl bg-white/5 text-dirole-primary font-black text-xs uppercase tracking-widest hover:bg-white/10 transition-all border border-white/5">
+                outfybrasil@gmail.com
+              </a>
+            </div>
           </section>
         </div>
 
-        <div className="mt-6 pt-6 border-t border-white/10 flex justify-end">
-          <button 
+        <div className="p-8 pb-10 border-t border-white/5 bg-white/[0.02] relative z-20">
+          <button
             onClick={onClose}
-            className="px-8 py-3 bg-gradient-to-r from-dirole-primary to-dirole-secondary text-white font-bold rounded-xl hover:opacity-90 transition-opacity shadow-lg"
+            className="w-full bg-white text-black font-black py-5 rounded-[1.5rem] shadow-2xl active:scale-95 transition-all text-xs uppercase tracking-[0.2em] hover:bg-slate-200"
           >
-            Li e Concordo
+            LI E CONCORDO
           </button>
         </div>
+
+        <style>{`
+          .custom-scrollbar::-webkit-scrollbar {
+            width: 4px;
+          }
+          .custom-scrollbar::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+          }
+          .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: rgba(139, 92, 246, 0.3);
+            border-radius: 10px;
+          }
+        `}</style>
       </div>
     </div>
   );

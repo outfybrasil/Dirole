@@ -1,9 +1,10 @@
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import './index.css'; // Tailwind Imports
 import App from './App';
 
 // Service Worker Registration
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     // Prevent registration in iframes/previews where it fails with security errors (Origin mismatch)
@@ -12,17 +13,17 @@ if ('serviceWorker' in navigator) {
 
     // Only try to register if likely supported to avoid console red ink
     if (!isIframe || isLocalhost) {
-        navigator.serviceWorker.register('/sw.js')
+      navigator.serviceWorker.register('/sw.js')
         .then((registration) => {
-            console.log('SW registered: ', registration);
+          console.log('SW registered: ', registration);
         })
         .catch((registrationError) => {
-            // Suppress specific origin error common in previews
-            if (registrationError.message?.includes('origin')) {
-                console.log('SW registration skipped (Origin mismatch)');
-            } else {
-                console.warn('SW registration failed: ', registrationError);
-            }
+          // Suppress specific origin error common in previews
+          if (registrationError.message?.includes('origin')) {
+            console.log('SW registration skipped (Origin mismatch)');
+          } else {
+            console.warn('SW registration failed: ', registrationError);
+          }
         });
     }
   });

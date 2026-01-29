@@ -16,8 +16,10 @@ interface ReviewModalProps {
 export const ReviewModal: React.FC<ReviewModalProps> = ({ location, currentUser, isOpen, onClose, onSuccess, onLogout }) => {
   // Simplified State - Defaults to "Average" (2)
   const [crowd, setCrowd] = useState(2);
+  const [price, setPrice] = useState(2);
   const [vibe, setVibe] = useState(2);
   const [comment, setComment] = useState('');
+  const [isOpenStatus, setIsOpenStatus] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isGuest = currentUser?.id.startsWith('guest_');
@@ -26,14 +28,14 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({ location, currentUser,
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // BLOCK GUEST ACTION
     if (isGuest) {
-        if (confirm("Este recurso é exclusivo para membros. Deseja criar uma conta gratuita agora?")) {
-            onClose();
-            if (onLogout) onLogout();
-        }
-        return;
+      if (confirm("Este recurso é exclusivo para membros. Deseja criar uma conta gratuita agora?")) {
+        onClose();
+        if (onLogout) onLogout();
+      }
+      return;
     }
 
     setIsSubmitting(true);
@@ -44,10 +46,9 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({ location, currentUser,
       userAvatar: currentUser?.avatar || '👻',
       locationId: location.id,
       // SIMPLIFIED DATA MODEL:
-      // We send 0 for price/gender to satisfy DB constraints without bothering the user
-      price: 0, 
+      price,
       crowd,
-      gender: 0, 
+      gender: 0,
       vibe,
       comment,
       createdAt: new Date()
@@ -69,143 +70,217 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({ location, currentUser,
     }
   };
 
-  const OptionButton = ({ 
-      selected, 
-      onClick, 
-      icon, 
-      label, 
-      colorClass 
-  }: { 
-      selected: boolean, 
-      onClick: () => void, 
-      icon: string, 
-      label: string, 
-      colorClass: string 
+  const OptionButton = ({
+    selected,
+    onClick,
+    icon,
+    label,
+    colorClass
+  }: {
+    selected: boolean,
+    onClick: () => void,
+    icon: string,
+    label: string,
+    colorClass: string
   }) => (
-      <button
-          type="button"
-          onClick={() => { triggerHaptic(); onClick(); }}
-          className={`flex-1 py-3 rounded-xl border transition-all flex flex-col items-center justify-center gap-1 active:scale-95 ${
-              selected 
-              ? `${colorClass} text-white shadow-lg border-transparent transform scale-105` 
-              : 'bg-slate-800 border-white/5 text-slate-400 hover:bg-slate-700'
-          }`}
-      >
-          <span className="text-xl">{icon}</span>
-          <span className="text-[10px] font-bold uppercase tracking-wider">{label}</span>
-      </button>
+    <button
+      type="button"
+      onClick={() => { triggerHaptic(); onClick(); }}
+      className={`flex-1 py-3 rounded-xl border transition-all flex flex-col items-center justify-center gap-1 active:scale-95 ${selected
+        ? `${colorClass} text-white shadow-lg border-transparent transform scale-105`
+        : 'bg-slate-800 border-white/5 text-slate-400 hover:bg-slate-700'
+        }`}
+    >
+      <span className="text-xl">{icon}</span>
+      <span className="text-[10px] font-bold uppercase tracking-wider">{label}</span>
+    </button>
   );
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm">
-      <div className="bg-dirole-bg w-full sm:w-[400px] rounded-t-3xl sm:rounded-3xl border border-white/10 p-6 animate-slide-up shadow-2xl relative overflow-hidden">
-        
-        {/* Decorative BG */}
-        <div className="absolute top-0 right-0 w-40 h-40 bg-dirole-primary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+    <div className="fixed inset-0 z-[500] flex items-end sm:items-center justify-center pointer-events-none">
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] pointer-events-auto transition-opacity" onClick={onClose}></div>
+      <div className="bg-[#0f0518] w-full max-w-lg rounded-t-[2.5rem] sm:rounded-[2rem] border-t border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.8)] pointer-events-auto animate-slide-up flex flex-col max-h-[90vh] sm:max-h-[80vh] overflow-hidden relative isolate">
 
-        <div className="flex justify-between items-center mb-6 relative z-10">
+        {/* Grabber Handle */}
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1 bg-white/20 rounded-full z-50"></div>
+
+        {/* HEADER */}
+        <div className="p-8 pt-10 pb-4 relative z-10 flex justify-between items-start">
           <div>
-            <h2 className="text-xl font-bold text-white">{location.name}</h2>
-            <p className="text-xs text-slate-400">
-                {isGuest ? 'Recurso bloqueado' : 'Check-in Rápido (+10 XP)'}
-            </p>
+            <h2 className="text-2xl font-black text-white leading-tight tracking-tight">{location.name.toUpperCase()}</h2>
+            <div className="flex items-center gap-2 mt-1">
+              <div className="w-1.5 h-1.5 rounded-full bg-dirole-primary animate-pulse"></div>
+              <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                {isGuest ? 'ACESSO LIMITADO' : 'CHECK-IN RÁPIDO (+10 XP)'}
+              </p>
+            </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition-colors">
+          <button onClick={onClose} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition-all active:scale-90">
             <i className="fas fa-times"></i>
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6 relative z-10">
-          
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-8 pb-10 space-y-8 relative z-10 custom-scrollbar">
+
+          {/* PREÇO */}
+          <div className="animate-fade-in" style={{ animationDelay: '100ms' }}>
+            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">
+              Faixa de Preço
+            </label>
+            <div className="flex gap-3">
+              <OptionButton
+                selected={price === 1}
+                onClick={() => setPrice(1)}
+                icon="💲"
+                label="Barato"
+                colorClass="bg-green-600 shadow-green-900/40"
+              />
+              <OptionButton
+                selected={price === 2}
+                onClick={() => setPrice(2)}
+                icon="💵"
+                label="Médio"
+                colorClass="bg-blue-600 shadow-blue-900/40"
+              />
+              <OptionButton
+                selected={price === 3}
+                onClick={() => setPrice(3)}
+                icon="💸"
+                label="Caro"
+                colorClass="bg-purple-600 shadow-purple-900/40"
+              />
+            </div>
+          </div>
+
           {/* LOTAÇÃO */}
-          <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-2">
-                  <i className="fas fa-users"></i> Como está a Lotação?
-              </label>
-              <div className="flex gap-2">
-                  <OptionButton 
-                      selected={crowd === 1} 
-                      onClick={() => setCrowd(1)} 
-                      icon="🟢" 
-                      label="Vazio" 
-                      colorClass="bg-green-600"
-                  />
-                  <OptionButton 
-                      selected={crowd === 2} 
-                      onClick={() => setCrowd(2)} 
-                      icon="🟡" 
-                      label="Médio" 
-                      colorClass="bg-yellow-600"
-                  />
-                  <OptionButton 
-                      selected={crowd === 3} 
-                      onClick={() => setCrowd(3)} 
-                      icon="🔴" 
-                      label="Lotado" 
-                      colorClass="bg-red-600"
-                  />
-              </div>
+          <div className="animate-fade-in" style={{ animationDelay: '200ms' }}>
+            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">
+              Lotação Atual
+            </label>
+            <div className="flex gap-3">
+              <OptionButton
+                selected={crowd === 1}
+                onClick={() => setCrowd(1)}
+                icon="🟢"
+                label="Tranquilo"
+                colorClass="bg-emerald-600 shadow-emerald-900/40"
+              />
+              <OptionButton
+                selected={crowd === 2}
+                onClick={() => setCrowd(2)}
+                icon="🟡"
+                label="Normal"
+                colorClass="bg-amber-500 shadow-amber-900/40"
+              />
+              <OptionButton
+                selected={crowd === 3}
+                onClick={() => setCrowd(3)}
+                icon="🔴"
+                label="Fervendo"
+                colorClass="bg-rose-600 shadow-rose-900/40"
+              />
+            </div>
           </div>
 
           {/* VIBE */}
-          <div>
-              <label className="block text-xs font-bold text-slate-400 uppercase mb-3 flex items-center gap-2">
-                  <i className="fas fa-fire"></i> Como está a Vibe?
-              </label>
-              <div className="flex gap-2">
-                  <OptionButton 
-                      selected={vibe === 1} 
-                      onClick={() => setVibe(1)} 
-                      icon="💤" 
-                      label="Morta" 
-                      colorClass="bg-slate-600"
-                  />
-                  <OptionButton 
-                      selected={vibe === 2} 
-                      onClick={() => setVibe(2)} 
-                      icon="👌" 
-                      label="Legal" 
-                      colorClass="bg-blue-600"
-                  />
-                  <OptionButton 
-                      selected={vibe === 3} 
-                      onClick={() => setVibe(3)} 
-                      icon="🔥" 
-                      label="Incrível" 
-                      colorClass="bg-orange-500"
-                  />
+          <div className="animate-fade-in" style={{ animationDelay: '300ms' }}>
+            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">
+              Vibe do Momento
+            </label>
+            <div className="flex gap-3">
+              <OptionButton
+                selected={vibe === 1}
+                onClick={() => setVibe(1)}
+                icon="💤"
+                label="Morta"
+                colorClass="bg-slate-600"
+              />
+              <OptionButton
+                selected={vibe === 2}
+                onClick={() => setVibe(2)}
+                icon="👌"
+                label="Legal"
+                colorClass="bg-sky-600 shadow-sky-900/40"
+              />
+              <OptionButton
+                selected={vibe === 3}
+                onClick={() => setVibe(3)}
+                icon="🔥"
+                label="Incrível"
+                colorClass="bg-orange-500 shadow-orange-900/40"
+              />
+            </div>
+          </div>
+
+          {/* ESTÁ ABERTO? (iOS Switch Style) */}
+          <div className="flex items-center justify-between bg-white/5 p-5 rounded-[1.5rem] border border-white/5 animate-fade-in" style={{ animationDelay: '400ms' }}>
+            <div className="flex items-center gap-4">
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl transition-all ${isOpenStatus ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                <i className={`fas ${isOpenStatus ? 'fa-door-open' : 'fa-door-closed'}`}></i>
               </div>
+              <div>
+                <span className="text-sm font-black text-white block uppercase tracking-tight">O local está aberto?</span>
+                <p className="text-[10px] font-bold text-slate-500 mt-0.5">{isOpenStatus ? 'Todos podem entrar' : 'Reportar fechamento'}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => { triggerHaptic(); setIsOpenStatus(!isOpenStatus); }}
+              className={`w-14 h-8 rounded-full transition-all relative ${isOpenStatus ? 'bg-green-500' : 'bg-white/10'}`}
+            >
+              <div className={`w-6 h-6 bg-white rounded-full shadow-lg absolute top-1 transition-all ${isOpenStatus ? 'left-7' : 'left-1'}`}></div>
+            </button>
           </div>
 
           {/* COMENTÁRIO */}
-          <div className="bg-white/5 p-1 rounded-xl border border-white/5">
-            <textarea
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              maxLength={140}
-              placeholder={isGuest ? "Crie uma conta para comentar..." : "Alguma dica? (Opcional)"}
-              disabled={!!isGuest}
-              className="w-full bg-transparent border-none p-3 text-sm text-white focus:outline-none focus:ring-0 resize-none h-16 placeholder-slate-500"
-            />
+          <div className="space-y-3 animate-fade-in" style={{ animationDelay: '500ms' }}>
+            <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Comentário (Opcional)</label>
+            <div className="bg-white/5 rounded-2xl border border-white/5 focus-within:border-dirole-primary focus-within:bg-white/10 transition-all shadow-inner overflow-hidden">
+              <textarea
+                value={comment}
+                onChange={(e) => setComment(e.target.value)}
+                maxLength={140}
+                placeholder={isGuest ? "Crie uma conta para detalhar seu rolê..." : "Alguma dica importante? Pessoas, música, preços..."}
+                disabled={!!isGuest}
+                className="w-full bg-transparent border-none p-5 text-sm text-white focus:outline-none focus:ring-0 resize-none h-24 placeholder-slate-700 font-medium"
+              />
+              <div className="bg-black/20 px-5 py-2 flex justify-end">
+                <span className="text-[10px] font-black text-slate-700 uppercase">{comment.length}/140</span>
+              </div>
+            </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className={`w-full font-bold py-4 rounded-xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 ${
-                isGuest 
-                ? 'bg-slate-700 text-slate-300' 
-                : 'bg-gradient-to-r from-dirole-primary to-dirole-secondary text-white shadow-purple-900/30'
-            }`}
-          >
-            {isSubmitting ? (
-                <><i className="fas fa-circle-notch fa-spin"></i> Enviando...</>
-            ) : (
-                isGuest ? 'Criar Conta' : 'Confirmar Check-in'
-            )}
-          </button>
+          <div className="pt-4 animate-fade-in" style={{ animationDelay: '600ms' }}>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className={`w-full font-black py-5 rounded-[1.5rem] shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3 text-xs uppercase tracking-[0.2em] ${isGuest
+                ? 'bg-white/5 text-slate-500 border border-white/5'
+                : 'bg-white text-black hover:bg-slate-200'
+                }`}
+            >
+              {isSubmitting ? (
+                <><div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin"></div> ENVIANDO...</>
+              ) : (
+                isGuest ? 'FAZER LOGIN' : 'CONFIRMAR CHECK-IN'
+              )}
+            </button>
+          </div>
         </form>
       </div>
+
+      <style>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.05);
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(139, 92, 246, 0.3);
+          border-radius: 10px;
+        }
+      `}</style>
     </div>
   );
 };
