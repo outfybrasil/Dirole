@@ -110,6 +110,13 @@ function App() {
     onlyOpen: false // Initialize new filter
   });
 
+  // Map Theme State
+  const [mapTheme, setMapTheme] = useState<'dark' | 'light'>('dark');
+
+  const toggleMapTheme = () => {
+    setMapTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
+
   // Calculate if we should show the "Search Here" button
   const shouldShowSearchHere = useMemo(() => {
     if (!currentMapCenter || !searchOrigin) return false;
@@ -769,7 +776,7 @@ function App() {
 
         {
           activeTab === 'map' && (
-            <div className="w-full h-full relative">
+            <>
               <ActivityTicker />
 
               {showFilters && (
@@ -791,8 +798,21 @@ function App() {
                 onRegionChange={handleRegionChange}
                 searchRadius={filters.maxDistance}
                 searchOrigin={searchOrigin}
+                theme={mapTheme}
               />
-            </div>
+
+              {/* Map Controls Container */}
+              <div className="absolute top-28 right-4 z-[400]">
+                <button
+                  onClick={toggleMapTheme}
+                  className={`w-10 h-10 rounded-full shadow-lg flex items-center justify-center transition-all transform active:scale-95 border border-white/20 ${mapTheme === 'dark' ? 'bg-black/80 text-white backdrop-blur-md' : 'bg-white/90 text-slate-900 backdrop-blur-md'}`}
+                >
+                  <i className={`fas ${mapTheme === 'dark' ? 'fa-sun' : 'fa-moon'} text-xs`}></i>
+                </button>
+              </div>
+
+
+            </>
           )
         }
 
@@ -846,12 +866,12 @@ function App() {
       }
 
       {/* FABs - FLOATING ACTION BUTTONS */}
-      <div className="fixed bottom-24 right-6 z-[50] pointer-events-none flex flex-col gap-4 items-end">
+      <div className="fixed bottom-24 right-4 z-[50] pointer-events-none flex flex-col gap-4 items-end">
         {activeTab === 'map' && (
           <>
             <button
               onClick={() => { triggerHaptic(); setIsAddModalOpen(true); }}
-              className="w-14 h-14 rounded-2xl bg-gradient-to-r from-dirole-primary to-dirole-secondary text-white shadow-xl shadow-purple-900/40 active:scale-90 transition-all hover:scale-105 border border-white/20 flex items-center justify-center pointer-events-auto"
+              className="w-12 h-12 rounded-2xl bg-gradient-to-r from-dirole-primary to-dirole-secondary text-white shadow-xl shadow-purple-900/40 active:scale-90 transition-all hover:scale-105 border border-white/20 flex items-center justify-center pointer-events-auto"
               title="Adicionar Novo Local"
             >
               <i className="fas fa-plus text-xl"></i>

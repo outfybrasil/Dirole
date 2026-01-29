@@ -118,15 +118,31 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
         // Salvar no Supabase se não for guest
         if (!updatedUser.id.startsWith('guest_')) {
-            await supabase.from('profiles').update({
-                name,
-                nickname,
-                avatar: finalAvatar
-            }).eq('id', updatedUser.id);
+            try {
+                const { error } = await supabase.from('profiles').update({
+                    name,
+                    nickname,
+                    avatar: finalAvatar,
+                    updated_at: new Date()
+                }).eq('id', updatedUser.id);
+
+                if (error) {
+                    console.error("Erro ao salvar perfil:", error);
+                    alert("Erro ao salvar alterações. Tente novamente.");
+                    setIsSaving(false);
+                    return;
+                }
+            } catch (e: any) {
+                console.warn("Erro de conexão ao salvar perfil:", e);
+                alert(`Erro ao salvar: ${e.message || JSON.stringify(e)}`);
+                // Continue execution to save locally at least
+            }
         }
 
         onSave(updatedUser);
         setIsSaving(false);
+        alert("Perfil atualizado com sucesso! 🚀");
+        onClose();
     };
 
     const handleLogout = async () => {

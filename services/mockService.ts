@@ -334,7 +334,8 @@ export const getSuggestedUsers = (): FriendUser[] => {
 };
 
 export const searchUsers = async (query: string, currentUserId: string): Promise<FriendUser[]> => {
-    if (!query || query.length < 2) return [];
+    const cleanQuery = query.replace('@', '').trim();
+    if (!cleanQuery || cleanQuery.length < 2) return [];
     if (currentUserId.startsWith('guest_')) return [];
 
     const blockedIds = await getBlockedUsers(currentUserId);
@@ -344,20 +345,25 @@ export const searchUsers = async (query: string, currentUserId: string): Promise
         const { data: profiles } = await supabase
             .from('profiles')
             .select('*')
-            .ilike('name', `%${query}%`)
+            .or(`name.ilike.%${cleanQuery}%,nickname.ilike.%${cleanQuery}%`)
             .neq('id', currentUserId)
             .limit(10);
 
         if (profiles && profiles.length > 0) {
             const filteredProfiles = profiles.filter((p: any) => !blockedIds.includes(p.id));
 
-            realUsers = await Promise.all(filteredProfiles.map(async (p: any) => {
-                const { data: friendship } = await supabase
-                    .from('friendships')
-                    .select('*')
-                    .or(`requester_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
-                    .or(`requester_id.eq.${p.id},receiver_id.eq.${p.id}`)
-                    .single();
+            // OTIMIZAÇÃO: Buscar todas as amizades do usuário atual de uma vez
+            const { data: myFriendships } = await supabase
+                .from('friendships')
+                .select('*')
+                .or(`requester_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`);
+
+            realUsers = filteredProfiles.map((p: any) => {
+                // Find friendship specifically with this user in memory
+                const friendship = myFriendships?.find((f: any) =>
+                    (f.requester_id === currentUserId && f.receiver_id === p.id) ||
+                    (f.receiver_id === currentUserId && f.requester_id === p.id)
+                );
 
                 let status = FriendshipStatus.NONE;
                 let fId = undefined;
@@ -372,6 +378,7 @@ export const searchUsers = async (query: string, currentUserId: string): Promise
                 return {
                     id: p.id,
                     name: p.name,
+                    nickname: p.nickname,
                     avatar: p.avatar,
                     points: p.points,
                     xp: p.xp,
@@ -381,7 +388,7 @@ export const searchUsers = async (query: string, currentUserId: string): Promise
                     friendshipStatus: status,
                     friendshipId: fId
                 };
-            }));
+            });
         }
     } catch (e) {
         console.warn("User search offline/error", e);

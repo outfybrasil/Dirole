@@ -21,11 +21,11 @@ const createCustomIcon = (location: Location) => {
   let colorClass = 'text-green-500';
   if (crowdValue > 1.6 && crowdValue <= 2.3) colorClass = 'text-yellow-500';
   if (crowdValue > 2.3) colorClass = 'text-red-500';
-  
+
   if (location.stats.avgCrowd === 0) colorClass = 'text-slate-400';
 
   const iconClass = LOCATION_ICONS[location.type] || 'fa-map-pin';
-  
+
   // Unverified Visuals
   const borderClass = location.verified ? 'border-2 border-white' : 'border-2 border-dashed border-slate-400 opacity-90';
   const bgClass = location.verified ? 'bg-slate-900' : 'bg-slate-800';
@@ -33,10 +33,10 @@ const createCustomIcon = (location: Location) => {
   // Pulse Effect logic (Subtle Glow)
   // Only for verified locations that are "Hot" (High Vibe + Moderate/High Crowd)
   const isHot = location.verified && location.stats.avgVibe > 2.3 && location.stats.avgCrowd > 1.6;
-  
+
   // Using animate-pulse with a blur for a "Glow" effect instead of the aggressive ping
-  const pulseHtml = isHot 
-    ? `<div class="absolute -inset-2 rounded-full bg-dirole-secondary/40 blur-sm animate-pulse z-0"></div>` 
+  const pulseHtml = isHot
+    ? `<div class="absolute -inset-2 rounded-full bg-dirole-secondary/40 blur-sm animate-pulse z-0"></div>`
     : '';
 
   return L.divIcon({
@@ -65,6 +65,7 @@ interface MapViewProps {
   onRegionChange?: (center: { lat: number; lng: number }) => void;
   searchRadius?: number; // in km
   searchOrigin?: { lat: number; lng: number } | null;
+  theme?: 'dark' | 'light';
 }
 
 // Component to recenter map only when target changes
@@ -88,40 +89,41 @@ const MapRevalidator = () => {
 };
 
 // Handler for Map Events
-const MapEventHandler = ({ onRegionChange }: { onRegionChange?: (c: {lat: number, lng: number}) => void }) => {
-    useMapEvents({
-        moveend: (e) => {
-            if (onRegionChange) {
-                const center = e.target.getCenter();
-                onRegionChange({ lat: center.lat, lng: center.lng });
-            }
-        }
-    });
-    return null;
+const MapEventHandler = ({ onRegionChange }: { onRegionChange?: (c: { lat: number, lng: number }) => void }) => {
+  useMapEvents({
+    moveend: (e) => {
+      if (onRegionChange) {
+        const center = e.target.getCenter();
+        onRegionChange({ lat: center.lat, lng: center.lng });
+      }
+    }
+  });
+  return null;
 }
 
-export const MapView = React.memo<MapViewProps>(({ 
-  locations, 
+export const MapView = React.memo<MapViewProps>(({
+  locations,
   userLocation,
   userAccuracy,
   mapCenter,
-  onOpenDetails, 
+  onOpenDetails,
   onRegionChange,
   searchRadius = 1,
-  searchOrigin
+  searchOrigin,
+  theme = 'dark'
 }) => {
-  
+
   // Memoize markers to prevent re-render of thousands of DOM nodes
   const markers = useMemo(() => locations.map(loc => (
-    <Marker 
-      key={loc.id} 
+    <Marker
+      key={loc.id}
       position={[loc.latitude, loc.longitude]}
       icon={createCustomIcon(loc)}
       eventHandlers={{
-          click: () => {
-              triggerHaptic(10); 
-              onOpenDetails(loc);
-          }
+        click: () => {
+          triggerHaptic(10);
+          onOpenDetails(loc);
+        }
       }}
     />
   )), [locations, onOpenDetails]);
@@ -129,56 +131,58 @@ export const MapView = React.memo<MapViewProps>(({
   // Visual Circle for Radius
   const radiusInMeters = searchRadius * 1000;
   const circleCenter = searchOrigin || (mapCenter || userLocation || INITIAL_CENTER);
-  
+
   // Determines where the map camera should be
   const effectiveCenter = mapCenter || userLocation || INITIAL_CENTER;
 
   return (
     <div className="w-full h-full relative z-0">
-      <MapContainer 
-        center={[effectiveCenter.lat, effectiveCenter.lng]} 
-        zoom={14} 
-        scrollWheelZoom={true} 
+      <MapContainer
+        center={[effectiveCenter.lat, effectiveCenter.lng]}
+        zoom={14}
+        scrollWheelZoom={true}
         style={{ height: '100%', width: '100%' }}
         zoomControl={false}
         preferCanvas={true} // Performance Boost
       >
         <MapRevalidator />
         <MapEventHandler onRegionChange={onRegionChange} />
-        
+
         <TileLayer
           attribution='&copy; OSM'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          url={theme === 'dark'
+            ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+            : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"}
           maxZoom={19}
         />
-        
+
         {/* Search Radius Circle - Shows where we searched */}
         {searchOrigin && (
-            <Circle 
-                center={[circleCenter.lat, circleCenter.lng]}
-                radius={radiusInMeters}
-                pathOptions={{
-                    color: '#8b5cf6',
-                    fillColor: '#8b5cf6',
-                    fillOpacity: 0.05,
-                    weight: 1,
-                    dashArray: '4, 8',
-                    interactive: false
-                }}
-            />
+          <Circle
+            center={[circleCenter.lat, circleCenter.lng]}
+            radius={radiusInMeters}
+            pathOptions={{
+              color: '#8b5cf6',
+              fillColor: '#8b5cf6',
+              fillOpacity: 0.05,
+              weight: 1,
+              dashArray: '4, 8',
+              interactive: false
+            }}
+          />
         )}
-        
+
         {/* Recenter Map Helper - Now listens to mapCenter separately */}
         {mapCenter && <RecenterMap center={mapCenter} />}
 
         {/* User Location Marker - Independent of Map Center */}
         {userLocation && (
-          <Marker 
+          <Marker
             position={[userLocation.lat, userLocation.lng]}
             icon={L.divIcon({
-            className: 'user-pin',
-            html: `<div class="w-4 h-4 rounded-full bg-blue-500 border-2 border-white shadow-lg pulse-ring"></div>`,
-            iconSize: [16, 16],
+              className: 'user-pin',
+              html: `<div class="w-4 h-4 rounded-full bg-blue-500 border-2 border-white shadow-lg pulse-ring"></div>`,
+              iconSize: [16, 16],
             })}
           />
         )}

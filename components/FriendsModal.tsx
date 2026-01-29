@@ -207,18 +207,18 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
     return (
         <div className="fixed inset-0 z-[500] flex items-end sm:items-center justify-center pointer-events-none">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] pointer-events-auto transition-opacity" onClick={onClose}></div>
-            <div className={`bg-[#0f0518] w-full max-w-lg ${showQrCode ? 'h-[90vh]' : 'h-[85vh]'} sm:h-[650px] rounded-t-[2.5rem] sm:rounded-[2rem] border-t border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.8)] pointer-events-auto animate-slide-up flex flex-col overflow-hidden relative isolate`}>
+            <div className={`bg-[#0f0518] w-full max-w-lg ${showQrCode ? 'h-[96vh] sm:h-[750px]' : 'h-[85vh] sm:h-[650px]'} rounded-t-[2rem] border-t border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.8)] pointer-events-auto animate-slide-up flex flex-col overflow-hidden relative isolate transition-all duration-300`}>
 
                 {/* Grabber Handle */}
                 <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1 bg-white/20 rounded-full z-50"></div>
 
                 {/* HEADER */}
-                <div className="p-8 pt-10 pb-4 relative z-10 flex justify-between items-center bg-white/[0.02]">
-                    <div className="flex items-center gap-4">
+                <div className="p-6 pt-8 pb-4 relative z-10 grid grid-cols-[40px_1fr_40px] items-center bg-white/[0.02]">
+                    <div className="flex justify-start">
                         {showQrCode ? (
                             <button
                                 onClick={toggleQr}
-                                className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center hover:bg-slate-200 transition-all active:scale-90"
+                                className="w-10 h-10 rounded-full bg-white text-black flex items-center justify-center hover:bg-slate-200 transition-all active:scale-90 shadow-lg"
                             >
                                 <i className="fas fa-arrow-left"></i>
                             </button>
@@ -231,42 +231,48 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
                                 <i className="fas fa-qrcode"></i>
                             </button>
                         )}
-                        <h2 className="text-2xl font-black text-white leading-tight tracking-tight uppercase italic">{showQrCode ? 'Dirole ID' : 'Galera'}</h2>
                     </div>
-                    <button onClick={onClose} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition-all active:scale-90">
-                        <i className="fas fa-times"></i>
-                    </button>
+
+                    <h2 className="text-2xl font-black text-white leading-tight tracking-tight uppercase italic text-center drop-shadow-md">
+                        {showQrCode ? 'Dirole ID' : 'Galera'}
+                    </h2>
+
+                    <div className="flex justify-end">
+                        <button onClick={onClose} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition-all active:scale-90">
+                            <i className="fas fa-times"></i>
+                        </button>
+                    </div>
                 </div>
 
                 {/* TABS (Only if NOT showing QR) */}
                 {!showQrCode && (
-                    <div className="flex p-3 gap-2 shrink-0 bg-white/[0.02] border-b border-white/5">
+                    <div className="flex px-6 pb-2 gap-3 shrink-0 bg-white/[0.02] border-b border-white/5 justify-center">
                         <button
                             onClick={() => { triggerHaptic(); setActiveTab('my_friends'); }}
-                            className={`flex-1 py-3 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-sm ${activeTab === 'my_friends' ? 'bg-dirole-primary text-white shadow-[0_5px_15px_rgba(139,92,246,0.3)]' : 'text-slate-500 hover:text-white'}`}
+                            className={`flex-1 py-3 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-sm max-w-[100px] ${activeTab === 'my_friends' ? 'bg-dirole-primary text-white shadow-[0_5px_15px_rgba(139,92,246,0.3)]' : 'text-slate-500 hover:text-white bg-white/5'}`}
                         >
                             Amigos
                         </button>
                         <button
                             onClick={() => { triggerHaptic(); setActiveTab('requests'); }}
-                            className={`flex-1 py-3 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-sm relative ${activeTab === 'requests' ? 'bg-dirole-primary text-white shadow-[0_5px_15px_rgba(139,92,246,0.3)]' : 'text-slate-500 hover:text-white'}`}
+                            className={`flex-1 py-3 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-sm max-w-[100px] relative ${activeTab === 'requests' ? 'bg-dirole-primary text-white shadow-[0_5px_15px_rgba(139,92,246,0.3)]' : 'text-slate-500 hover:text-white bg-white/5'}`}
                         >
                             Convites
                             {requests.length > 0 && <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-[#0f0518] animate-pulse"></span>}
                         </button>
                         <button
                             onClick={() => { triggerHaptic(); setActiveTab('search'); }}
-                            className={`flex-1 py-3 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-sm ${activeTab === 'search' ? 'bg-dirole-primary text-white shadow-[0_5px_15px_rgba(139,92,246,0.3)]' : 'text-slate-500 hover:text-white'}`}
+                            className={`flex-1 py-3 text-[10px] font-black uppercase tracking-wider rounded-xl transition-all shadow-sm max-w-[100px] ${activeTab === 'search' ? 'bg-dirole-primary text-white shadow-[0_5px_15px_rgba(139,92,246,0.3)]' : 'text-slate-500 hover:text-white bg-white/5'}`}
                         >
                             Buscar
                         </button>
                     </div>
                 )}
 
-                <div className="flex-1 overflow-y-auto p-6 relative custom-scrollbar">
+                <div className="flex-1 overflow-y-auto p-6 relative custom-scrollbar flex flex-col">
 
                     {showQrCode ? (
-                        <div className="h-full flex flex-col items-center justify-start pt-4 animate-fade-in pb-10">
+                        <div className="flex-1 flex flex-col items-center justify-center min-h-0 py-4 animate-fade-in">
 
                             {!isScanning && !scanResult && (
                                 <div className="w-full max-w-[300px] bg-[#120822] rounded-[2.5rem] p-8 shadow-2xl relative flex flex-col items-center border border-white/5 overflow-hidden">
@@ -414,20 +420,22 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
 
                             {activeTab === 'search' && (
                                 <div className="space-y-6">
-                                    <form onSubmit={handleSearch} className="relative group">
-                                        <i className="fas fa-search absolute left-5 top-5 text-slate-500 text-sm transition-colors group-focus-within:text-white"></i>
+                                    <form onSubmit={handleSearch} className="relative group w-full">
+                                        <div className="absolute left-5 top-1/2 -translate-y-1/2">
+                                            <i className="fas fa-search text-slate-500 text-sm transition-colors group-focus-within:text-dirole-primary"></i>
+                                        </div>
                                         <input
                                             type="text"
                                             value={searchQuery}
                                             onChange={(e) => setSearchQuery(e.target.value)}
                                             placeholder="Nome ou @apelido..."
-                                            className="w-full bg-white/5 border border-white/10 rounded-2xl py-4.5 pl-14 pr-24 text-sm text-white focus:outline-none focus:border-dirole-primary focus:bg-white/10 transition-all font-medium placeholder-slate-700 shadow-inner"
+                                            className="w-full bg-white/5 border border-white/10 rounded-2xl h-14 pl-12 pr-24 text-sm text-white focus:outline-none focus:border-dirole-primary focus:bg-white/10 transition-all font-medium placeholder-slate-600 shadow-inner"
                                             autoFocus
                                         />
                                         <button
                                             type="submit"
                                             disabled={!searchQuery.trim()}
-                                            className="absolute right-3 top-2.5 bottom-2.5 bg-white text-black px-5 rounded-xl font-black text-[10px] uppercase tracking-wider disabled:opacity-20 transition-all active:scale-95"
+                                            className="absolute right-2 top-2 bottom-2 bg-dirole-primary text-white px-4 rounded-xl font-black text-[10px] uppercase tracking-wider disabled:opacity-50 transition-all active:scale-95 shadow-lg"
                                         >
                                             Buscar
                                         </button>

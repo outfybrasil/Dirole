@@ -251,6 +251,16 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                                             className="w-full bg-black/30 border border-white/10 rounded-xl p-4 text-white focus:border-dirole-primary focus:outline-none backdrop-blur-sm"
                                         />
                                     </div>
+                                    <div>
+                                        <input
+                                            type="password"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            placeholder="Senha"
+                                            required
+                                            className="w-full bg-black/30 border border-white/10 rounded-xl p-4 text-white focus:border-dirole-primary focus:outline-none backdrop-blur-sm"
+                                        />
+                                    </div>
                                     <div className="flex justify-end">
                                         <button type="button" className="text-xs text-slate-400 hover:text-white transition-colors">
                                             Esqueceu a senha?
