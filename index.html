@@ -74,8 +74,8 @@
 
     /* Dark Tactical Map Theme */
     .leaflet-tile-pane {
-      filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
-      opacity: 0.8;
+      /* Removed conflicting invert filter since we use dark tiles already */
+      filter: brightness(0.8) contrast(1.2);
     }
 
     /* Otimização de Performance: Remover sombras pesadas e blur excessivo */

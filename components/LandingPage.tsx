@@ -6,8 +6,41 @@ interface LandingPageProps {
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({ onEnter }) => {
+    const [modalContent, setModalContent] = React.useState<{ title: string, text: string } | null>(null);
+
     return (
         <div className="min-h-screen bg-[#0f0518] text-white font-sans overflow-x-hidden relative selection:bg-purple-500/30">
+            {/* Modal for About/Terms/Privacy */}
+            {modalContent && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 backdrop-blur-xl bg-black/60 animate-fade-in">
+                    <div className="bg-[#1a0b2e] border border-white/10 rounded-[2rem] p-8 max-w-md w-full relative shadow-2xl">
+                        <button
+                            onClick={() => setModalContent(null)}
+                            className="absolute top-6 right-6 text-gray-400 hover:text-white transition-colors"
+                        >
+                            <ArrowRight className="w-6 h-6 rotate-180" />
+                        </button>
+                        <h3 className="text-2xl font-black italic mb-6 tracking-tight uppercase text-purple-400">
+                            {modalContent.title}
+                        </h3>
+                        <div className="text-gray-300 leading-relaxed text-sm space-y-4">
+                            {modalContent.text.split('\n').map((para, i) => (
+                                <p key={i}>{para}</p>
+                            ))}
+                        </div>
+                        <div className="mt-8 pt-6 border-t border-white/5 flex flex-col items-center gap-2">
+                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Uma criação</p>
+                            <span className="text-lg font-black italic text-white tracking-widest">OUTFY</span>
+                        </div>
+                        <button
+                            onClick={() => setModalContent(null)}
+                            className="mt-8 w-full py-4 bg-white text-black font-bold rounded-2xl hover:bg-purple-100 transition-colors"
+                        >
+                            Entendido
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Background Ambience */}
             <div className="fixed inset-0 z-0">
@@ -46,7 +79,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnter }) => {
                         Disponível em todo o Brasil
                     </div>
 
-                    <h1 className="text-5xl md:text-7xl font-black italic leading-[0.9] tracking-tighter">
+                    <h1 className="text-5xl md:text-7xl font-black italic leading-[1.1] tracking-tighter py-2">
                         O TERMÔMETRO <br />
                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-orange-400">
                             DO SEU ROLÊ
@@ -99,8 +132,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnter }) => {
                             <div className="h-[46px] w-[3px] bg-gray-800 absolute -start-[17px] top-[178px] rounded-s-lg"></div>
                             <div className="h-[64px] w-[3px] bg-gray-800 absolute -end-[17px] top-[142px] rounded-e-lg"></div>
                             <div className="rounded-[2rem] overflow-hidden w-full h-full bg-[#1a0b2e] relative">
-                                {/* Mockup Content */}
-                                <div className="absolute inset-0 bg-[url('https://maps.wikimedia.org/img/osm-intl,13,-23.5505,-46.6333,300x600.png')] opacity-30 grayscale mix-blend-overlay"></div>
+                                {/* Mockup Content - Improved Map */}
+                                <div className="absolute inset-0 bg-[url('https://maps.wikimedia.org/img/osm-intl,13,-23.5505,-46.6333,400x800.png')] opacity-40 mix-blend-screen bg-cover bg-center"></div>
+                                <div className="absolute inset-0 bg-gradient-to-b from-purple-900/40 via-transparent to-[#1a0b2e]"></div>
 
                                 {/* Floating Elements Mockup */}
                                 <div className="absolute top-12 left-4 right-4 flex gap-2">
@@ -164,14 +198,39 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnter }) => {
             </section>
 
             {/* Footer */}
-            <footer className="py-12 text-center text-gray-600 text-sm relative z-10 border-t border-white/5">
-                <div className="flex justify-center gap-6 mb-8">
-                    <a href="#" className="hover:text-white transition-colors">Sobre</a>
-                    <a href="#" className="hover:text-white transition-colors">Termos</a>
-                    <a href="#" className="hover:text-white transition-colors">Privacidade</a>
+            <footer className="py-20 text-center relative z-10 border-t border-white/5 bg-black/20">
+                <div className="max-w-7xl mx-auto px-6">
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-8 mb-12">
+                        <div className="flex items-center gap-2">
+                            <img src="/og-image.png" className="w-8 h-8 object-contain" alt="Dirole Logo" />
+                            <span className="text-xl font-black italic tracking-tighter">DIROLE</span>
+                        </div>
+                        <div className="flex flex-wrap justify-center gap-8 text-sm font-bold text-gray-400 uppercase tracking-widest">
+                            <button onClick={() => setModalContent({
+                                title: 'Sobre o Dirole',
+                                text: 'O Dirole é o termômetro social definitivo. Criado para que você nunca mais chegue em um lugar e se arrependa da lotação ou da vibe.\nNossa missão é inteligência social em tempo real para transformar suas noites.\nDesenvolvido pela OUTFY com o máximo padrão de design e performance.'
+                            })} className="hover:text-white transition-colors">Sobre</button>
+
+                            <button onClick={() => setModalContent({
+                                title: 'Termos de Uso',
+                                text: 'Ao utilizar o Dirole, você concorda em compartilhar informações verídicas sobre os locais.\nO uso indevido da plataforma para spam ou informações falsas resultará no banimento da conta.\nTodos os dados são de propriedade da OUTFY.'
+                            })} className="hover:text-white transition-colors">Termos</button>
+
+                            <button onClick={() => setModalContent({
+                                title: 'Privacidade',
+                                text: 'Sua privacidade é nossa prioridade. Coletamos sua localização apenas enquanto você usa o app para mostrar os melhores rolês ao seu redor.\nSeus dados não são vendidos para terceiros.\nSegurança por OUTFY.'
+                            })} className="hover:text-white transition-colors">Privacidade</button>
+                        </div>
+                    </div>
+                    <div className="pt-8 border-t border-white/5 flex flex-col items-center gap-4">
+                        <p className="text-gray-500 text-sm">
+                            &copy; {new Date().getFullYear()} Dirole App. Todos os direitos reservados.
+                        </p>
+                        <p className="text-xs font-bold text-gray-600 bg-white/5 px-4 py-2 rounded-full border border-white/5">
+                            Uma criação <span className="text-white">OUTFY</span>
+                        </p>
+                    </div>
                 </div>
-                <p>&copy; {new Date().getFullYear()} Dirole App. Todos os direitos reservados.</p>
-                <p className="mt-2 text-xs">Feito com 💜 para a noite.</p>
             </footer>
 
         </div>
