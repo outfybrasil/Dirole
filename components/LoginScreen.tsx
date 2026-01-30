@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { signUpWithEmail, signInWithEmail, signInWithGoogle } from '../services/supabaseClient';
-import { saveUserProfileLocal, triggerHaptic } from '../services/mockService';
+import { signUpWithEmail, signInWithEmail, signInWithGoogle, getCurrentSession } from '../services/authService';
+import { saveUserProfileLocal, triggerHaptic, syncUserProfile } from '../services/mockService';
 import { User } from '../types';
 import { PrivacyPolicyModal } from './PrivacyPolicyModal';
 
@@ -47,10 +47,19 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         setErrorMsg(null);
         try {
             await signInWithEmail(email, password);
-            // Login bem-sucedido será detectado pelo listener no App.tsx
+            const session = await getCurrentSession();
+            if (session) {
+                const user = await syncUserProfile(session.userId, { email: session.email, name: session.name });
+                if (user) {
+                    onLoginSuccess(user);
+                } else {
+                    setErrorMsg("Erro ao sincronizar perfil.");
+                }
+            }
         } catch (error: any) {
             console.error(error);
             setErrorMsg("Email ou senha incorretos.");
+        } finally {
             setIsLoading(false);
         }
     };
@@ -79,25 +88,30 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         }
 
         try {
-            const result = await signUpWithEmail(email, password, {
-                name,
-                nickname,
-                age: parseInt(age),
-                gender,
-                avatar
-            });
-
-            if (result.user && !result.session) {
-                setIsLoading(false);
-                setIsSuccess(true);
-                return;
+            await signUpWithEmail(email, password, name);
+            const session = await getCurrentSession();
+            if (session) {
+                const syncedUser = await syncUserProfile(session.userId, {
+                    name,
+                    nickname,
+                    email,
+                    avatar,
+                    gender
+                });
+                if (syncedUser) {
+                    onLoginSuccess(syncedUser);
+                    return;
+                }
             }
+
+            setIsLoading(false);
+            setIsSuccess(true);
         } catch (error: any) {
             console.error(error);
-            if (error.message?.includes("already registered") || error.code === "user_already_exists") {
+            if (error.message?.includes("already registered") || error.code === 409) {
                 setErrorMsg("Este e-mail já está cadastrado. Tente fazer login.");
-            } else if (error.message?.includes("Password should be")) {
-                setErrorMsg("A senha deve ter pelo menos 6 caracteres.");
+            } else if (error.message?.includes("Password") || error.code === 400) {
+                setErrorMsg("A senha deve ter pelo menos 8 caracteres.");
             } else {
                 setErrorMsg(error.message || "Erro ao criar conta.");
             }
@@ -176,7 +190,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 <div className="w-full max-w-sm flex flex-col items-center my-auto py-10">
 
                     <div className="mb-8 text-center">
-                        <h1 className="text-6xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-dirole-primary via-dirole-secondary to-orange-400 mb-2 drop-shadow-[0_0_15px_rgba(139,92,246,0.5)] pr-2 py-2">
+                        <h1 className="text-6xl md:text-8xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-dirole-primary via-dirole-secondary to-orange-400 mb-2 drop-shadow-[0_0_15px_rgba(139,92,246,0.5)] px-6 py-2 no-clip">
                             DIROLE
                         </h1>
                         <p className="text-slate-400 font-medium tracking-[0.2em] text-xs uppercase">O Termômetro do Rolê</p>

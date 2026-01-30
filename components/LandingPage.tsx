@@ -61,13 +61,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnter }) => {
             </div>
 
             {/* Navbar */}
-            <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-6 flex items-center justify-between backdrop-blur-md bg-[#0f0518]/50 border-b border-white/5">
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 relative">
-                        <div className="absolute inset-0 bg-gradient-to-tr from-purple-500 to-pink-500 rounded-xl rotate-6 blur-lg opacity-60"></div>
-                        <img src="/og-image.png" className="w-10 h-10 object-contain relative z-10" alt="Dirole Logo" />
+            <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-4 flex flex-col sm:flex-row items-center justify-between backdrop-blur-md bg-[#0f0518]/50 border-b border-white/5 gap-4">
+                <div className="flex items-center gap-6">
+                    <div className="w-24 h-24 md:w-32 md:h-32 relative">
+                        <div className="absolute inset-0 bg-gradient-to-tr from-purple-500 to-pink-500 rounded-[2rem] md:rounded-[2.5rem] rotate-6 blur-2xl opacity-60"></div>
+                        <img src="/og-image.png" className="w-24 h-24 md:w-32 md:h-32 object-contain relative z-10" alt="Dirole Logo" />
                     </div>
-                    <span className="text-2xl font-black italic tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400 py-2 inline-block overflow-visible leading-relaxed">
+                    <span className="text-5xl md:text-7xl font-black italic tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400 no-clip px-4">
                         DIROLE
                     </span>
                 </div>
@@ -89,9 +89,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnter }) => {
                         Disponível em todo o Brasil
                     </div>
 
-                    <h1 className="text-5xl md:text-7xl font-black italic leading-[1.4] tracking-tight overflow-visible">
-                        <span className="block pt-4">O TERMÔMETRO</span>
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-orange-400 pb-4 block">
+                    <h1 className="text-5xl md:text-7xl font-black italic tracking-tight hero-title-container overflow-visible">
+                        <span className="inline-block no-clip hero-title px-4">O TERMÔMETRO</span> <br />
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-orange-400 inline-block no-clip hero-title px-4">
                             DO SEU ROLÊ
                         </span>
                     </h1>
@@ -213,7 +213,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnter }) => {
                     <div className="flex flex-col md:flex-row items-center justify-between gap-8 mb-12">
                         <div className="flex items-center gap-2">
                             <img src="/og-image.png" className="w-8 h-8 object-contain" alt="Dirole Logo" />
-                            <span className="text-xl font-black italic tracking-tighter py-1 inline-block overflow-visible leading-relaxed">DIROLE</span>
+                            <span className="text-xl font-black italic tracking-tighter no-clip">DIROLE</span>
                         </div>
                         <div className="flex flex-wrap justify-center gap-8 text-sm font-bold text-gray-400 uppercase tracking-widest">
                             <button onClick={() => setModalContent({

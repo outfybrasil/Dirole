@@ -36,7 +36,7 @@ self.addEventListener('fetch', (event) => {
     const url = new URL(event.request.url);
 
     // CRITICAL: Skip interception for external APIs to avoid CORS/Timeouts
-    if (url.hostname.includes('supabase') ||
+    if (url.hostname.includes('appwrite') ||
         url.hostname.includes('openstreetmap') ||
         url.hostname.includes('cartocdn') ||
         url.hostname.includes('unsplash')) {

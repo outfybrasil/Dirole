@@ -22,7 +22,8 @@ import { QRScannerModal } from './components/QRScannerModal';
 import { Location, Filters, User } from './types';
 import { getNearbyRoles, getUserProfile, toggleFavorite, syncUserProfile, triggerHaptic, requestNotificationPermission, sendLocalNotification, searchLocations, getUserById } from './services/mockService';
 import { INITIAL_CENTER } from './constants';
-import { supabase, signOut } from './services/supabaseClient';
+import { getCurrentSession, signOut } from './services/authService';
+// import { supabase } from './services/supabaseClient'; // REMOVED SUPABASE
 import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
 import { DataPrivacyModal } from './components/DataPrivacyModal';
 import { Geolocation } from '@capacitor/geolocation';
@@ -172,54 +173,47 @@ function App() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Check Supabase Session & Load Local Profile
+  // Check Appwrite Session & Load Local Profile
   useEffect(() => {
-    // 1. Check Local Storage
-    const localProfile = getUserProfile();
-    if (localProfile) {
-      setCurrentUser(localProfile);
-    }
-
-    // 2. Auth Listener (Supabase)
-    // 2. Auth Listener (Supabase)
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const initAuth = async () => {
       try {
-        console.log(`[Auth Debug] Event: ${event}`);
-        if (event === 'SIGNED_IN' && session?.user) {
-          const { user } = session;
-          console.log(`[Auth Debug] User detected: ${user.id}`);
+        // 1. Check Local Storage first for fast UI
+        const localProfile = getUserProfile();
+        if (localProfile) {
+          setCurrentUser(localProfile);
+        }
 
-          // Sync with Supabase 'profiles' table using metadata from signup
-          const syncedUser = await syncUserProfile(user.id, {
-            full_name: user.user_metadata.full_name,
-            nickname: user.user_metadata.nickname,
-            email: user.email,
-            age: user.user_metadata.age,
-            gender: user.user_metadata.gender,
-            avatar_url: user.user_metadata.avatar_url
+        // 2. Verify with Appwrite Session
+        console.log("[Auth] Checking Appwrite session...");
+        const session = await getCurrentSession();
+
+        if (session) {
+          console.log("[Auth] Active session found:", session.userId);
+
+          // Sync profile
+          const syncedUser = await syncUserProfile(session.userId, {
+            email: session.email,
+            name: session.name,
+            // Add other meta if needed
           });
 
           if (syncedUser) {
-            console.log(`[Auth Debug] User synced success.`);
             setCurrentUser(syncedUser);
-            requestNotificationPermission(); // Ask again on login
-          } else {
-            console.error(`[Auth Debug] User sync returned null.`);
           }
-        } else if (event === 'SIGNED_OUT') {
-          console.log(`[Auth Debug] User signed out.`);
-          setCurrentUser(null);
-          localStorage.removeItem('dirole_user_profile');
-          setLocations([]);
+        } else {
+          console.log("[Auth] No active session.");
+          if (localProfile) {
+            // Optional: clear local profile if no session exists
+            // setCurrentUser(null);
+            // localStorage.removeItem('dirole_user_profile');
+          }
         }
       } catch (err) {
-        console.error("[Auth Debug] Critical Error in Auth Listener:", err);
+        console.error("[Auth] Session check failed:", err);
       }
-    });
-
-    return () => {
-      authListener.subscription.unsubscribe();
     };
+
+    initAuth();
   }, []);
 
   // --- NOTIFICATION HANDLERS ---
@@ -234,11 +228,8 @@ function App() {
 
   const fetchNotificationCount = useCallback(async (userId: string) => {
     try {
-      const [invites, friends] = await Promise.all([
-        supabase.from('invites').select('id', { count: 'exact' }).eq('to_user_id', userId).eq('status', 'pending'),
-        supabase.from('friendships').select('id', { count: 'exact' }).eq('receiver_id', userId).eq('status', 'pending')
-      ]);
-      setNotificationCount((invites.count || 0) + (friends.count || 0));
+      // Appwrite notification count placeholder (can be implemented with databases.listDocuments)
+      setNotificationCount(0);
     } catch (e) { console.error(e); }
   }, []);
 
@@ -249,79 +240,13 @@ function App() {
   }, [currentUser, fetchNotificationCount]);
 
 
-  // --- REALTIME NOTIFICATIONS (INVITES & FRIENDS) ---
+  // --- REALTIME NOTIFICATIONS (DISABLED FOR MIGRATION) ---
+  /*
   useEffect(() => {
     if (!currentUser) return;
-
-    const channel = supabase.channel('realtime:social')
-      // Listener 1: Invites
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'invites', filter: `to_user_id=eq.${currentUser.id}` },
-        (payload) => {
-          const invite = payload.new;
-          triggerHaptic([100, 50, 100]);
-          sendLocalNotification(
-            "📩 Novo Convite de Rolê!",
-            invite.message || `Você foi convidado para ir ao ${invite.location_name}`
-          );
-          addToast({
-            title: "📩 Novo Convite!",
-            message: `Bora pro ${invite.location_name}?`,
-            type: 'invite',
-            actionLabel: 'VER',
-            action: () => setIsNotificationsModalOpen(true)
-          });
-          setNotificationCount(prev => prev + 1);
-        }
-      )
-      // Listener 2: Friend Requests (INSERT into friendships where receiver is current user)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'friendships', filter: `receiver_id=eq.${currentUser.id}` },
-        (payload) => {
-          triggerHaptic([50, 50]);
-          sendLocalNotification(
-            "👥 Nova Solicitação de Amizade",
-            "Alguém quer se conectar com você no Dirole!"
-          );
-          addToast({
-            title: "👥 Novo Amigo!",
-            message: "Alguém te mandou uma solicitação.",
-            type: 'friend_request',
-            actionLabel: 'ACEITAR',
-            action: () => {
-              setIsNotificationsModalOpen(true);
-            }
-          });
-          setNotificationCount(prev => prev + 1);
-        }
-      )
-      // Listener 3: Friend Request Accepted (UPDATE where status='accepted')
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'friendships', filter: `requester_id=eq.${currentUser.id}` },
-        (payload) => {
-          if (payload.new.status === 'accepted') {
-            triggerHaptic(50);
-            sendLocalNotification(
-              "🤝 Pedido Aceito!",
-              "Você tem um novo amigo para curtir os rolês."
-            );
-            addToast({
-              title: "🤝 Pedido Aceito!",
-              message: "Sua amizade foi confirmada!",
-              type: 'success'
-            });
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    // Appwrite Realtime could be implemented here
   }, [currentUser]);
+  */
 
   const fetchData = async (lat: number, lng: number) => {
     if (!isRefreshing) setIsLoading(true);
@@ -608,7 +533,7 @@ function App() {
     try {
       await signOut();
     } catch (e) {
-      console.warn('Erro ao deslogar do Supabase, mas estado local limpo', e);
+      console.warn('Erro ao deslogar do Appwrite, mas estado local limpo', e);
     }
   }, []);
 
@@ -751,7 +676,7 @@ function App() {
               className="w-full h-full object-contain relative z-10 drop-shadow-[0_0_20px_rgba(139,92,246,0.3)]"
             />
           </div>
-          <h1 className="text-6xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-dirole-primary via-dirole-secondary to-orange-400 mb-2 animate-pulse-slow drop-shadow-[0_0_15px_rgba(139,92,246,0.5)] pr-2">
+          <h1 className="text-6xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-dirole-primary via-dirole-secondary to-orange-400 mb-2 animate-pulse-slow drop-shadow-[0_0_15px_rgba(139,92,246,0.5)] px-4 no-clip">
             DIROLE
           </h1>
           <p className="text-slate-400 font-bold tracking-widest text-xs uppercase opacity-80">O Termômetro do Rolê</p>
@@ -789,11 +714,11 @@ function App() {
       <header className="bg-[#0f0518]/80 backdrop-blur-xl z-[60] px-6 py-4 pt-[max(1rem,env(safe-area-inset-top))] border-b border-white/5 flex justify-center sticky top-0 shrink-0">
         <div className="w-full max-w-7xl flex justify-between items-center transition-all">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 flex items-center justify-center overflow-hidden">
-              <img src="/og-image.png" className="w-10 h-10 object-contain" alt="Logo" />
+            <div className="w-14 h-14 flex items-center justify-center overflow-hidden">
+              <img src="/og-image.png" className="w-14 h-14 object-contain" alt="Logo" />
             </div>
             <div className="flex flex-col">
-              <h1 className="text-xl font-black italic tracking-tighter text-white leading-none">
+              <h1 className="text-3xl font-black italic tracking-tighter text-white leading-none no-clip px-2">
                 DIROLE
               </h1>
               <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] leading-none mt-1">Social Thermometer</p>
