@@ -1189,17 +1189,7 @@ function App() {
         currentUser={currentUser}
       />
 
-      {/* DEBUG OVERLAY - REMOVE BEFORE PRODUCTION */}
-      <div className="fixed top-0 left-0 z-[99999] bg-black/80 text-[#00ff00] font-mono text-[10px] p-2 pointer-events-none opacity-50 hover:opacity-100 transition-opacity">
-        <p>SPLASH: {String(showSplash)}</p>
-        <p>USER: {currentUser ? currentUser.id.substring(0, 8) : 'NULL'}</p>
-        <p>PROFILE_SYNC: {currentUser ? 'YES' : 'NO'}</p>
-        <p>LOADING: {String(isLoading)}</p>
-        <p>LOCS: {locations.length}</p>
-        <p>GPS: {userLocation ? `${userLocation.lat.toFixed(4)},${userLocation.lng.toFixed(4)}` : 'WAITING'}</p>
-        <p>TAB: {activeTab}</p>
-        <p>OFFLINE: {String(isOffline)}</p>
-      </div>
+
 
       <OnboardingModal
         isOpen={showOnboarding}
