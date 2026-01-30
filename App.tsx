@@ -28,6 +28,7 @@ import { DataPrivacyModal } from './components/DataPrivacyModal';
 import { Geolocation } from '@capacitor/geolocation';
 import UserAvatar from './components/UserAvatar';
 import { OnboardingModal } from './components/OnboardingModal';
+import { LandingPage } from './components/LandingPage';
 
 function App() {
   const [showSplash, setShowSplash] = useState(true);
@@ -35,6 +36,7 @@ function App() {
   const [isDataModalOpen, setIsDataModalOpen] = useState(false);
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
 
   // User State  // --- 0. DEV SANITY: CLEAR SERVICE WORKERS ---
   useEffect(() => {
@@ -761,9 +763,12 @@ function App() {
     );
   }
 
-  // --- 2. LOGIN SCREEN (If not authenticated) ---
+  // --- 2. LANDING PAGE & LOGIN FLOW (If not authenticated) ---
   if (!currentUser) {
-    return <LoginScreen onLoginSuccess={setCurrentUser} />;
+    if (showLogin) {
+      return <LoginScreen onLoginSuccess={setCurrentUser} />;
+    }
+    return <LandingPage onEnter={() => setShowLogin(true)} />;
   }
 
   // --- 3. MAIN APP (Only rendered after login) ---

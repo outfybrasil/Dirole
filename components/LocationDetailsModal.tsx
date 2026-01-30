@@ -40,6 +40,14 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
             setActiveTab('overview');
             setHasVoted(false); // Reset vote state on open
 
+            // Safety timeout: stop loading after 8s no matter what
+            const safetyTimer = setTimeout(() => {
+                setLoadingData((current) => {
+                    if (current) console.warn("Forcing stop loading data in modal due to timeout");
+                    return false;
+                });
+            }, 8000);
+
             Promise.all([
                 getReviewsForLocation(location.id),
                 getEventsForLocation(location),
@@ -48,8 +56,14 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
                 setReviews(revs);
                 setEvents(evts);
                 setGallery(pics);
+            }).catch(err => {
+                console.error("Error loading location details:", err);
+            }).finally(() => {
+                clearTimeout(safetyTimer);
                 setLoadingData(false);
             });
+
+            return () => clearTimeout(safetyTimer);
         }
     }, [isOpen, location]);
 

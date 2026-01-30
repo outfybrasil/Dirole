@@ -1381,14 +1381,27 @@ export const getReviewsForLocation = async (locationId: string): Promise<Review[
     if (locationId.startsWith('temp_')) return [];
 
     const user = getUserProfile();
-    const blockedIds = user ? await getBlockedUsers(user.id) : [];
-
     try {
-        const { data } = await supabase
+        const blockedIds = user ? await getBlockedUsers(user.id) : [];
+
+        // Timeout protection for fetching reviews
+        const queryPromise = supabase
             .from('reviews')
             .select('*')
             .eq('location_id', locationId)
             .order('created_at', { ascending: false });
+
+        const timeoutPromise = new Promise<{ data: any, error: any }>((resolve) =>
+            setTimeout(() => resolve({ data: [], error: { message: 'Timeout fetching reviews' } }), 5000)
+        );
+
+        const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
+
+        if (error) {
+            console.warn("[getReviewsForLocation] Failed or timed out:", error.message);
+            return [];
+        }
+
         if (data) {
             const allReviews = data.map((r: any) => ({
                 id: r.id,
@@ -1405,17 +1418,24 @@ export const getReviewsForLocation = async (locationId: string): Promise<Review[
             }));
             return allReviews.filter((r: Review) => !blockedIds.includes(r.userId));
         }
-    } catch (e) { console.warn(e); }
+    } catch (e) { console.warn("[getReviewsForLocation] Exception:", e); }
     return [];
 }
 
 // ⚠️ ATENÇÃO: Esta função assume que você rodou o SQL de RESET do banco
+// ⚠️ ATENÇÃO: Esta função assume que você rodou o SQL de RESET do banco
 export const submitReview = async (review: Review, locationContext?: Location): Promise<boolean> => {
     let finalLocationId = review.locationId;
+    console.log(`[SubmitReview] Iniciando para locationId: ${finalLocationId}`);
 
     // 1. SYNC TEMP LOCATION
     if (review.locationId.startsWith('temp_')) {
-        if (!locationContext) return false;
+        console.log(`[SubmitReview] Location is TEMP. Syncing to DB...`);
+        if (!locationContext) {
+            console.error("[SubmitReview] Falta context para sync.");
+            return false;
+        }
+
         try {
             // Simplificado: apenas tenta criar com colunas novas. Se falhar, é erro de banco.
             const payload = {
@@ -1429,24 +1449,37 @@ export const submitReview = async (review: Review, locationContext?: Location): 
                 votes_for_verification: 10,
                 stats: locationContext.stats
             };
-            const { data: results, error: insertError } = await supabase.from('locations').insert(payload).select();
+
+            // Timeout safety for Location Insert
+            const insertPromise = supabase.from('locations').insert(payload).select();
+            const timeoutPromise = new Promise<{ data: any, error: any }>((resolve) => setTimeout(() => resolve({ data: null, error: 'TIMEOUT' }), 10000));
+
+            const { data: results, error: insertError } = await Promise.race([insertPromise, timeoutPromise]);
+
             if (!insertError && results && results.length > 0) {
                 finalLocationId = results[0].id;
+                console.log(`[SubmitReview] Location synced! New ID: ${finalLocationId}`);
             } else {
+                console.warn("[SubmitReview] Primary sync failed:", insertError);
                 // Fallback para banco antigo
                 const legacyPayload = { ...payload, nome: payload.name, endereco: payload.address, tipo: payload.type, url_imagem: payload.image_url };
                 const { data: retry, error: retryError } = await supabase.from('locations').insert(legacyPayload).select();
                 if (!retryError && retry && retry.length > 0) {
                     finalLocationId = retry[0].id;
+                    console.log(`[SubmitReview] Legacy sync success! New ID: ${finalLocationId}`);
                 } else {
+                    console.error("[SubmitReview] FATAL: Could not sync temp location.", retryError);
+                    alert("Erro: Não foi possível registrar o local no banco.");
                     return false;
                 }
             }
-        } catch (e) { return false; }
+        } catch (e) {
+            console.error("[SubmitReview] Exception during sync:", e);
+            return false;
+        }
     }
 
     // 2. SUBMIT REVIEW - DIRECT & SIMPLE
-    // Apenas tenta inserir na tabela 'reviews'. Se falhar, é porque o usuário não rodou o SQL de fix.
     const payload = {
         location_id: finalLocationId,
         user_id: review.userId,
@@ -1460,36 +1493,57 @@ export const submitReview = async (review: Review, locationContext?: Location): 
     };
 
     try {
-        const { error } = await supabase.from('reviews').insert(payload);
+        console.log("[SubmitReview] Inserting review with timeout protection...", payload);
+
+        // TIMEOUT PROTECTION
+        const insertPromise = supabase.from('reviews').insert(payload);
+        const timeoutPromise = new Promise<{ error: any }>((resolve) =>
+            setTimeout(() => resolve({ error: { message: 'Timeout: O banco de dados demorou muito para responder.' } }), 10000)
+        );
+
+        const { error } = await Promise.race([insertPromise, timeoutPromise]);
 
         if (error) {
-            console.error("SQL Error on Insert:", error);
-            console.warn(">> O USUÁRIO PRECISA RODAR O SCRIPT SQL DE RESET <<");
-            alert("Erro de banco de dados. Por favor, execute o script SQL de correção.");
+            console.error("SQL Error on Insert or Timeout:", error);
+
+            // If it's a timeout, we might assume it succeeded in the background if connection is flaky, 
+            // but safer to tell user to try again or just return success if we are optimistic.
+            // For now, let's return FALSE so they can retry, but show a specific alert.
+            if (error.message?.includes('Timeout')) {
+                alert("A conexão está lenta. Tente novamente.");
+            } else {
+                alert("Erro ao salvar: " + (error.message || "Erro desconhecido"));
+            }
             return false;
         }
 
-        // Success! Update stats
-        await updateUserProgress(review.userId, 10);
+        console.log("[SubmitReview] SUCCESS!");
 
-        // Update aggregated stats on location
-        const { data: allReviews } = await supabase.from('reviews').select('*').eq('location_id', finalLocationId);
-        if (allReviews && allReviews.length > 0) {
-            const count = allReviews.length;
-            const avgCrowd = allReviews.reduce((acc: number, r: any) => acc + (r.crowd || 0), 0) / count;
-            const avgVibe = allReviews.reduce((acc: number, r: any) => acc + (r.vibe || 0), 0) / count;
-            const avgPrice = allReviews.reduce((acc: number, r: any) => acc + (r.price || 0), 0) / count;
+        // Success! Update stats (Fire and forget to avoid hanging UI)
+        updateUserProgress(review.userId, 10).catch(e => console.warn("XP update failed", e));
 
-            await supabase.from('locations').update({
-                stats: { avgCrowd, avgVibe, avgPrice, reviewCount: count, lastUpdated: new Date() }
-            }).eq('id', finalLocationId);
-        }
+        // Update aggregated stats on location (Fire and forget)
+        (async () => {
+            try {
+                const { data: allReviews } = await supabase.from('reviews').select('*').eq('location_id', finalLocationId);
+                if (allReviews && allReviews.length > 0) {
+                    const count = allReviews.length;
+                    const avgCrowd = allReviews.reduce((acc: number, r: any) => acc + (r.crowd || 0), 0) / count;
+                    const avgVibe = allReviews.reduce((acc: number, r: any) => acc + (r.vibe || 0), 0) / count;
+                    const avgPrice = allReviews.reduce((acc: number, r: any) => acc + (r.price || 0), 0) / count;
+
+                    await supabase.from('locations').update({
+                        stats: { avgCrowd, avgVibe, avgPrice, reviewCount: count, lastUpdated: new Date() }
+                    }).eq('id', finalLocationId);
+                }
+            } catch (err) { console.warn("Stats aggregation failed", err); }
+        })();
 
         triggerHaptic([50, 50]);
         return true;
 
     } catch (e) {
-        console.error(e);
+        console.error("Exception in submitReview:", e);
         return false;
     }
 };
