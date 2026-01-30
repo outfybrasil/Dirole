@@ -1,0 +1,34 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Additional Custom Global Styles */
+body {
+    background-color: #0f0518;
+    color: white;
+    overscroll-behavior-y: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+::-webkit-scrollbar {
+    width: 0px;
+    background: transparent;
+}
+
+/* SMARTWATCH & ULTRA-SMALL SCREEN (PWA/WEARABLES) */
+@media (max-width: 360px) {
+    :root { font-size: 14px; }
+}
+
+@media (max-width: 300px) {
+    :root { font-size: 12px; }
+    .nav-label { display: none !important; }
+    .nav-icon { font-size: 1.25rem !important; margin-bottom: 0 !important; }
+    .p-8 { padding: 1rem !important; }
+    .px-8 { padding-left: 1.25rem !important; padding-right: 1.25rem !important; }
+}
+
+@media (max-width: 250px) {
+    body { padding: 4% !important; }
+    .bottom-nav { padding-bottom: 20px !important; border-radius: 40px !important; }
+}
