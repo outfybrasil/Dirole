@@ -67,7 +67,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnter }) => {
                         <div className="absolute inset-0 bg-gradient-to-tr from-purple-500 to-pink-500 rounded-xl rotate-6 blur-lg opacity-60"></div>
                         <img src="/og-image.png" className="w-10 h-10 object-contain relative z-10" alt="Dirole Logo" />
                     </div>
-                    <span className="text-2xl font-black italic tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
+                    <span className="text-2xl font-black italic tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400 py-2 inline-block overflow-visible leading-relaxed">
                         DIROLE
                     </span>
                 </div>
@@ -213,7 +213,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnter }) => {
                     <div className="flex flex-col md:flex-row items-center justify-between gap-8 mb-12">
                         <div className="flex items-center gap-2">
                             <img src="/og-image.png" className="w-8 h-8 object-contain" alt="Dirole Logo" />
-                            <span className="text-xl font-black italic tracking-tighter">DIROLE</span>
+                            <span className="text-xl font-black italic tracking-tighter py-1 inline-block overflow-visible leading-relaxed">DIROLE</span>
                         </div>
                         <div className="flex flex-wrap justify-center gap-8 text-sm font-bold text-gray-400 uppercase tracking-widest">
                             <button onClick={() => setModalContent({
