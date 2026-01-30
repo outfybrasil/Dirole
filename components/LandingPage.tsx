@@ -10,34 +10,44 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnter }) => {
 
     return (
         <div className="min-h-screen bg-[#0f0518] text-white font-sans overflow-x-hidden relative selection:bg-purple-500/30">
-            {/* Modal for About/Terms/Privacy */}
+            {/* Modal for About/Terms/Privacy - Styled as a "New Window" */}
             {modalContent && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 backdrop-blur-xl bg-black/60 animate-fade-in">
-                    <div className="bg-[#1a0b2e] border border-white/10 rounded-[2rem] p-8 max-w-md w-full relative shadow-2xl">
-                        <button
-                            onClick={() => setModalContent(null)}
-                            className="absolute top-6 right-6 text-gray-400 hover:text-white transition-colors"
-                        >
-                            <ArrowRight className="w-6 h-6 rotate-180" />
-                        </button>
-                        <h3 className="text-2xl font-black italic mb-6 tracking-tight uppercase text-purple-400">
-                            {modalContent.title}
-                        </h3>
-                        <div className="text-gray-300 leading-relaxed text-sm space-y-4">
+                <div className="fixed inset-0 z-[200] flex items-center justify-center sm:p-6 backdrop-blur-2xl bg-black/80 animate-fade-in transition-all">
+                    <div className="bg-[#0f0518] border-0 sm:border sm:border-white/10 w-full h-full sm:h-auto sm:max-w-2xl sm:rounded-[2.5rem] flex flex-col relative shadow-[0_0_100px_rgba(139,92,246,0.2)] overflow-hidden">
+
+                        {/* Modal Header */}
+                        <div className="flex items-center justify-between p-6 sm:p-8 border-b border-white/5 bg-white/5">
+                            <h3 className="text-2xl font-black italic tracking-tight uppercase bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-500">
+                                {modalContent.title}
+                            </h3>
+                            <button
+                                onClick={() => setModalContent(null)}
+                                className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-white hover:bg-white/10 transition-colors border border-white/10"
+                            >
+                                <ArrowRight className="w-6 h-6 rotate-180" />
+                            </button>
+                        </div>
+
+                        {/* Modal Body */}
+                        <div className="flex-1 overflow-y-auto p-6 sm:p-10 text-gray-300 leading-relaxed text-lg space-y-6">
                             {modalContent.text.split('\n').map((para, i) => (
-                                <p key={i}>{para}</p>
+                                <p key={i} className="animate-fade-in-up" style={{ animationDelay: `${i * 100}ms` }}>{para}</p>
                             ))}
                         </div>
-                        <div className="mt-8 pt-6 border-t border-white/5 flex flex-col items-center gap-2">
-                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">Uma criação</p>
-                            <span className="text-lg font-black italic text-white tracking-widest">OUTFY</span>
+
+                        {/* Modal Footer */}
+                        <div className="p-8 border-t border-white/5 bg-black/40 flex flex-col items-center gap-4">
+                            <div className="flex items-center gap-3 opacity-60">
+                                <p className="text-xs font-bold text-gray-500 uppercase tracking-[0.2em]">Desenvolvido por</p>
+                                <span className="text-xl font-black italic text-white tracking-widest">OUTFY</span>
+                            </div>
+                            <button
+                                onClick={() => setModalContent(null)}
+                                className="w-full sm:w-auto px-12 py-4 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-black italic rounded-2xl hover:scale-105 transition-all shadow-lg active:scale-95"
+                            >
+                                FECHAR JANELA
+                            </button>
                         </div>
-                        <button
-                            onClick={() => setModalContent(null)}
-                            className="mt-8 w-full py-4 bg-white text-black font-bold rounded-2xl hover:bg-purple-100 transition-colors"
-                        >
-                            Entendido
-                        </button>
                     </div>
                 </div>
             )}
@@ -79,9 +89,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnter }) => {
                         Disponível em todo o Brasil
                     </div>
 
-                    <h1 className="text-5xl md:text-7xl font-black italic leading-[1.1] tracking-tighter py-2">
-                        O TERMÔMETRO <br />
-                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-orange-400">
+                    <h1 className="text-5xl md:text-7xl font-black italic leading-[1.4] tracking-tight overflow-visible">
+                        <span className="block pt-4">O TERMÔMETRO</span>
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-pink-500 to-orange-400 pb-4 block">
                             DO SEU ROLÊ
                         </span>
                     </h1>
