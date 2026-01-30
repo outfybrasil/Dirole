@@ -16,7 +16,7 @@ const suppressError = (error: any) => {
   return false;
 };
 
-// Catch Unhandled Promise Rejections (e.g. failed fetches, Supabase timeouts)
+// Catch Unhandled Promise Rejections (e.g. failed fetches, API timeouts)
 window.addEventListener('unhandledrejection', (event) => {
   if (suppressError(event.reason)) {
     event.preventDefault();

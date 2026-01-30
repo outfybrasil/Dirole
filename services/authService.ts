@@ -1,5 +1,5 @@
 import { ID, OAuthProvider } from 'appwrite';
-import { account, databases, APPWRITE_DATABASE_ID } from './appwriteClient';
+import { account, databases, APPWRITE_DATABASE_ID, APPWRITE_PROJECT_ID } from './appwriteClient';
 
 export const signUpWithEmail = async (email: string, pass: string, name: string) => {
     try {
@@ -21,8 +21,11 @@ export const signInWithEmail = async (email: string, pass: string) => {
 
 export const signInWithGoogle = async () => {
     try {
+        console.log("[Auth] Initiating Google login...");
+        console.log("[Auth] Current Project ID:", APPWRITE_PROJECT_ID);
+        console.log("[Auth] Provider used: google (hardcoded)");
         // Redireciona para o Google OAuth do Appwrite
-        return account.createOAuth2Session(OAuthProvider.Google, window.location.origin, window.location.origin);
+        return account.createOAuth2Session('google' as any, window.location.origin, window.location.origin);
     } catch (e: any) {
         throw e;
     }

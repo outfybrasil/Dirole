@@ -23,7 +23,6 @@ import { Location, Filters, User } from './types';
 import { getNearbyRoles, getUserProfile, toggleFavorite, syncUserProfile, triggerHaptic, requestNotificationPermission, sendLocalNotification, searchLocations, getUserById } from './services/mockService';
 import { INITIAL_CENTER } from './constants';
 import { getCurrentSession, signOut } from './services/authService';
-// import { supabase } from './services/supabaseClient'; // REMOVED SUPABASE
 import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
 import { DataPrivacyModal } from './components/DataPrivacyModal';
 import { Geolocation } from '@capacitor/geolocation';

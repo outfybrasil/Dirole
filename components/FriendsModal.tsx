@@ -134,7 +134,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
             // @ts-ignore - Web NFC API
             const ndef = new NDEFReader();
             await ndef.write({
-                records: [{ recordType: "url", data: `https://dirole.app/u/${currentUser.id}` }]
+                records: [{ recordType: "url", data: `https://dirole.appwrite.network/u/${currentUser.id}` }]
             });
             triggerHaptic([50, 50, 50]);
             alert("Perfil compartilhado via NFC com sucesso!");

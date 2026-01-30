@@ -26,6 +26,19 @@ Para facilitar, criei um script que configura o banco de dados inteiro para voc�
 
 ---
 
+### 2. Configurar Autenticação Google (Essencial) 🔐
+O script acima cria o banco de dados, mas **não configura o login social**. Para o Google funcionar:
+
+1.  **No Appwrite Console**:
+    *   Vá em **Auth** > **Settings**.
+    *   Ative o provedor **Google**.
+    *   Copie a **URI de Callback** fornecida (ex: `https://cloud.appwrite.io/v1/account/sessions/oauth2/callback/google/...`).
+2.  **No Google Cloud Console**:
+    *   Crie credenciais OAuth 2.0.
+    *   **Origens Autorizadas**: Adicione `http://localhost:5173` (ou sua porta local) e seu domínio de produção.
+    *   **URIs de Redirecionamento**: Cole a URI de Callback do Appwrite.
+    *   Copie o **Client ID** e **Client Secret** e cole no Appwrite.
+
 ### 2. Configuração via CLI (Opcional) 🖥️
 Se você tem o Appwrite CLI instalado:
 ```bash
