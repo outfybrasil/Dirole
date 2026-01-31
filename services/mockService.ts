@@ -687,11 +687,11 @@ export const sendFriendRequest = async (currentUserId: string, targetUserId: str
             },
             [
                 Permission.read(Role.user(currentUserId)),
-                Permission.read(Role.user(targetUserId)),
+                Permission.read(Role.users()), // Allow other users to see the request
                 Permission.update(Role.user(currentUserId)),
-                Permission.update(Role.user(targetUserId)),
+                Permission.update(Role.users()), // Allow the target user to update status to accepted/rejected
                 Permission.delete(Role.user(currentUserId)),
-                Permission.delete(Role.user(targetUserId))
+                Permission.delete(Role.users()) // Allow either party to delete/cancel
             ]
         );
         console.log(`[Appwrite] ✅ Friend request created! Doc ID: ${doc.$id}`);
