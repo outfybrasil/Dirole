@@ -11,7 +11,10 @@
   "dependencies": {
     "@capacitor/camera": "^7.0.2",
     "@capacitor/geolocation": "^7.1.6",
+<<<<<<< HEAD
     "@ionic/pwa-elements": "^3.3.0",
+=======
+>>>>>>> 5ae22fa59f65bfed05acedb669344010fc6aae7a
     "appwrite": "^21.5.0",
     "capacitor-fingerprint-auth": "^0.0.2",
     "html5-qrcode": "^2.3.8",
