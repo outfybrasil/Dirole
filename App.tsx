@@ -342,7 +342,7 @@ function App() {
 
     // Subscribe to friendships collection
     try {
-      const unsubscribe = client.subscribe(
+      const unsubscribeFriendships = client.subscribe(
         `databases.${APPWRITE_DATABASE_ID}.collections.friendships.documents`,
         (response: any) => {
           console.log('[Realtime] Friendship event:', response.events, response.payload);
@@ -391,8 +391,54 @@ function App() {
         }
       );
 
-      unsubscribeRef.current = unsubscribe;
-      console.log('[Realtime] ✅ Subscription active for friendships');
+      // --- INVITES LISTENER (New) ---
+      const unsubscribeInvites = client.subscribe(
+        `databases.${APPWRITE_DATABASE_ID}.collections.invites.documents`,
+        (response: any) => {
+          console.log('[Realtime] Invite Event:', response.events);
+          const payload = response.payload;
+          const events = response.events || [];
+
+          const isCreate = events.some((e: string) => e.includes('.create'));
+          const isUpdate = events.some((e: string) => e.includes('.update'));
+
+          // 1. New Invite Receive (Someone invited ME to a location)
+          if (isCreate && payload.to_user_id === currentUser.id) {
+            console.log('[Realtime] 🎫 NEW LOCATION INVITE received!');
+            playNotificationSound();
+            triggerHaptic();
+            addToast({
+              title: 'Chamado pro Rolê! 🍻',
+              message: `Convite para ${payload.location_name || 'um local'}.`,
+              type: 'info',
+              actionLabel: 'Ver',
+              action: () => setIsNotificationsModalOpen(true)
+            });
+            sendLocalNotification('🍻 Chamado pro Rolê!', 'Você foi convidado para sair!');
+            // Refresh notification count if you have separate counters for invites
+          }
+
+          // 2. My Invite was Accepted (I invited someone, and they accepted)
+          if (isUpdate && payload.from_user_id === currentUser.id && payload.status === 'accepted') {
+            console.log('[Realtime] 🚀 LOCATION INVITE ACCEPTED!');
+            playNotificationSound();
+            triggerHaptic();
+            addToast({
+              title: 'Confirmado! 🚀',
+              message: 'Seu convite para o rolê foi aceito.',
+              type: 'success'
+            });
+            sendLocalNotification('🚀 Confirmado!', 'Seu convite para o rolê foi aceito.');
+          }
+        }
+      );
+
+      unsubscribeRef.current = () => {
+        unsubscribeFriendships();
+        unsubscribeInvites();
+      };
+
+      console.log('[Realtime] ✅ Subscription active for friendships AND invites');
 
     } catch (err) {
       console.error('[Realtime] Subscription failed:', err);
@@ -1202,6 +1248,7 @@ function App() {
             onCheckIn={handleCheckIn}
             onClaim={handleOpenClaim}
             onReport={handleOpenReport}
+            onInvite={handleOpenInvite}
             onShowToast={(title, message, type) => addToast({
               title,
               message,
