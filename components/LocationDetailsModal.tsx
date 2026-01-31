@@ -11,6 +11,7 @@ interface LocationDetailsModalProps {
     onClaim?: (loc: Location) => void;
     onReport?: (id: string, type: 'location' | 'review' | 'photo', name?: string) => void;
     onInvite?: (loc: Location) => void;
+    onShowToast?: (title: string, message: string, type: 'success' | 'error' | 'info') => void;
 }
 
 type TabType = 'overview' | 'agenda' | 'gallery';
@@ -22,7 +23,8 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
     onCheckIn,
     onClaim,
     onReport,
-    onInvite
+    onInvite,
+    onShowToast
 }) => {
     const [activeTab, setActiveTab] = useState<TabType>('overview');
     const [hasVoted, setHasVoted] = useState(false);
@@ -138,12 +140,15 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
 
     const handleShare = async () => {
         triggerHaptic();
+        const shareUrl = `${window.location.origin}/?loc=${location.id}`;
+        const shareText = `Olha esse rolê no Dirole: ${location.name} - ${location.address}`;
+
         if (navigator.share) {
             try {
                 await navigator.share({
                     title: `Vem pro ${location.name}!`,
-                    text: `Olha esse lugar que achei no Dirole: ${location.name} - ${location.address}`,
-                    url: window.location.href
+                    text: shareText,
+                    url: shareUrl
                 });
             } catch (error) {
                 console.log('Error sharing:', error);
@@ -151,8 +156,12 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
         } else {
             // Fallback for desktop or non-supported browsers
             try {
-                await navigator.clipboard.writeText(`${location.name} - ${location.address}`);
-                alert("Link copiado para a área de transferência!");
+                await navigator.clipboard.writeText(shareUrl);
+                if (onShowToast) {
+                    onShowToast("Link Copiado! 🔗", "Compartilhe com seus amigos.", 'success');
+                } else {
+                    alert("Link copiado para a área de transferência!");
+                }
             } catch (err) {
                 console.error('Failed to copy', err);
             }

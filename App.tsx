@@ -138,6 +138,25 @@ function App() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const startY = useRef(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  // DEEP LINKING: Handle ?loc=ID to open location details automatically on load
+  useEffect(() => {
+    if (locations.length > 0 && hasInitialLoad && !selectedLocation) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const locId = urlParams.get('loc');
+      if (locId) {
+        const found = locations.find(l => l.id === locId);
+        if (found) {
+          console.log("[DeepLink] Opening found location:", found.name);
+          setSelectedLocation(found);
+          setIsDetailsModalOpen(true);
+          setMapTarget({ lat: found.latitude, lng: found.longitude });
+          // Clean the URL so refresh doesn't keep opening it
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+      }
+    }
+  }, [locations, hasInitialLoad, selectedLocation]);
+
   const REFRESH_THRESHOLD = 80;
 
   // Initial Filters - Default 1km
@@ -338,22 +357,41 @@ function App() {
 
           // Only react to CREATE events where current user is receiver and status is pending
           const isCreate = events.some((e: string) => e.includes('.create'));
+          const isUpdate = events.some((e: string) => e.includes('.update'));
           const isForMe = payload.receiver_id === currentUser.id;
+          const iSentIt = payload.requester_id === currentUser.id;
           const isPending = payload.status === 'pending';
+          const isAccepted = payload.status === 'accepted';
 
+          // 1. New request FOR ME
           if (isCreate && isForMe && isPending) {
             console.log('[Realtime] 🔔 NEW FRIEND REQUEST received!');
-
-            // Trigger all feedback
             playNotificationSound();
             triggerHaptic();
-            sendLocalNotification(
-              '🔔 Novo Convite!',
-              'Você recebeu um novo pedido de amizade!'
-            );
-
-            // Update count
+            addToast({
+              title: 'Novo Convite! 📩',
+              message: 'Alguém quer ser seu amigo no Dirole.',
+              type: 'info'
+            });
+            sendLocalNotification('🔔 Novo Convite!', 'Você recebeu um novo pedido de amizade!');
             fetchNotificationCount(currentUser.id);
+          }
+
+          // 2. Request I sent was ACCEPTED
+          if (isUpdate && iSentIt && isAccepted) {
+            console.log('[Realtime] 🎉 FRIEND REQUEST ACCEPTED!');
+            playNotificationSound();
+            triggerHaptic();
+            addToast({
+              title: 'Convite Aceito! 🤝',
+              message: 'Vocês agora são amigos! Bora dominar o mapa.',
+              type: 'success'
+            });
+            sendLocalNotification('🤝 Amizade Confirmada!', 'Seu convite de amizade foi aceito!');
+
+            // Update local user state to reflect new friends list
+            const updated = getUserProfile();
+            if (updated) setCurrentUser(updated);
           }
         }
       );
@@ -703,75 +741,7 @@ function App() {
     setNotificationCount(0); // Clear badge on open
   }, []);
 
-  // --- REALTIME NOTIFICATIONS ---
-  useEffect(() => {
-    if (!currentUser) return;
 
-    const currentUserId = currentUser.id; // Capture ID for closure
-    console.log(`[Realtime] Subscribing to notifications for ${currentUserId}...`);
-
-    const unsubscribe = client.subscribe(
-      `databases.${APPWRITE_DATABASE_ID}.collections.friendships.documents`,
-      (response) => {
-        console.log("[Realtime] Event Received:", response); // GLOBAL LOG
-
-        // payload contains the document
-        const payload = response.payload as any;
-        const events = response.events; // e.g., databases.*.collections.*.documents.*.create
-
-        console.log("[Realtime] Payload receiver:", payload.receiver_id, "Current:", currentUser.id);
-        console.log("[Realtime] Event Includes Create?", events.some(e => e.includes('.create')));
-        console.log("[Realtime] Status:", payload.status);
-
-        // 1. New Friend Request Received
-        if (
-          events.some(e => e.includes('.create')) &&
-          payload.receiver_id === currentUserId &&
-          payload.status === 'pending'
-        ) {
-          console.log("[Realtime] MATCH! Incrementing badge...");
-          triggerHaptic();
-          setNotificationCount(prev => {
-            console.log("[Realtime] New count:", prev + 1);
-            // Force UI update via state
-            return prev + 1;
-          });
-
-          // Force toast
-          addToast({
-            title: 'Novo Convite! 📩',
-            message: 'Alguém quer ser seu amigo no Dirole.',
-            type: 'info'
-          });
-        }
-
-        // 2. Friend Request Accepted (I am the requester)
-        if (
-          events.some(e => e.includes('.update')) &&
-          payload.requester_id === currentUserId &&
-          payload.status === 'accepted'
-        ) {
-          console.log("[Realtime] MATCH ACCEPT! Refreshing...");
-          triggerHaptic();
-          addToast({
-            title: 'Convite Aceito! 🤝',
-            message: 'Vocês agora são amigos! Bora dominar o mapa.',
-            type: 'success'
-          });
-
-          // Silent refresh
-          getUserProfile(currentUserId).then(u => {
-            if (u) setCurrentUser(prev => ({ ...prev!, friends: u.friends }));
-          });
-        }
-      }
-    );
-
-    return () => {
-      console.log("[Realtime] Unsubscribing...");
-      unsubscribe();
-    };
-  }, [currentUser?.id]); // Only re-subscribe if ID changes, NOT if other user props change
 
   const handleOpenInvite = useCallback((loc: Location) => {
     setSelectedLocation(loc);
@@ -1229,7 +1199,11 @@ function App() {
             onCheckIn={handleCheckIn}
             onClaim={handleOpenClaim}
             onReport={handleOpenReport}
-            onInvite={handleOpenInvite}
+            onShowToast={(title, message, type) => addToast({
+              title,
+              message,
+              type: type as any
+            })}
           />
           <ClaimBusinessModal
             location={selectedLocation}

@@ -195,35 +195,103 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
         );
     }
 
-    const renderUserCard = (user: FriendUser, type: 'friend' | 'request' | 'search') => (
-        <div key={user.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between mb-2">
-            <div className="flex items-center gap-3">
-                <div className="relative">
-                    <UserAvatar avatar={user.avatar} size="md" />
-                    {user.level && (
-                        <div className="absolute -bottom-1 -right-1 bg-yellow-500 text-black text-[8px] font-black px-1.5 py-0.5 rounded-full border border-[#0f0518]">
-                            {user.level}
-                        </div>
+    const renderUserCard = (user: FriendUser, type: 'friend' | 'request' | 'search') => {
+        const isSelf = currentUser && user.id === currentUser.id;
+
+        return (
+            <div key={user.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between mb-2 group relative overflow-hidden active:bg-white/10 transition-colors">
+                <div className="flex items-center gap-3">
+                    <div className="relative">
+                        <UserAvatar avatar={user.avatar} size="md" />
+                        {user.level && (
+                            <div className="absolute -bottom-1 -right-1 bg-yellow-500 text-black text-[8px] font-black px-1.5 py-0.5 rounded-full border border-[#0f0518]">
+                                {user.level}
+                            </div>
+                        )}
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-white text-sm">{user.name}</h4>
+                        <p className="text-xs text-slate-500 font-medium">@{user.nickname}</p>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                    {/* BUSCA: Botões Dinâmicos */}
+                    {type === 'search' && !isSelf && (
+                        <>
+                            {user.friendshipStatus === FriendshipStatus.NONE && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); handleSendRequest(user.id); }}
+                                    className="bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all active:scale-90 shadow-lg shadow-indigo-500/20"
+                                >
+                                    Adicionar
+                                </button>
+                            )}
+                            {user.friendshipStatus === FriendshipStatus.PENDING_SENT && (
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter bg-white/5 px-2 py-1 rounded-md">
+                                    Solicitado
+                                </span>
+                            )}
+                            {user.friendshipStatus === FriendshipStatus.PENDING_RECEIVED && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); handleResponse(user.friendshipId || '', true); }}
+                                    className="bg-green-500 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all active:scale-90"
+                                >
+                                    Aceitar
+                                </button>
+                            )}
+                            {user.friendshipStatus === FriendshipStatus.ACCEPTED && (
+                                <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center text-green-500">
+                                    <i className="fas fa-check text-xs"></i>
+                                </div>
+                            )}
+                        </>
                     )}
-                </div>
-                <div>
-                    <h4 className="font-bold text-white text-sm">{user.name}</h4>
-                    <p className="text-xs text-slate-500 font-medium">@{user.nickname}</p>
-                </div>
-            </div>
 
-            <div>
-
-                {type === 'friend' && (
-                    <div className="flex items-center gap-2">
+                    {/* AMIGOS / REQUESTS: Botões Standard */}
+                    {type === 'friend' && (
                         <button className="text-slate-500 text-xs hover:text-white p-2">
                             <i className="fas fa-chevron-right"></i>
                         </button>
-                    </div>
-                )}
+                    )}
+
+                    {type === 'request' && (
+                        <div className="flex gap-2">
+                            <button
+                                onClick={(e) => { e.stopPropagation(); handleResponse(user.friendshipId || '', true); }}
+                                className="bg-indigo-500 text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase shadow-lg shadow-indigo-500/20 active:scale-95"
+                            >
+                                Aceitar
+                            </button>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); handleResponse(user.friendshipId || '', false); }}
+                                className="bg-white/5 text-slate-400 px-3 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-white/10 active:scale-95 border border-white/5"
+                            >
+                                Recusar
+                            </button>
+                        </div>
+                    )}
+
+                    {/* DENÚNCIA: Sempre visível se não for eu */}
+                    {!isSelf && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm(`Deseja denunciar ${user.name}? Nossa equipe analisará o perfil.`)) {
+                                    if (onShowToast) onShowToast("Denúncia Enviada", "Obrigado por sua colaboração.", 'info');
+                                    else alert("Denúncia enviada.");
+                                }
+                            }}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 hover:text-red-500 hover:bg-red-500/10 transition-all sm:opacity-0 group-hover:opacity-100"
+                            title="Denunciar Usuário"
+                        >
+                            <i className="fas fa-flag text-xs"></i>
+                        </button>
+                    )}
+                </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     return (
         <div className="fixed inset-0 z-[500] flex items-end sm:items-center justify-center pointer-events-none">
