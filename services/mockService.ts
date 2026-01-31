@@ -639,11 +639,44 @@ export const getFriends = async (currentUserId: string): Promise<FriendUser[]> =
     return [];
 };
 
-export const sendFriendRequest = async (currentUserId: string, targetUserId: string): Promise<boolean> => {
-    if (currentUserId.startsWith('guest_')) return false;
+export const sendFriendRequest = async (currentUserId: string, targetUserId: string): Promise<{ success: boolean, error?: string }> => {
+    console.log(`[Appwrite] Attempting to send friend request from ${currentUserId} to ${targetUserId}`);
+
+    if (!currentUserId || !targetUserId) {
+        return { success: false, error: "IDs de usuário ausentes" };
+    }
+
+    if (currentUserId.startsWith('guest_')) {
+        return { success: false, error: "Usuários convidados não podem enviar convites" };
+    }
+
+    if (currentUserId === targetUserId) {
+        return { success: false, error: "Você não pode adicionar a si mesmo" };
+    }
 
     try {
-        await databases.createDocument(
+        // Check if relationship already exists
+        const existing = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'friendships',
+            [
+                Query.or([
+                    Query.and([Query.equal('requester_id', currentUserId), Query.equal('receiver_id', targetUserId)]),
+                    Query.and([Query.equal('requester_id', targetUserId), Query.equal('receiver_id', currentUserId)])
+                ])
+            ]
+        );
+
+        if (existing.total > 0) {
+            const rel = existing.documents[0];
+            if (rel.status === 'accepted') return { success: false, error: "Vocês já são amigos!" };
+            if (rel.status === 'pending') {
+                if (rel.requester_id === currentUserId) return { success: false, error: "Você já enviou um convite." };
+                else return { success: false, error: "Você já tem um convite pendente desta pessoa." };
+            }
+        }
+
+        const doc = await databases.createDocument(
             APPWRITE_DATABASE_ID,
             'friendships',
             ID.unique(),
@@ -661,10 +694,14 @@ export const sendFriendRequest = async (currentUserId: string, targetUserId: str
                 Permission.delete(Role.user(targetUserId))
             ]
         );
-        return true;
+        console.log(`[Appwrite] ✅ Friend request created! Doc ID: ${doc.$id}`);
+        return { success: true };
     } catch (e: any) {
-        console.error("[Appwrite] Error sending friend request:", e.message);
-        return false;
+        console.error("[Appwrite] ❌ FATAL Error sending friend request:", e);
+        return {
+            success: false,
+            error: e.message || "Erro desconhecido no Appwrite"
+        };
     }
 };
 

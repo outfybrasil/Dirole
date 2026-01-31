@@ -96,12 +96,12 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
         setSearchResults(prev => prev.map(u => u.id === targetId ? { ...u, friendshipStatus: FriendshipStatus.PENDING_SENT } : u));
         setSuggestedUsers(prev => prev.map(u => u.id === targetId ? { ...u, friendshipStatus: FriendshipStatus.PENDING_SENT } : u));
 
-        const success = await sendFriendRequest(currentUser.id, targetId);
-        if (success) {
+        const result = await sendFriendRequest(currentUser.id, targetId);
+        if (result.success) {
             if (onShowToast) onShowToast("Convite Enviado! 📨", "Aguarde a aprovação do seu amigo.", 'success');
         } else {
             // Rollback if needed, but for now just warn
-            if (onShowToast) onShowToast("Erro ao enviar", "Tente novamente.", 'error');
+            if (onShowToast) onShowToast("Erro ao enviar", result.error || "Tente novamente.", 'error');
         }
     };
 
@@ -429,8 +429,8 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
                                 <button
                                     onClick={() => { triggerHaptic(); setActiveTab('requests'); }}
                                     className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'requests'
-                                            ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
-                                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                        ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
+                                        : 'text-gray-400 hover:text-white hover:bg-white/5'
                                         }`}
                                 >
                                     Solicitações
@@ -443,8 +443,8 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
                                 <button
                                     onClick={() => { triggerHaptic(); setActiveTab('my_friends'); }}
                                     className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'my_friends'
-                                            ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
-                                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                        ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
+                                        : 'text-gray-400 hover:text-white hover:bg-white/5'
                                         }`}
                                 >
                                     Amigos
@@ -455,8 +455,8 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
                                 <button
                                     onClick={() => { triggerHaptic(); setActiveTab('search'); }}
                                     className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'search'
-                                            ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
-                                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                        ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
+                                        : 'text-gray-400 hover:text-white hover:bg-white/5'
                                         }`}
                                 >
                                     Buscar
