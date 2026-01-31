@@ -157,7 +157,7 @@ export const Leaderboard: React.FC = () => {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <h3 className={`font-black text-base truncate tracking-tight transition-colors ${isFirst ? 'text-yellow-400' : 'text-white group-hover:text-dirole-primary'}`}>
-                      {user.name && user.name.toUpperCase()}
+                      {user.nickname ? user.nickname.toUpperCase() : user.name?.toUpperCase()}
                     </h3>
                     {isMe && <span className="text-[9px] font-black bg-dirole-primary/20 text-dirole-primary px-2 py-0.5 rounded-md uppercase tracking-wider">Você</span>}
                   </div>
