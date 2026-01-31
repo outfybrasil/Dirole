@@ -20,14 +20,16 @@ import { NotificationsModal } from './components/NotificationsModal';
 import { QRScannerModal } from './components/QRScannerModal';
 
 import { Location, Filters, User } from './types';
-import { getNearbyRoles, getUserProfile, toggleFavorite, syncUserProfile, triggerHaptic, requestNotificationPermission, sendLocalNotification, searchLocations, getUserById } from './services/mockService';
+import { getNearbyRoles, getUserProfile, toggleFavorite, syncUserProfile, triggerHaptic, requestNotificationPermission, sendLocalNotification, searchLocations, getUserById, client, APPWRITE_DATABASE_ID, getPendingFriendRequests } from './services/mockService';
 import { INITIAL_CENTER } from './constants';
-import { supabase, signOut } from './services/supabaseClient';
+import { getCurrentSession, signOut, verifyEmail } from './services/authService';
 import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
 import { DataPrivacyModal } from './components/DataPrivacyModal';
 import { Geolocation } from '@capacitor/geolocation';
 import UserAvatar from './components/UserAvatar';
 import { OnboardingModal } from './components/OnboardingModal';
+import { LandingPage } from './components/LandingPage';
+import { VerificationPendingScreen } from './components/VerificationPendingScreen';
 
 function App() {
   const [showSplash, setShowSplash] = useState(true);
@@ -35,6 +37,9 @@ function App() {
   const [isDataModalOpen, setIsDataModalOpen] = useState(false);
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+  const [isEmailUnverified, setIsEmailUnverified] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState('');
 
   // User State  // --- 0. DEV SANITY: CLEAR SERVICE WORKERS ---
   useEffect(() => {
@@ -53,6 +58,30 @@ function App() {
       setIsAddModalOpen(true);
     };
     window.addEventListener('open-add-location', handleOpenAdd);
+
+    // CHECK FOR EMAIL VERIFICATION CALLBACK
+    const urlParams = new URLSearchParams(window.location.search);
+    const userId = urlParams.get('userId');
+    const secret = urlParams.get('secret');
+
+    if (userId && secret) {
+      console.log("[Auth] Verifying email...", userId);
+      verifyEmail(userId, secret)
+        .then(() => {
+          console.log("[Auth] Email verified successfully!");
+          // Remove params from URL
+          window.history.replaceState({}, '', window.location.pathname);
+          // Show success toast (deferred until component mount logic handles it, or just generic alert for now)
+          alert("E-mail verificado com sucesso! 🎉 Você pode usar o app agora.");
+          // Force reload to update session state if logged in
+          window.location.reload();
+        })
+        .catch((err) => {
+          console.error("[Auth] Verification failed", err);
+          alert("Falha ao verificar e-mail. O link pode ter expirado.");
+        });
+    }
+
     return () => window.removeEventListener('open-add-location', handleOpenAdd);
   }, []);
 
@@ -92,6 +121,7 @@ function App() {
 
   const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
   const [friendsModalTab, setFriendsModalTab] = useState<'my_friends' | 'requests' | 'search'>('my_friends');
+  const [friendsModalView, setFriendsModalView] = useState<'default' | 'qr'>('default');
 
   const [reportTarget, setReportTarget] = useState<{ id: string, type: 'location' | 'review' | 'photo' | 'user', name?: string } | null>(null);
 
@@ -170,54 +200,56 @@ function App() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Check Supabase Session & Load Local Profile
+  // Check Appwrite Session & Load Local Profile
   useEffect(() => {
-    // 1. Check Local Storage
-    const localProfile = getUserProfile();
-    if (localProfile) {
-      setCurrentUser(localProfile);
-    }
-
-    // 2. Auth Listener (Supabase)
-    // 2. Auth Listener (Supabase)
-    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+    const initAuth = async () => {
       try {
-        console.log(`[Auth Debug] Event: ${event}`);
-        if (event === 'SIGNED_IN' && session?.user) {
-          const { user } = session;
-          console.log(`[Auth Debug] User detected: ${user.id}`);
+        // 1. Check Local Storage first for fast UI
+        const localProfile = getUserProfile();
+        if (localProfile) {
+          setCurrentUser(localProfile);
+        }
 
-          // Sync with Supabase 'profiles' table using metadata from signup
-          const syncedUser = await syncUserProfile(user.id, {
-            full_name: user.user_metadata.full_name,
-            nickname: user.user_metadata.nickname,
-            email: user.email,
-            age: user.user_metadata.age,
-            gender: user.user_metadata.gender,
-            avatar_url: user.user_metadata.avatar_url
+        // 2. Verify with Appwrite Session
+        console.log("[Auth] Checking Appwrite session...");
+        const session = await getCurrentSession();
+
+        if (session) {
+          console.log("[Auth] Active session found:", session.userId);
+
+          // CHECK EMAIL VERIFICATION
+          if (session.emailVerification === false) {
+            console.log("[Auth] Email not verified. Blocking access.");
+            setIsEmailUnverified(true);
+            setVerificationEmail(session.email);
+            // We still assume user is "logged in" for session purposes, but UI is blocked
+            // return; // Optional: stop profile sync if unverified
+          }
+
+          // Sync profile
+          const syncedUser = await syncUserProfile(session.userId, {
+            email: session.email,
+            name: session.name,
+            // Add other meta if needed
           });
 
           if (syncedUser) {
-            console.log(`[Auth Debug] User synced success.`);
             setCurrentUser(syncedUser);
-            requestNotificationPermission(); // Ask again on login
-          } else {
-            console.error(`[Auth Debug] User sync returned null.`);
           }
-        } else if (event === 'SIGNED_OUT') {
-          console.log(`[Auth Debug] User signed out.`);
-          setCurrentUser(null);
-          localStorage.removeItem('dirole_user_profile');
-          setLocations([]);
+        } else {
+          console.log("[Auth] No active session.");
+          if (localProfile) {
+            // Optional: clear local profile if no session exists
+            // setCurrentUser(null);
+            // localStorage.removeItem('dirole_user_profile');
+          }
         }
       } catch (err) {
-        console.error("[Auth Debug] Critical Error in Auth Listener:", err);
+        console.error("[Auth] Session check failed:", err);
       }
-    });
-
-    return () => {
-      authListener.subscription.unsubscribe();
     };
+
+    initAuth();
   }, []);
 
   // --- NOTIFICATION HANDLERS ---
@@ -230,96 +262,129 @@ function App() {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  const fetchNotificationCount = useCallback(async (userId: string) => {
+  const previousCountRef = useRef(0);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
+
+  // Play notification sound using Web Audio API
+  const playNotificationSound = useCallback(() => {
     try {
-      const [invites, friends] = await Promise.all([
-        supabase.from('invites').select('id', { count: 'exact' }).eq('to_user_id', userId).eq('status', 'pending'),
-        supabase.from('friendships').select('id', { count: 'exact' }).eq('receiver_id', userId).eq('status', 'pending')
-      ]);
-      setNotificationCount((invites.count || 0) + (friends.count || 0));
-    } catch (e) { console.error(e); }
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      // Pleasant notification tone (C major chord - 523.25 Hz)
+      oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime);
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.5);
+    } catch (e) {
+      console.warn('[Sound] Failed to play notification:', e);
+    }
   }, []);
 
-  useEffect(() => {
-    if (currentUser) {
-      fetchNotificationCount(currentUser.id);
+
+  const fetchNotificationCount = useCallback(async (userId: string) => {
+    try {
+      const pendingRequests = await getPendingFriendRequests(userId);
+      const newCount = pendingRequests.length;
+
+      // If count increased, trigger feedback
+      if (newCount > previousCountRef.current && previousCountRef.current > 0) {
+        playNotificationSound();
+        triggerHaptic();
+        sendLocalNotification(
+          '🔔 Novo Convite!',
+          'Você recebeu um novo pedido de amizade'
+        );
+      }
+
+      previousCountRef.current = newCount;
+      setNotificationCount(newCount);
+    } catch (e) {
+      console.error('[Notifications] Failed to fetch friend requests:', e);
     }
-  }, [currentUser, fetchNotificationCount]);
+  }, [playNotificationSound]);
 
-
-  // --- REALTIME NOTIFICATIONS (INVITES & FRIENDS) ---
+  // Real-time friend request notifications via Appwrite WebSocket
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || currentUser.id.startsWith('guest_')) {
+      console.log('[Realtime] Skipping subscription (no user or guest)');
+      return;
+    }
 
-    const channel = supabase.channel('realtime:social')
-      // Listener 1: Invites
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'invites', filter: `to_user_id=eq.${currentUser.id}` },
-        (payload) => {
-          const invite = payload.new;
-          triggerHaptic([100, 50, 100]);
-          sendLocalNotification(
-            "📩 Novo Convite de Rolê!",
-            invite.message || `Você foi convidado para ir ao ${invite.location_name}`
-          );
-          addToast({
-            title: "📩 Novo Convite!",
-            message: `Bora pro ${invite.location_name}?`,
-            type: 'invite',
-            actionLabel: 'VER',
-            action: () => setIsNotificationsModalOpen(true)
-          });
-          setNotificationCount(prev => prev + 1);
-        }
-      )
-      // Listener 2: Friend Requests (INSERT into friendships where receiver is current user)
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'friendships', filter: `receiver_id=eq.${currentUser.id}` },
-        (payload) => {
-          triggerHaptic([50, 50]);
-          sendLocalNotification(
-            "👥 Nova Solicitação de Amizade",
-            "Alguém quer se conectar com você no Dirole!"
-          );
-          addToast({
-            title: "👥 Novo Amigo!",
-            message: "Alguém te mandou uma solicitação.",
-            type: 'friend_request',
-            actionLabel: 'ACEITAR',
-            action: () => {
-              setIsNotificationsModalOpen(true);
-            }
-          });
-          setNotificationCount(prev => prev + 1);
-        }
-      )
-      // Listener 3: Friend Request Accepted (UPDATE where status='accepted')
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'friendships', filter: `requester_id=eq.${currentUser.id}` },
-        (payload) => {
-          if (payload.new.status === 'accepted') {
-            triggerHaptic(50);
+    console.log('[Realtime] Setting up friendship notifications for user:', currentUser.id);
+
+    // Cleanup previous subscription
+    if (unsubscribeRef.current) {
+      console.log('[Realtime] Cleaning up previous subscription');
+      unsubscribeRef.current();
+      unsubscribeRef.current = null;
+    }
+
+    // Subscribe to friendships collection
+    try {
+      const unsubscribe = client.subscribe(
+        `databases.${APPWRITE_DATABASE_ID}.collections.friendships.documents`,
+        (response: any) => {
+          console.log('[Realtime] Friendship event:', response.events, response.payload);
+
+          const payload = response.payload;
+          const events = response.events || [];
+
+          // Only react to CREATE events where current user is receiver and status is pending
+          const isCreate = events.some((e: string) => e.includes('.create'));
+          const isForMe = payload.receiver_id === currentUser.id;
+          const isPending = payload.status === 'pending';
+
+          if (isCreate && isForMe && isPending) {
+            console.log('[Realtime] 🔔 NEW FRIEND REQUEST received!');
+
+            // Trigger all feedback
+            playNotificationSound();
+            triggerHaptic();
             sendLocalNotification(
-              "🤝 Pedido Aceito!",
-              "Você tem um novo amigo para curtir os rolês."
+              '🔔 Novo Convite!',
+              'Você recebeu um novo pedido de amizade!'
             );
-            addToast({
-              title: "🤝 Pedido Aceito!",
-              message: "Sua amizade foi confirmada!",
-              type: 'success'
-            });
+
+            // Update count
+            fetchNotificationCount(currentUser.id);
           }
         }
-      )
-      .subscribe();
+      );
+
+      unsubscribeRef.current = unsubscribe;
+      console.log('[Realtime] ✅ Subscription active for friendships');
+
+    } catch (err) {
+      console.error('[Realtime] Subscription failed:', err);
+    }
+
+    // Initial count fetch
+    fetchNotificationCount(currentUser.id);
 
     return () => {
-      supabase.removeChannel(channel);
+      console.log('[Realtime] Cleaning up subscription on unmount');
+      if (unsubscribeRef.current) {
+        unsubscribeRef.current();
+        unsubscribeRef.current = null;
+      }
     };
+  }, [currentUser, fetchNotificationCount, playNotificationSound]);
+
+
+  // --- REALTIME NOTIFICATIONS (MIGRATED TO WEBSOCKET ABOVE) ---
+  /*
+  useEffect(() => {
+    if (!currentUser) return;
+    // Appwrite Realtime could be implemented here
   }, [currentUser]);
+  */
 
   const fetchData = async (lat: number, lng: number) => {
     if (!isRefreshing) setIsLoading(true);
@@ -606,7 +671,7 @@ function App() {
     try {
       await signOut();
     } catch (e) {
-      console.warn('Erro ao deslogar do Supabase, mas estado local limpo', e);
+      console.warn('Erro ao deslogar do Appwrite, mas estado local limpo', e);
     }
   }, []);
 
@@ -637,6 +702,76 @@ function App() {
     setIsNotificationsModalOpen(true);
     setNotificationCount(0); // Clear badge on open
   }, []);
+
+  // --- REALTIME NOTIFICATIONS ---
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const currentUserId = currentUser.id; // Capture ID for closure
+    console.log(`[Realtime] Subscribing to notifications for ${currentUserId}...`);
+
+    const unsubscribe = client.subscribe(
+      `databases.${APPWRITE_DATABASE_ID}.collections.friendships.documents`,
+      (response) => {
+        console.log("[Realtime] Event Received:", response); // GLOBAL LOG
+
+        // payload contains the document
+        const payload = response.payload as any;
+        const events = response.events; // e.g., databases.*.collections.*.documents.*.create
+
+        console.log("[Realtime] Payload receiver:", payload.receiver_id, "Current:", currentUser.id);
+        console.log("[Realtime] Event Includes Create?", events.some(e => e.includes('.create')));
+        console.log("[Realtime] Status:", payload.status);
+
+        // 1. New Friend Request Received
+        if (
+          events.some(e => e.includes('.create')) &&
+          payload.receiver_id === currentUserId &&
+          payload.status === 'pending'
+        ) {
+          console.log("[Realtime] MATCH! Incrementing badge...");
+          triggerHaptic();
+          setNotificationCount(prev => {
+            console.log("[Realtime] New count:", prev + 1);
+            // Force UI update via state
+            return prev + 1;
+          });
+
+          // Force toast
+          addToast({
+            title: 'Novo Convite! 📩',
+            message: 'Alguém quer ser seu amigo no Dirole.',
+            type: 'info'
+          });
+        }
+
+        // 2. Friend Request Accepted (I am the requester)
+        if (
+          events.some(e => e.includes('.update')) &&
+          payload.requester_id === currentUserId &&
+          payload.status === 'accepted'
+        ) {
+          console.log("[Realtime] MATCH ACCEPT! Refreshing...");
+          triggerHaptic();
+          addToast({
+            title: 'Convite Aceito! 🤝',
+            message: 'Vocês agora são amigos! Bora dominar o mapa.',
+            type: 'success'
+          });
+
+          // Silent refresh
+          getUserProfile(currentUserId).then(u => {
+            if (u) setCurrentUser(prev => ({ ...prev!, friends: u.friends }));
+          });
+        }
+      }
+    );
+
+    return () => {
+      console.log("[Realtime] Unsubscribing...");
+      unsubscribe();
+    };
+  }, [currentUser?.id]); // Only re-subscribe if ID changes, NOT if other user props change
 
   const handleOpenInvite = useCallback((loc: Location) => {
     setSelectedLocation(loc);
@@ -749,7 +884,7 @@ function App() {
               className="w-full h-full object-contain relative z-10 drop-shadow-[0_0_20px_rgba(139,92,246,0.3)]"
             />
           </div>
-          <h1 className="text-6xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-dirole-primary via-dirole-secondary to-orange-400 mb-2 animate-pulse-slow drop-shadow-[0_0_15px_rgba(139,92,246,0.5)] pr-2">
+          <h1 className="text-6xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-dirole-primary via-dirole-secondary to-orange-400 mb-2 animate-pulse-slow drop-shadow-[0_0_15px_rgba(139,92,246,0.5)] px-4 no-clip">
             DIROLE
           </h1>
           <p className="text-slate-400 font-bold tracking-widest text-xs uppercase opacity-80">O Termômetro do Rolê</p>
@@ -761,9 +896,23 @@ function App() {
     );
   }
 
-  // --- 2. LOGIN SCREEN (If not authenticated) ---
+  // --- 2. LANDING PAGE & LOGIN FLOW (If not authenticated) ---
   if (!currentUser) {
-    return <LoginScreen onLoginSuccess={setCurrentUser} />;
+    if (showLogin) {
+      return <LoginScreen onLoginSuccess={setCurrentUser} />;
+    }
+    return <LandingPage onEnter={() => setShowLogin(true)} />;
+  }
+
+  // --- 2.5 VERIFICATION BARRIER ---
+  // If user is logged in (currentUser exists) BUT email is unverified, show pending screen
+  if (isEmailUnverified) {
+    return (
+      <VerificationPendingScreen
+        email={verificationEmail}
+        onVerified={() => window.location.reload()}
+      />
+    );
   }
 
   // --- 3. MAIN APP (Only rendered after login) ---
@@ -784,11 +933,11 @@ function App() {
       <header className="bg-[#0f0518]/80 backdrop-blur-xl z-[60] px-6 py-4 pt-[max(1rem,env(safe-area-inset-top))] border-b border-white/5 flex justify-center sticky top-0 shrink-0">
         <div className="w-full max-w-7xl flex justify-between items-center transition-all">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 flex items-center justify-center overflow-hidden">
-              <img src="/og-image.png" className="w-10 h-10 object-contain" alt="Logo" />
+            <div className="w-14 h-14 flex items-center justify-center overflow-hidden">
+              <img src="/og-image.png" className="w-14 h-14 object-contain" alt="Logo" />
             </div>
             <div className="flex flex-col">
-              <h1 className="text-xl font-black italic tracking-tighter text-white leading-none">
+              <h1 className="text-3xl font-black italic tracking-tighter text-white leading-none no-clip px-2">
                 DIROLE
               </h1>
               <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] leading-none mt-1">Social Thermometer</p>
@@ -827,10 +976,16 @@ function App() {
               </div>
             </button>
             <button
-              onClick={() => { triggerHaptic(); setIsQRScannerOpen(true); }}
-              className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition-all active:scale-90"
+              onClick={() => {
+                triggerHaptic();
+                // CHANGE: Open Friends Modal with QR view directly instead of Scanner
+                setFriendsModalView('qr');
+                setFriendsModalTab('my_friends');
+                setIsFriendsModalOpen(true);
+              }}
+              className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center border border-white/10 hover:bg-white/10 active:scale-95 transition-all shadow-lg backdrop-blur-md"
             >
-              <i className="fas fa-qrcode"></i>
+              <i className="fas fa-qrcode text-white text-sm"></i>
             </button>
           </div>
         </div>
@@ -1125,9 +1280,11 @@ function App() {
           onClose={() => {
             setIsFriendsModalOpen(false);
             setScannedUser(null);
+            setFriendsModalView('default'); // Reset view on close
           }}
           currentUser={currentUser}
           initialTab={friendsModalTab}
+          initialView={friendsModalView}
           scannedUser={scannedUser}
           onLogout={handleLogout}
           onOpenScanner={() => {

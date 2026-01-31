@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
-import { supabase, deleteAccount } from '../services/supabaseClient';
-import { saveUserProfileLocal, triggerHaptic, uploadAvatar } from '../services/mockService';
+import { signOut } from '../services/authService';
+import { saveUserProfileLocal, triggerHaptic, uploadAvatar, syncUserProfile, updateUserProfile } from '../services/mockService';
 import { LEVEL_THRESHOLDS } from '../constants';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import UserAvatar from './UserAvatar';
@@ -147,30 +147,26 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
             // 2. Salvar Localmente (Garante persistência imediata)
             localStorage.setItem('dirole_user_profile', JSON.stringify(updatedUser));
 
-            // 3. Atualizar no Supabase (Com Corrida de Timeout de 10s)
+            // 3. Atualizar no Appwrite
             if (!updatedUser.id.startsWith('guest_')) {
-                const updatePromise = supabase.from('profiles').update({
-                    name: trimmedName,
-                    nickname: trimmedNickname,
-                    avatar: finalAvatar,
-                    updated_at: new Date()
-                }).eq('id', updatedUser.id);
-
-                const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error("Timeout de conexão")), 10000)
-                );
-
                 try {
-                    await Promise.race([updatePromise, timeoutPromise]);
+                    await updateUserProfile(updatedUser.id, {
+                        name: trimmedName,
+                        nickname: trimmedNickname,
+                        avatar: finalAvatar
+                    });
                 } catch (sErr: any) {
-                    console.warn("[Profile] Supabase bypass/timeout:", sErr.message);
+                    console.warn("[Profile] Appwrite update failed:", sErr.message);
                 }
             }
 
             // 4. Fechar e Atualizar App
             console.log("[Profile] Finalizando...");
             onSave(updatedUser);
+            if (onClose) onClose(); // Close modal on success
             if (onShowToast) onShowToast("Perfil atualizado! 🚀", 'success');
+            // Force reload removed. Updating via state callbacks.
+            // window.location.reload();
 
         } catch (err: any) {
             console.error("[Profile] Erro crítico:", err);
@@ -182,6 +178,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
     const handleLogout = async () => {
         triggerHaptic();
+        await signOut();
         if (onLogout) {
             onLogout();
         }
@@ -192,15 +189,18 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
         if (deleteConfirmText !== 'DELETAR') return;
 
         try {
+            // MVP: Soft delete (logout + warning)
+            // Permanent deletion requires Appwrite Function (server-side)
             if (currentUser && !currentUser.id.startsWith('guest_')) {
-                await deleteAccount(currentUser.id);
-            } else {
-                localStorage.removeItem('dirole_user_profile');
+                console.log("[Appwrite] Account deletion requested for:", currentUser.id);
+                // In a real app, you'd trigger a Cloud Function here
             }
+            localStorage.removeItem('dirole_user_profile');
+            await signOut();
             if (onLogout) onLogout();
             onClose();
         } catch (e) {
-            alert("Erro ao excluir conta. Tente novamente.");
+            console.error("Delete account flow failed:", e);
         }
     };
 

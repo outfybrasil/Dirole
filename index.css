@@ -17,18 +17,79 @@ body {
 
 /* SMARTWATCH & ULTRA-SMALL SCREEN (PWA/WEARABLES) */
 @media (max-width: 360px) {
-    :root { font-size: 14px; }
+    :root {
+        font-size: 14px;
+    }
+
+    .hero-title {
+        font-size: 2.25rem !important;
+        line-height: 1.2 !important;
+    }
 }
 
 @media (max-width: 300px) {
-    :root { font-size: 12px; }
-    .nav-label { display: none !important; }
-    .nav-icon { font-size: 1.25rem !important; margin-bottom: 0 !important; }
-    .p-8 { padding: 1rem !important; }
-    .px-8 { padding-left: 1.25rem !important; padding-right: 1.25rem !important; }
+    :root {
+        font-size: 12px;
+    }
+
+    .nav-label {
+        display: none !important;
+    }
+
+    .nav-icon {
+        font-size: 1.25rem !important;
+        margin-bottom: 0 !important;
+    }
+
+    .p-8 {
+        padding: 1rem !important;
+    }
+
+    .px-8 {
+        padding-left: 1.25rem !important;
+        padding-right: 1.25rem !important;
+    }
+
+    .hero-title {
+        font-size: 2rem !important;
+    }
 }
 
 @media (max-width: 250px) {
-    body { padding: 4% !important; }
-    .bottom-nav { padding-bottom: 20px !important; border-radius: 40px !important; }
+    body {
+        padding: 4% !important;
+    }
+
+    .bottom-nav {
+        padding-bottom: 20px !important;
+        border-radius: 40px !important;
+    }
+
+    .hero-title {
+        font-size: 1.75rem !important;
+    }
+}
+
+/* Fix for italic text clipping (especially accents like Ô, Ê, Á) */
+.no-clip {
+    padding-top: 0.7em !important;
+    padding-bottom: 0.5em !important;
+    overflow: visible !important;
+    display: inline-block !important;
+    line-height: 1.4 !important;
+    white-space: nowrap !important;
+}
+
+.hero-title-container {
+    overflow: visible !important;
+    padding-top: 4rem !important;
+    padding-bottom: 2rem !important;
+    line-height: 1.8 !important;
+}
+
+.hero-title {
+    /* Ensure transformation doesn't clip */
+    transform-origin: center;
+    position: relative;
+    z-index: 1;
 }

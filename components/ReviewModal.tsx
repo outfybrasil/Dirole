@@ -55,7 +55,13 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({ location, currentUser,
     };
 
     try {
-      await submitReview(review, location);
+      const success = await submitReview(review, location);
+
+      if (!success) {
+        // Error handled by service alerts
+        return;
+      }
+
       onSuccess(10);
       onClose();
       setComment('');

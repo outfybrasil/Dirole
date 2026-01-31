@@ -9,13 +9,14 @@ interface FriendsModalProps {
     onClose: () => void;
     currentUser: User | null;
     initialTab?: 'my_friends' | 'requests' | 'search';
+    initialView?: 'default' | 'qr';
     onLogout?: () => void;
     onOpenScanner?: () => void;
     scannedUser?: User | null;
     onShowToast?: (title: string, message: string, type: 'success' | 'error' | 'info') => void;
 }
 
-export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, currentUser, initialTab = 'my_friends', onLogout, onOpenScanner, scannedUser, onShowToast }) => {
+export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, currentUser, initialTab = 'my_friends', initialView = 'default', onLogout, onOpenScanner, scannedUser, onShowToast }) => {
     const [activeTab, setActiveTab] = useState<'my_friends' | 'requests' | 'search'>(initialTab);
     const [friends, setFriends] = useState<FriendUser[]>([]);
     const [requests, setRequests] = useState<FriendUser[]>([]);
@@ -48,6 +49,10 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
                 setShowQrCode(true);
                 setScanResult(scannedUser);
                 setIsScanning(false);
+            } else if (initialView === 'qr') {
+                setShowQrCode(true);
+                setScanResult(null);
+                setIsScanning(false);
             } else {
                 setShowQrCode(false); // Reset QR state on open
                 setIsScanning(false);
@@ -55,7 +60,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
             }
             setScanError(null);
         }
-    }, [isOpen, initialTab, scannedUser]);
+    }, [isOpen, initialTab, scannedUser, initialView]);
 
     useEffect(() => {
         if (isOpen && currentUser && !isGuest) {
@@ -134,7 +139,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
             // @ts-ignore - Web NFC API
             const ndef = new NDEFReader();
             await ndef.write({
-                records: [{ recordType: "url", data: `https://dirole.app/u/${currentUser.id}` }]
+                records: [{ recordType: "url", data: `https://dirole.appwrite.network/u/${currentUser.id}` }]
             });
             triggerHaptic([50, 50, 50]);
             alert("Perfil compartilhado via NFC com sucesso!");
@@ -191,52 +196,23 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
     }
 
     const renderUserCard = (user: FriendUser, type: 'friend' | 'request' | 'search') => (
-        <div key={user.id} className="bg-white/5 border border-white/5 rounded-xl p-3 flex items-center justify-between mb-2 hover:bg-white/10 transition-colors">
+        <div key={user.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between mb-2">
             <div className="flex items-center gap-3">
-                <div className="w-10 h-10 shrink-0">
+                <div className="relative">
                     <UserAvatar avatar={user.avatar} size="md" />
+                    {user.level && (
+                        <div className="absolute -bottom-1 -right-1 bg-yellow-500 text-black text-[8px] font-black px-1.5 py-0.5 rounded-full border border-[#0f0518]">
+                            {user.level}
+                        </div>
+                    )}
                 </div>
                 <div>
-                    <p className="font-bold text-white text-sm">{user.name}</p>
-                    <p className="text-xs text-slate-500">Lvl {user.level} • {Math.floor(user.points / 10)} check-ins</p>
-                    {type === 'friend' && user.lastCheckIn && (
-                        <p className="text-[10px] text-dirole-primary flex items-center gap-1 mt-0.5 animate-pulse">
-                            <i className="fas fa-map-marker-alt"></i> No {user.lastCheckIn}
-                        </p>
-                    )}
+                    <h4 className="font-bold text-white text-sm">{user.name}</h4>
+                    <p className="text-xs text-slate-500 font-medium">@{user.nickname}</p>
                 </div>
             </div>
 
             <div>
-                {type === 'request' && user.friendshipId && (
-                    <div className="flex gap-2">
-                        <button onClick={() => handleResponse(user.friendshipId!, true)} className="w-8 h-8 rounded-full bg-green-500/20 text-green-500 flex items-center justify-center hover:bg-green-500/40 transition-colors">
-                            <i className="fas fa-check"></i>
-                        </button>
-                        <button onClick={() => handleResponse(user.friendshipId!, false)} className="w-8 h-8 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center hover:bg-red-500/40 transition-colors">
-                            <i className="fas fa-times"></i>
-                        </button>
-                    </div>
-                )}
-
-                {type === 'search' && (
-                    <div className="flex gap-1">
-                        {user.friendshipStatus === FriendshipStatus.NONE && (
-                            <button onClick={() => handleSendRequest(user.id)} className="px-3 py-1.5 bg-dirole-primary/20 text-dirole-primary text-xs font-bold rounded-lg border border-dirole-primary/50 active:scale-95 transition-transform">
-                                Adicionar
-                            </button>
-                        )}
-                        {user.friendshipStatus === FriendshipStatus.PENDING_SENT && (
-                            <span className="text-xs text-slate-500 italic bg-white/5 px-2 py-1 rounded">Enviado</span>
-                        )}
-                        {user.friendshipStatus === FriendshipStatus.ACCEPTED && (
-                            <span className="text-xs text-green-500 font-bold flex items-center gap-1"><i className="fas fa-check"></i> Amigo</span>
-                        )}
-                        <button onClick={() => handleBlock(user.id)} className="w-8 h-8 flex items-center justify-center text-slate-600 hover:text-red-500" title="Bloquear">
-                            <i className="fas fa-ban"></i>
-                        </button>
-                    </div>
-                )}
 
                 {type === 'friend' && (
                     <div className="flex items-center gap-2">
@@ -316,56 +292,60 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
                         <div className="w-full flex flex-col items-center justify-start min-h-full py-8 animate-fade-in">
 
                             {!isScanning && !scanResult && (
-                                <div className="w-full max-w-[340px] bg-[#120822] rounded-[2.5rem] p-6 sm:p-8 shadow-2xl relative flex flex-col items-center border border-white/5 overflow-hidden">
+                                <div className="w-full max-w-[300px] bg-[#1a1a2e] border border-white/10 rounded-[2.5rem] p-6 shadow-[0_0_50px_rgba(0,0,0,0.5)] relative flex flex-col items-center overflow-hidden animate-slide-up mx-auto mb-4">
 
-                                    {/* Gradient Animating BG */}
-                                    <div className="absolute inset-0 bg-gradient-to-br from-dirole-primary/5 via-transparent to-dirole-secondary/5 pointer-events-none"></div>
-
-                                    {/* Avatar */}
-                                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full p-1 bg-gradient-to-tr from-dirole-primary to-dirole-secondary shadow-[0_0_20px_rgba(139,92,246,0.3)] relative z-10 mb-4 sm:mb-6 shrink-0">
-                                        <UserAvatar
-                                            avatar={currentUser?.avatar}
-                                            size="lg"
-                                            className="w-full h-full border-2 border-slate-900"
-                                        />
+                                    {/* Header / Avatar */}
+                                    <div className="flex flex-col items-center mb-5 z-10">
+                                        <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-tr from-dirole-primary to-dirole-secondary shadow-[0_0_20px_rgba(139,92,246,0.3)] mb-3">
+                                            <UserAvatar
+                                                avatar={currentUser?.avatar}
+                                                size="lg"
+                                                className="w-full h-full border-2 border-[#1a1a2e]"
+                                            />
+                                        </div>
+                                        <h3 className="text-lg font-black text-white mb-1 leading-none truncate max-w-[220px]">
+                                            {currentUser?.name}
+                                        </h3>
+                                        <p className="text-dirole-secondary text-[10px] font-black tracking-[0.2em] uppercase opacity-80">
+                                            @{currentUser?.nickname}
+                                        </p>
                                     </div>
 
-                                    {/* Info */}
-                                    <h3 className="text-lg sm:text-2xl font-black text-white mb-1 tracking-tight text-center leading-tight break-words w-full px-2">
-                                        {currentUser?.name?.toUpperCase()}
-                                    </h3>
-                                    <p className="text-dirole-primary text-[10px] sm:text-xs font-black tracking-[0.2em] mb-6 sm:mb-8 text-center truncate w-full px-4">
-                                        @{currentUser?.nickname?.toUpperCase() || 'USUARIO'}
-                                    </p>
-
-                                    {/* QR Code */}
-                                    <div className="bg-white p-3 sm:p-4 rounded-3xl mb-6 sm:mb-8 shadow-[0_0_40px_rgba(255,255,255,0.1)] group transition-all hover:scale-[1.02] shrink-0">
-                                        <img src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=dirole:${currentUser?.id}&color=000000`} alt="QR Code" className="w-48 h-48" />
+                                    {/* QR Code - White Background for readability */}
+                                    <div className="bg-white p-3 rounded-2xl mb-6 shadow-[0_0_30px_rgba(255,255,255,0.1)] shrink-0">
+                                        <img src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=dirole:${currentUser?.id}&color=000000`} alt="QR Code" className="w-40 h-40 mix-blend-multiply" />
                                     </div>
 
-                                    {/* Level Pill */}
-                                    <div className="bg-yellow-500/10 px-4 py-1.5 rounded-full border border-yellow-500/20 shadow-inner">
-                                        <span className="text-[10px] font-black text-yellow-500 tracking-[0.3em] uppercase">
-                                            ELITE NÍVEL {currentUser?.level}
-                                        </span>
-                                    </div>
-
-                                    {/* NFC Option */}
-                                    {hasNfc && (
+                                    {/* Actions */}
+                                    <div className="w-full flex gap-3">
                                         <button
-                                            onClick={shareViaNFC}
-                                            disabled={isNfcWriting}
-                                            className={`mt-4 sm:mt-6 w-full max-w-[280px] flex items-center justify-center gap-3 px-4 py-3 sm:px-6 rounded-2xl transition-all border ${isNfcWriting ? 'bg-blue-600 shadow-[0_0_20px_rgba(37,99,235,0.5)] border-blue-500' : 'bg-white/5 hover:bg-white/10 border-white/10'}`}
+                                            onClick={startScan}
+                                            className="flex-1 bg-white text-black font-black py-3.5 rounded-xl flex flex-col items-center justify-center gap-1 hover:bg-slate-200 transition-all shadow-lg active:scale-95"
                                         >
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${isNfcWriting ? 'bg-white text-blue-600' : 'bg-blue-500 text-white'}`}>
-                                                <i className={`fas fa-wifi rotate-90 ${isNfcWriting ? 'animate-ping' : ''}`}></i>
-                                            </div>
-                                            <div className="text-left min-w-0 flex-1">
-                                                <p className={`text-xs font-bold uppercase tracking-wider truncate ${isNfcWriting ? 'text-white' : 'text-white'}`}>Aproximar</p>
-                                                <p className={`text-[10px] truncate ${isNfcWriting ? 'text-blue-100' : 'text-slate-400'}`}>{isNfcWriting ? 'Aproxime celular...' : 'Toque para ativar NFC'}</p>
-                                            </div>
+                                            <i className="fas fa-camera text-base"></i>
+                                            <span className="text-[10px] uppercase tracking-wider">Escanear</span>
                                         </button>
-                                    )}
+
+                                        <button
+                                            onClick={() => {
+                                                if (hasNfc) {
+                                                    shareViaNFC();
+                                                } else {
+                                                    if (onShowToast) onShowToast("Dispositivo sem NFC", "Tente usar o QR Code.", "error");
+                                                }
+                                            }}
+                                            className={`flex-1 font-black py-3.5 rounded-xl flex flex-col items-center justify-center gap-1 transition-all shadow-lg active:scale-95 border ${hasNfc ? 'bg-dirole-primary text-white border-dirole-primary hover:bg-dirole-primary/80' : 'bg-white/5 text-slate-500 border-white/10 hover:bg-white/10'}`}
+                                        >
+                                            <i className="fas fa-wifi rotate-90 text-base"></i>
+                                            <span className="text-[10px] uppercase tracking-wider">NFC</span>
+                                        </button>
+                                    </div>
+
+                                    {/* ID Label */}
+                                    <div className="mt-4 text-[9px] font-black text-slate-600 uppercase tracking-widest">
+                                        DIROLE ID
+                                    </div>
+
                                 </div>
                             )}
 
@@ -437,20 +417,51 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
 
                             {
                                 !isScanning && !scanResult && (
-                                    <div className="mt-10 w-full max-w-[300px]">
-                                        <button onClick={startScan} className="w-full bg-white text-black font-black py-5 rounded-[1.5rem] flex items-center justify-center gap-4 hover:bg-slate-200 transition-all shadow-xl active:scale-95 text-xs uppercase tracking-[0.2em]">
-                                            <i className="fas fa-camera text-lg"></i>
-                                            <span>Escanear Amigo</span>
-                                        </button>
-                                        <p className="text-[10px] font-bold text-slate-500 text-center mt-6 max-w-[220px] mx-auto leading-relaxed">
-                                            Aponte a câmera para o QR Code de outro usuário para conectarem.
-                                        </p>
-                                    </div>
+                                    <p className="text-[10px] font-bold text-slate-500 text-center mt-2 max-w-[220px] mx-auto leading-relaxed opacity-50">
+                                        Mostre este código para conectar
+                                    </p>
                                 )
                             }
                         </div>
                     ) : (
                         <div className="animate-fade-in-up">
+                            <div className="flex gap-2 mb-6 bg-white/5 p-1 rounded-xl">
+                                <button
+                                    onClick={() => { triggerHaptic(); setActiveTab('requests'); }}
+                                    className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'requests'
+                                            ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
+                                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                        }`}
+                                >
+                                    Solicitações
+                                    {requests.length > 0 && (
+                                        <span className="ml-2 px-2 py-0.5 text-xs bg-red-500 text-white rounded-full">
+                                            {requests.length}
+                                        </span>
+                                    )}
+                                </button>
+                                <button
+                                    onClick={() => { triggerHaptic(); setActiveTab('my_friends'); }}
+                                    className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'my_friends'
+                                            ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
+                                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                        }`}
+                                >
+                                    Amigos
+                                    <span className="ml-2 text-xs opacity-60">
+                                        {friends.length}
+                                    </span>
+                                </button>
+                                <button
+                                    onClick={() => { triggerHaptic(); setActiveTab('search'); }}
+                                    className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'search'
+                                            ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
+                                            : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                        }`}
+                                >
+                                    Buscar
+                                </button>
+                            </div>
                             {activeTab === 'my_friends' && (
                                 <div className="space-y-3">
                                     {requests.length > 0 && (

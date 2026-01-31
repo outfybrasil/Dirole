@@ -10,10 +10,11 @@
     content="Descubra como está o rolê em tempo real com o Dirole. O termômetro social mais quente do Brasil para você saber se o local está lotado, qual a vibe e o preço agora mesmo." />
   <meta name="keywords"
     content="dirole, termometro social, balada, bar, role, sao paulo, rio de janeiro, curitiba, eventos, tempo real" />
+  <meta name="robots" content="index, follow" />
 
   <!-- OpenGraph / Facebook -->
   <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://dirole.app/" />
+  <meta property="og:url" content="https://dirole.appwrite.network/" />
   <meta property="og:title" content="Dirole - O Termômetro do Rolê" />
   <meta property="og:description"
     content="Descubra se o rolê está bom antes de sair de casa. Acompanhe a temperatura social dos bares e baladas em tempo real." />
@@ -21,7 +22,7 @@
 
   <!-- Twitter -->
   <meta property="twitter:card" content="summary_large_image" />
-  <meta property="twitter:url" content="https://dirole.app/" />
+  <meta property="twitter:url" content="https://dirole.appwrite.network/" />
   <meta property="twitter:title" content="Dirole - O Termômetro do Rolê" />
   <meta property="twitter:description" content="A temperatura social do seu rolê em tempo real." />
   <meta property="twitter:image" content="/og-image.png" />
@@ -73,8 +74,8 @@
 
     /* Dark Tactical Map Theme */
     .leaflet-tile-pane {
-      filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
-      opacity: 0.8;
+      /* Removed conflicting invert filter since we use dark tiles already */
+      filter: brightness(0.8) contrast(1.2);
     }
 
     /* Otimização de Performance: Remover sombras pesadas e blur excessivo */

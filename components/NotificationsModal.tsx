@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { User, Invite, FriendUser, FriendshipStatus } from '../types';
-import { supabase } from '../services/supabaseClient';
-import { respondToFriendRequest, triggerHaptic } from '../services/mockService';
+import { getPendingInvites, getPendingFriendRequests, updateInviteStatus, respondToFriendRequest, triggerHaptic } from '../services/mockService';
 
 interface NotificationsModalProps {
     isOpen: boolean;
@@ -13,7 +12,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({ isOpen, 
     const [invites, setInvites] = useState<Invite[]>([]);
     const [friendRequests, setFriendRequests] = useState<FriendUser[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'invites' | 'friends'>('invites');
+    const [activeTab, setActiveTab] = useState<'invites' | 'friends'>('friends');
 
     useEffect(() => {
         if (isOpen) {
@@ -24,58 +23,15 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({ isOpen, 
     const fetchNotifications = async () => {
         setIsLoading(true);
         try {
-            // SAFETY: Timeout Promise for robust loading (3s)
-            const timeoutPromise = new Promise<{ data: null }>((_, reject) =>
-                setTimeout(() => reject(new Error("Notifications Timeout")), 3000)
-            );
+            // 1. Fetch pending invites
+            const inviteData = await getPendingInvites(currentUser.id);
+            setInvites(inviteData);
 
-            // 1. Fetch pending invites with timeout
-            const invitesQuery = supabase
-                .from('invites')
-                .select('*')
-                .eq('to_user_id', currentUser.id)
-                .eq('status', 'pending');
-
-            try {
-                const { data: inviteData } = (await Promise.race([invitesQuery, timeoutPromise])) as any;
-                if (inviteData) {
-                    setInvites(inviteData.map((i: any) => ({
-                        id: i.id,
-                        fromUserId: i.from_user_id,
-                        toUserId: i.to_user_id,
-                        locationId: i.location_id,
-                        locationName: i.location_name,
-                        message: i.message,
-                        status: i.status,
-                        createdAt: new Date(i.created_at)
-                    })));
-                }
-            } catch (e) { console.warn("[Notifications] Invites fetch timed out"); }
-
-            // 2. Fetch pending friend requests with timeout
-            const requestsQuery = supabase
-                .from('friendships')
-                .select('*, requester:profiles!requester_id(*)')
-                .eq('receiver_id', currentUser.id)
-                .eq('status', 'pending');
-
-            try {
-                const { data: friendshipData } = (await Promise.race([requestsQuery, timeoutPromise])) as any;
-                if (friendshipData) {
-                    // Filter out any requests where the requester profile couldn't be loaded (deleted/ghost users)
-                    const validRequests = friendshipData
-                        .filter((f: any) => f.requester)
-                        .map((f: any) => ({
-                            ...f.requester,
-                            friendshipId: f.id,
-                            friendshipStatus: FriendshipStatus.PENDING_RECEIVED
-                        }));
-
-                    setFriendRequests(validRequests);
-                }
-            } catch (e) { console.warn("[Notifications] Requests fetch timed out"); }
+            // 2. Fetch pending friend requests
+            const validRequests = await getPendingFriendRequests(currentUser.id);
+            setFriendRequests(validRequests);
         } catch (e) {
-            console.error("DEBUG: Error in fetchNotifications:", e);
+            console.error("[Notifications] Error in fetchNotifications:", e);
         } finally {
             setIsLoading(false);
         }
@@ -84,8 +40,10 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({ isOpen, 
     const handleInviteAction = async (inviteId: string, status: 'accepted' | 'declined') => {
         triggerHaptic();
         try {
-            await supabase.from('invites').update({ status }).eq('id', inviteId);
-            setInvites(prev => prev.filter(i => i.id !== inviteId));
+            const success = await updateInviteStatus(inviteId, status);
+            if (success) {
+                setInvites(prev => prev.filter(i => i.id !== inviteId));
+            }
         } catch (e) {
             console.error(e);
         }
@@ -121,16 +79,16 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({ isOpen, 
                 <div className="px-8 mb-6">
                     <div className="flex bg-white/5 p-1 rounded-2xl border border-white/5">
                         <button
-                            onClick={() => setActiveTab('invites')}
-                            className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'invites' ? 'bg-dirole-primary text-white shadow-lg' : 'text-slate-500'}`}
-                        >
-                            Convites ({invites.length})
-                        </button>
-                        <button
                             onClick={() => setActiveTab('friends')}
                             className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'friends' ? 'bg-dirole-primary text-white shadow-lg' : 'text-slate-500'}`}
                         >
                             Pedidos ({friendRequests.length})
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('invites')}
+                            className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'invites' ? 'bg-dirole-primary text-white shadow-lg' : 'text-slate-500'}`}
+                        >
+                            Convites ({invites.length})
                         </button>
                     </div>
                 </div>
@@ -202,7 +160,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({ isOpen, 
                                         </button>
                                         <button
                                             onClick={() => handleFriendAction(user.friendshipId!, false)}
-                                            className="w-10 h-10 rounded-xl bg-white/5 text-slate-500 flex items-center justify-center active:scale-90 transition-all font-black text-lg"
+                                            className="w-10 h-10 rounded-xl bg-red-500/20 text-red-500 flex items-center justify-center active:scale-90 transition-all font-black text-lg border border-red-500/20 shadow-lg shadow-red-900/20"
                                         >
                                             ×
                                         </button>

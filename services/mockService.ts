@@ -1,7 +1,33 @@
-
 import { Location, LocationType, User, Filters, FriendshipStatus, Route, Review, ActivityFeedItem, LocationEvent, GalleryItem, Report, FriendUser, Invite } from '../types';
 import { BADGES, LEVEL_THRESHOLDS, DEFAULT_LOCATION_IMAGES } from '../constants';
-import { supabase } from './supabaseClient';
+import client, { databases, storage, account, APPWRITE_DATABASE_ID, APPWRITE_BUCKET_ID, APPWRITE_PROJECT_ID } from './appwriteClient';
+export { client, databases, storage, account, APPWRITE_DATABASE_ID };
+import {
+    Account,
+    ID,
+    Query,
+    Databases,
+    Storage,
+    Permission,
+    Role
+} from 'appwrite';
+
+// --- FILE UPLOAD ---
+export const uploadFile = async (file: File): Promise<string> => {
+    try {
+        const result = await storage.createFile(
+            APPWRITE_BUCKET_ID,
+            ID.unique(),
+            file
+        );
+        // Get view URL
+        const fileUrl = storage.getFileView(APPWRITE_BUCKET_ID, result.$id);
+        return fileUrl.toString();
+    } catch (e: any) {
+        console.error("Upload failed:", e);
+        throw e;
+    }
+};
 
 // MOCK ROUTES
 const MOCK_ROUTES: Route[] = [
@@ -136,202 +162,190 @@ const STORAGE_KEY = 'dirole_user_profile';
 
 export const blockUser = async (blockerId: string, blockedId: string): Promise<boolean> => {
     try {
-        const { error } = await supabase.from('blocked_users').insert({
-            blocker_id: blockerId,
-            blocked_id: blockedId
-        });
-        if (error) throw error;
+        await databases.createDocument(
+            APPWRITE_DATABASE_ID,
+            'blocked_users',
+            ID.unique(),
+            {
+                blocker_id: blockerId,
+                blocked_id: blockedId
+            }
+        );
         return true;
-    } catch (e) {
-        console.error("Error blocking user:", e);
+    } catch (e: any) {
+        console.error("[Appwrite] Error blocking user:", e.message);
         return false;
     }
 };
 
 export const getBlockedUsers = async (userId: string): Promise<string[]> => {
-    try {
-        const { data } = await supabase
-            .from('blocked_users')
-            .select('blocked_id')
-            .eq('blocker_id', userId);
+    // TEMPORARY FIX: Collection 'blocked_users' might not exist yet.
+    // Returning empty array to prevent 404s and app crash.
+    // console.warn("[Appwrite] getBlockedUsers: Blocked users collection not ready. Returning empty list.");
+    return [];
 
-        return data ? data.map((b: any) => b.blocked_id) : [];
-    } catch (e) {
+    /* 
+    // ORIGINAL CODE (Commented out until collection is verified)
+    try {
+        const response = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'blocked_users', // Ensure this ID exists in Appwrite
+            [
+                Query.equal('blocker_id', userId)
+            ]
+        );
+        return response.documents.map((doc: any) => doc.blocked_id);
+    } catch (e: any) {
+        console.error("[Appwrite] getBlockedUsers error:", e.message);
         return [];
     }
+    */
 };
 
 // --- USER PROFILE MANAGEMENT ---
 
 export const uploadAvatar = async (userId: string, webPath: string): Promise<string | null> => {
     try {
-        console.log("[Supabase Storage] Starting check for path:", webPath);
+        console.log(`[Appwrite Storage] Uploading avatar for user: ${userId}`);
+        console.log(`[Appwrite Storage] Source webPath: ${webPath}`);
 
-        // 1. Fetch the blob from the local webPath
         const response = await fetch(webPath);
-        if (!response.ok) throw new Error("Local file fetch failed");
+        if (!response.ok) {
+            throw new Error(`Local file fetch failed: ${response.status} ${response.statusText}`);
+        }
+
         const blob = await response.blob();
-        console.log("[Supabase Storage] Blob created. Size:", blob.size, "Type:", blob.type);
+        console.log(`[Appwrite Storage] Blob size: ${blob.size} bytes`);
+        console.log(`[Appwrite Storage] Blob type: ${blob.type}`);
 
-        // 2. Prepare file metadata
-        const fileExt = blob.type.split('/')[1] || 'jpg';
-        const fileName = `${userId}-${Date.now()}.${fileExt}`;
-        const filePath = `${fileName}`; // Just filename, bucket is provided in .from()
+        // Validate file size (max 5MB)
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        if (blob.size === 0) {
+            throw new Error("File is empty (0 bytes)");
+        }
+        if (blob.size > maxSize) {
+            throw new Error(`File too large: ${(blob.size / 1024 / 1024).toFixed(2)}MB (max 5MB)`);
+        }
 
-        console.log("[Supabase Storage] Uploading to bucket 'avatars' as:", filePath);
+        const file = new File([blob], `avatar_${userId}.jpg`, { type: 'image/jpeg' });
+        console.log(`[Appwrite Storage] File created: ${file.name}, ${file.size} bytes`);
 
-        // 3. Upload to Supabase Storage with 15s Timeout
-        const uploadPromise = supabase.storage
-            .from('avatars')
-            .upload(filePath, blob, {
-                cacheControl: '3600',
-                upsert: true
-            });
-
-        const timeoutPromise = new Promise<never>((_, reject) =>
-            setTimeout(() => {
-                console.warn("[Supabase Storage] QUICK TIMEOUT (4s) - Switching to Fallback");
-                reject(new Error("Upload Timeout (4s)"));
-            }, 4000)
+        const result = await storage.createFile(
+            APPWRITE_BUCKET_ID,
+            ID.unique(),
+            file
         );
 
-        console.log("[Supabase Storage] Racing Library Upload vs 15s Timeout...");
+        console.log(`[Appwrite Storage] Upload SUCCESS! File ID: ${result.$id}`);
+
+        // Use SDK method to get proper view URL (includes correct endpoint + auth)
+        const viewUrl = storage.getFileView(APPWRITE_BUCKET_ID, result.$id);
+
+        console.log("[Appwrite Storage] SDK View URL:", viewUrl.toString());
+
+        // Test if URL is accessible
         try {
-            const result: any = await Promise.race([uploadPromise, timeoutPromise]);
-            const { data, error: uploadError } = result;
-
-            if (uploadError) {
-                console.error("[Supabase Storage] Library Upload Error:", uploadError);
-                throw uploadError;
+            const testResponse = await fetch(viewUrl.toString());
+            console.log(`[Appwrite Storage] URL Test: ${testResponse.status} ${testResponse.statusText}`);
+            if (!testResponse.ok) {
+                console.error("[Appwrite Storage] URL is NOT accessible! Status:", testResponse.status);
+            } else {
+                console.log("[Appwrite Storage] ✅ URL is accessible!");
             }
-
-            console.log("[Supabase Storage] Library Upload success:", data);
-
-            // 4. Get Public URL
-            const { data: { publicUrl } } = supabase.storage
-                .from('avatars')
-                .getPublicUrl(filePath);
-
-            console.log("[Supabase Storage] Final Public URL:", publicUrl);
-            return publicUrl;
-        } catch (libErr: any) {
-            console.warn("[Supabase Storage] >>> CATCH TRIGGERED <<< Reason:", libErr.message);
-
-            // --- RAW API FALLBACK ---
-            const baseUrl = (supabase as any).supabaseUrl || 'https://gwvnwsvaepxwjasdupks.supabase.co';
-            const apiKey = (supabase as any).supabaseKey;
-
-            console.log("[Supabase Storage] Starting Raw Fetch to:", `${baseUrl}/storage/v1/object/avatars/${filePath}`);
-
-            const rawResponse = await fetch(`${baseUrl}/storage/v1/object/avatars/${filePath}`, {
-                method: 'POST',
-                headers: {
-                    'apikey': apiKey,
-                    'Authorization': `Bearer ${apiKey}`,
-                    'Content-Type': blob.type,
-                    'x-upsert': 'true'
-                },
-                body: blob
-            });
-
-            if (!rawResponse.ok) {
-                const errData = await rawResponse.json();
-                console.error("[Supabase Storage] Raw API Fallback Failed with status:", rawResponse.status, errData);
-                throw new Error(`Raw Upload Failed: ${rawResponse.status}`);
-            }
-
-            console.log("[Supabase Storage] Raw API Fallback SUCCESS!");
-
-            // In Fallback mode, we construct the public URL manually to avoid more hangs
-            const constructedUrl = `${baseUrl}/storage/v1/object/public/avatars/${filePath}`;
-            console.log("[Supabase Storage] Constructed Fallback URL:", constructedUrl);
-            return constructedUrl;
+        } catch (testErr) {
+            console.error("[Appwrite Storage] URL accessibility test failed:", testErr);
         }
+
+        return viewUrl.toString();
     } catch (e: any) {
-        console.error("[Supabase Storage] FATAL ERROR in uploadAvatar:", e.message || e);
+        console.error("[Appwrite Storage] FATAL ERROR in uploadAvatar:", e.message || e);
+        console.error("[Appwrite Storage] Full error object:", e);
         return null;
     }
 };
 
 export const syncUserProfile = async (authId: string, meta: any): Promise<User | null> => {
     try {
-        console.log("[Supabase Sync] Starting sync for user:", authId);
+        console.log(`[Appwrite Sync] Syncing user profile for ${authId}`);
 
-        // 1. Attempt to fetch profile with a small retry loop (wait for trigger)
-        let attempts = 0;
-        let existing = null;
+        const response = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'profiles',
+            [Query.equal('userId', authId), Query.limit(1)]
+        );
 
-        while (attempts < 3) {
-            const { data, error } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', authId)
-                .single();
+        let profileDoc;
 
-            if (data) {
-                existing = data;
-                break;
-            }
-
-            console.log(`[Supabase Sync] Profile not found yet, retrying... (${attempts + 1}/3)`);
-            attempts++;
-            await new Promise(r => setTimeout(r, 1000)); // Wait 1s between retries
+        if (response.documents.length === 0) {
+            console.log("[Appwrite Sync] Profile not found. Creating emergency profile...");
+            profileDoc = await databases.createDocument(
+                APPWRITE_DATABASE_ID,
+                'profiles',
+                ID.unique(),
+                {
+                    userId: authId,
+                    name: meta.full_name || meta.name || 'Novo Usuário',
+                    nickname: meta.nickname || '',
+                    email: meta.email || '',
+                    avatar: meta.avatar_url || '😎',
+                    points: 0,
+                    xp: 0,
+                    level: 1,
+                    gender: meta.gender || 'Outro',
+                    badges: JSON.stringify([])
+                }
+            );
+        } else {
+            profileDoc = response.documents[0];
+            console.log("[Appwrite Sync] Match found! Profile loaded.");
         }
 
-        if (existing) {
-            console.log("[Supabase Sync] Profile found:", existing.id);
-            const user: User = {
-                id: existing.id,
-                name: existing.name || 'Usuário',
-                nickname: existing.nickname || '',
-                email: existing.email || '',
-                age: existing.age || 0,
-                gender: existing.gender || '',
-                avatar: existing.avatar || '😎',
-                points: existing.points || 0,
-                xp: existing.xp || 0,
-                level: existing.level || 1,
-                badges: existing.badges || [],
-                favorites: existing.favorites || []
-            };
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
-            return user;
-        }
-
-        // 2. Fallback if trigger failed (manual emergency insert)
-        console.warn("[Supabase Sync] Trigger failed to create profile, running emergency insert...");
-        const newUser = {
-            id: authId,
-            name: meta.full_name || meta.name || 'Novo Usuário',
-            nickname: meta.nickname || '',
-            email: meta.email || '',
-            avatar: meta.avatar_url || '😎',
-            points: 0,
-            xp: 0,
-            level: 1,
-            badges: [],
+        const user: User = {
+            id: profileDoc.userId,
+            name: profileDoc.name,
+            nickname: profileDoc.nickname,
+            email: profileDoc.email,
+            avatar: profileDoc.avatar,
+            points: profileDoc.points || 0,
+            xp: profileDoc.xp || 0,
+            level: profileDoc.level || 1,
+            badges: profileDoc.badges ? JSON.parse(profileDoc.badges) : [],
             favorites: []
         };
 
-        const { error: insertError } = await supabase.from('profiles').insert(newUser);
-        if (insertError) {
-            console.error("[Supabase Sync] Emergency insert failed:", insertError);
-            throw insertError;
-        }
-
-        const user: User = newUser as User;
         localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
         return user;
+    } catch (e: any) {
+        console.error("[Appwrite Sync] Major sync error:", e);
+        return null;
+    }
+};
 
-    } catch (e) {
-        console.error("[Supabase Sync] Major sync error:", e);
-        // Minimum viable local state
-        return {
-            id: authId,
-            name: meta.full_name || 'Usuario',
-            avatar: meta.avatar_url || '😎',
-            points: 0, xp: 0, level: 1, badges: [], favorites: []
-        };
+export const updateUserProfile = async (userId: string, data: Partial<User>): Promise<boolean> => {
+    try {
+        const response = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'profiles',
+            [Query.equal('userId', userId), Query.limit(1)]
+        );
+
+        if (response.documents.length > 0) {
+            await databases.updateDocument(
+                APPWRITE_DATABASE_ID,
+                'profiles',
+                response.documents[0].$id,
+                {
+                    name: data.name,
+                    nickname: data.nickname,
+                    avatar: data.avatar
+                }
+            );
+            return true;
+        }
+        return false;
+    } catch (e: any) {
+        console.error("[Appwrite] updateUserProfile failed:", e.message);
+        return false;
     }
 };
 
@@ -356,27 +370,31 @@ export const getUserProfile = (): User | null => {
 
 export const getUserById = async (userId: string): Promise<User | null> => {
     try {
-        const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
-        if (data) {
-            return {
-                id: data.id,
-                name: data.name,
-                nickname: data.nickname,
-                email: data.email,
-                age: data.age,
-                gender: data.gender,
-                avatar: data.avatar,
-                points: data.points,
-                xp: data.xp,
-                level: data.level,
-                badges: data.badges || [],
-                favorites: data.favorites || []
-            };
-        }
-    } catch (e) {
-        console.error("Error fetching user by ID:", e);
+        const response = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'profiles',
+            [Query.equal('userId', userId), Query.limit(1)]
+        );
+
+        if (response.documents.length === 0) return null;
+        const profileDoc = response.documents[0] as any;
+
+        return {
+            id: profileDoc.userId,
+            name: profileDoc.name,
+            nickname: profileDoc.nickname,
+            email: profileDoc.email,
+            avatar: profileDoc.avatar,
+            points: profileDoc.points || 0,
+            xp: profileDoc.xp || 0,
+            level: profileDoc.level || 1,
+            badges: profileDoc.badges ? JSON.parse(profileDoc.badges) : [],
+            favorites: []
+        };
+    } catch (e: any) {
+        console.error("[Appwrite] Error fetching user by ID:", e.message);
+        return null;
     }
-    return null;
 };
 
 export const saveUserProfileLocal = (name: string, avatar: string): User => {
@@ -400,39 +418,48 @@ export const updateUserProgress = async (userId: string, pointsToAdd: number) =>
 
     const local = getUserProfile();
     if (local && local.id === userId) {
-        local.points += pointsToAdd;
-        local.xp += pointsToAdd;
+        local.points = (local.points || 0) + pointsToAdd;
+        local.xp = (local.xp || 0) + pointsToAdd;
 
-        const nextLevel = LEVEL_THRESHOLDS.find(l => l.level === local.level + 1);
+        const nextLevel = LEVEL_THRESHOLDS.find((l: any) => l.level === (local.level || 1) + 1);
         if (nextLevel && local.xp >= nextLevel.xp) {
-            local.level += 1;
+            local.level = (local.level || 1) + 1;
             triggerHaptic([50, 100, 50, 100]);
         }
         localStorage.setItem(STORAGE_KEY, JSON.stringify(local));
     }
 
     try {
-        const { data: currentRemote } = await supabase.from('profiles').select('points, xp, level').eq('id', userId).single();
+        const response = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'profiles',
+            [Query.equal('userId', userId), Query.limit(1)]
+        );
 
-        if (currentRemote) {
-            let newPoints = currentRemote.points + pointsToAdd;
-            let newXp = currentRemote.xp + pointsToAdd;
-            let newLevel = currentRemote.level;
+        if (response.documents.length > 0) {
+            const doc = response.documents[0] as any;
+            let newPoints = (doc.points || 0) + pointsToAdd;
+            let newXp = (doc.xp || 0) + pointsToAdd;
+            let newLevel = doc.level || 1;
 
-            const nextLvl = LEVEL_THRESHOLDS.find(l => l.level === newLevel + 1);
+            const nextLvl = LEVEL_THRESHOLDS.find((l: any) => l.level === newLevel + 1);
             if (nextLvl && newXp >= nextLvl.xp) {
                 newLevel++;
             }
 
-            await supabase.from('profiles').update({
-                points: newPoints,
-                xp: newXp,
-                level: newLevel,
-                updated_at: new Date()
-            }).eq('id', userId);
+            await databases.updateDocument(
+                APPWRITE_DATABASE_ID,
+                'profiles',
+                doc.$id,
+                {
+                    points: newPoints,
+                    xp: newXp,
+                    level: newLevel
+                }
+            );
         }
     } catch (e) {
-        console.error("Erro ao salvar progresso na nuvem:", e);
+        console.error("Erro ao salvar progresso no Appwrite:", e);
     }
 };
 
@@ -456,10 +483,22 @@ export const toggleFavorite = async (locationId: string): Promise<User | null> =
 
     if (!user.id.startsWith('guest_')) {
         try {
-            await supabase.from('profiles').update({
-                favorites: newFavorites
-            }).eq('id', user.id);
-        } catch (e) { console.error(e); }
+            const response = await databases.listDocuments(
+                APPWRITE_DATABASE_ID,
+                'profiles',
+                [Query.equal('userId', user.id), Query.limit(1)]
+            );
+            if (response.documents.length > 0) {
+                await databases.updateDocument(
+                    APPWRITE_DATABASE_ID,
+                    'profiles',
+                    response.documents[0].$id,
+                    {
+                        favorites: JSON.stringify(newFavorites)
+                    }
+                );
+            }
+        } catch (e: any) { console.error("[Appwrite] toggleFavorite failed:", e.message); }
     }
 
     return user;
@@ -476,152 +515,125 @@ export const searchUsers = async (query: string, currentUserId: string): Promise
     if (!cleanQuery || cleanQuery.length < 2) return [];
     if (currentUserId.startsWith('guest_')) return [];
 
-    const blockedIds = await getBlockedUsers(currentUserId);
-    let realUsers: FriendUser[] = [];
-
     try {
-        // Split query into terms if it contains spaces
-        const terms = cleanQuery.split(' ').filter(t => t.length > 0);
-        let queryBuilder = supabase.from('profiles').select('*');
+        const blockedIds = await getBlockedUsers(currentUserId);
 
-        if (terms.length > 1) {
-            // If multiple terms, simplistic approach to finding name match
-            const orString = terms.map(t => `name.ilike.%${t}%,nickname.ilike.%${t}%`).join(',');
-            queryBuilder = queryBuilder.or(orString);
-        } else {
-            queryBuilder = queryBuilder.or(`name.ilike.%${cleanQuery}%,nickname.ilike.%${cleanQuery}%`);
-        }
+        // Search in Appwrite profiles
+        const response = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'profiles',
+            [
+                Query.limit(100)
+            ]
+        );
 
-        const { data: profiles } = await queryBuilder
-            .neq('id', currentUserId)
-            .limit(20); // Incresed limit
+        const profiles = response.documents.filter((p: any) =>
+            (p.name?.toLowerCase().includes(cleanQuery.toLowerCase()) ||
+                p.nickname?.toLowerCase().includes(cleanQuery.toLowerCase())) &&
+            p.userId !== currentUserId &&
+            !blockedIds.includes(p.userId)
+        );
 
-        if (profiles && profiles.length > 0) {
-            const filteredProfiles = profiles.filter((p: any) => !blockedIds.includes(p.id));
+        // Fetch friendships
+        const fResponseRes = await Promise.all([
+            databases.listDocuments(APPWRITE_DATABASE_ID, 'friendships', [Query.equal('requester_id', currentUserId)]),
+            databases.listDocuments(APPWRITE_DATABASE_ID, 'friendships', [Query.equal('receiver_id', currentUserId)])
+        ]);
 
-            // FETCH ALL FRIENDSHIPS for current user to map status in memory
-            const { data: myFriendships } = await supabase
-                .from('friendships')
-                .select('*')
-                .or(`requester_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`);
+        const myFriendships = [...fResponseRes[0].documents, ...fResponseRes[1].documents];
 
-            realUsers = filteredProfiles.map((p: any) => {
-                // Find friendship specifically with this user in memory
-                const friendship = myFriendships?.find((f: any) =>
-                    (f.requester_id === currentUserId && f.receiver_id === p.id) ||
-                    (f.receiver_id === currentUserId && f.requester_id === p.id)
-                );
+        return profiles.map((p: any) => {
+            const friendship = myFriendships.find((f: any) =>
+                (f.requester_id === currentUserId && f.receiver_id === p.userId) ||
+                (f.receiver_id === currentUserId && f.requester_id === p.userId)
+            );
 
-                let status = FriendshipStatus.NONE;
-                let fId = undefined;
+            let status = FriendshipStatus.NONE;
+            let fId = undefined;
 
-                if (friendship) {
-                    fId = friendship.id;
-                    if (friendship.status === 'accepted') status = FriendshipStatus.ACCEPTED;
-                    else if (friendship.requester_id === currentUserId) status = FriendshipStatus.PENDING_SENT;
-                    else status = FriendshipStatus.PENDING_RECEIVED;
-                }
+            if (friendship) {
+                fId = friendship.$id;
+                if (friendship.status === 'accepted') status = FriendshipStatus.ACCEPTED;
+                else if (friendship.requester_id === currentUserId) status = FriendshipStatus.PENDING_SENT;
+                else status = FriendshipStatus.PENDING_RECEIVED;
+            }
 
-                return {
-                    id: p.id,
-                    name: p.name,
-                    nickname: p.nickname,
-                    avatar: p.avatar,
-                    points: p.points,
-                    xp: p.xp,
-                    level: p.level,
-                    badges: p.badges,
-                    favorites: p.favorites,
-                    friendshipStatus: status,
-                    friendshipId: fId
-                };
-            });
-        }
-    } catch (e) {
-        console.warn("User search offline/error", e);
+            return {
+                id: p.userId,
+                name: p.name,
+                nickname: p.nickname,
+                avatar: p.avatar,
+                points: p.points || 0,
+                xp: p.xp || 0,
+                level: p.level || 1,
+                badges: p.badges ? JSON.parse(p.badges) : [],
+                favorites: p.favorites ? JSON.parse(p.favorites) : [],
+                friendshipStatus: status,
+                friendshipId: fId
+            };
+        });
+    } catch (e: any) {
+        console.error("[Appwrite] searchUsers error:", e.message);
+        return [];
     }
-
-    return realUsers;
 };
 
 export const getFriends = async (currentUserId: string): Promise<FriendUser[]> => {
     if (currentUserId.startsWith('guest_')) return [];
 
-    console.log(`[getFriends] Fetching friends for ${currentUserId}...`);
+    console.log(`[Appwrite] Fetching friends for ${currentUserId}...`);
 
     try {
         const blockedIds = await getBlockedUsers(currentUserId);
 
-        // 1. Check Session Health & Recover if needed
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        const fResponseRes = await Promise.all([
+            databases.listDocuments(APPWRITE_DATABASE_ID, 'friendships', [Query.equal('requester_id', currentUserId)]),
+            databases.listDocuments(APPWRITE_DATABASE_ID, 'friendships', [Query.equal('receiver_id', currentUserId)])
+        ]);
 
-        if (!session || sessionError) {
-            console.warn("[getFriends] Session lost or invalid. Attempting refresh...");
-            const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+        const friendships = [...fResponseRes[0].documents, ...fResponseRes[1].documents];
 
-            if (refreshError || !refreshData.session) {
-                console.error("[getFriends] FATAL: Could not recover session.", refreshError);
-                // Return empty but consider alerting user to re-login
-                return [];
-            }
-            console.log("[getFriends] Session recovered successfully!");
-        }
-
-        const { data: friendships, error: fError } = await supabase
-            .from('friendships')
-            .select('*')
-            .or(`requester_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`);
-
-        if (fError) {
-            console.error("[getFriends] Supabase Error (Friendships):", fError);
-            throw fError;
-        }
-
-        if (friendships && friendships.length > 0) {
-            console.log(`[getFriends] Found ${friendships.length} raw friendships.`);
+        if (friendships.length > 0) {
             const friendIds = friendships.map((f: any) => f.requester_id === currentUserId ? f.receiver_id : f.requester_id);
             const safeFriendIds = friendIds.filter((id: string) => !blockedIds.includes(id));
 
             if (safeFriendIds.length > 0) {
-                const { data: profiles, error: pError } = await supabase.from('profiles').select('*').in('id', safeFriendIds);
+                // Fetch profiles for these IDs
+                // Appwrite doesn't have "in" query, so we might need multiple calls or list all and filter
+                // For a few friends, we can list and filter if under 100
+                const pResponse = await databases.listDocuments(
+                    APPWRITE_DATABASE_ID,
+                    'profiles',
+                    [Query.limit(100)]
+                );
 
-                if (pError) {
-                    console.error("[getFriends] Supabase Error (Profiles):", pError);
-                    throw pError;
-                }
+                const profiles = pResponse.documents.filter((p: any) => safeFriendIds.includes(p.userId));
 
-                if (profiles) {
-                    console.log(`[getFriends] Successfully loaded ${profiles.length} friend profiles.`);
-                    return profiles.map((p: any) => {
-                        const f = friendships.find((fr: any) => fr.requester_id === p.id || fr.receiver_id === p.id);
-                        let status = FriendshipStatus.NONE;
-                        if (f.status === 'accepted') status = FriendshipStatus.ACCEPTED;
-                        else if (f.requester_id === currentUserId) status = FriendshipStatus.PENDING_SENT;
-                        else status = FriendshipStatus.PENDING_RECEIVED;
+                return profiles.map((p: any) => {
+                    const f = friendships.find((fr: any) => fr.requester_id === p.userId || fr.receiver_id === p.userId);
+                    let status = FriendshipStatus.NONE;
+                    if (f.status === 'accepted') status = FriendshipStatus.ACCEPTED;
+                    else if (f.requester_id === currentUserId) status = FriendshipStatus.PENDING_SENT;
+                    else status = FriendshipStatus.PENDING_RECEIVED;
 
-                        return {
-                            id: p.id,
-                            name: p.name,
-                            avatar: p.avatar,
-                            points: p.points,
-                            xp: p.xp,
-                            level: p.level,
-                            badges: p.badges,
-                            favorites: p.favorites,
-                            friendshipStatus: status,
-                            friendshipId: f.id,
-                            lastCheckIn: undefined
-                        };
-                    });
-                }
-            } else {
-                console.log("[getFriends] No safe friend IDs to fetch (all blocked or empty).");
+                    return {
+                        id: p.userId,
+                        name: p.name,
+                        nickname: p.nickname,
+                        avatar: p.avatar,
+                        points: p.points || 0,
+                        xp: p.xp || 0,
+                        level: p.level || 1,
+                        badges: p.badges ? JSON.parse(p.badges) : [],
+                        favorites: p.favorites ? JSON.parse(p.favorites) : [],
+                        friendshipStatus: status,
+                        friendshipId: f.$id
+                    };
+                });
             }
-        } else {
-            console.log("[getFriends] No friendships found in DB.");
         }
-    } catch (e) {
-        console.error("[getFriends] CRITICAL ERROR:", e);
+    } catch (e: any) {
+        console.error("[Appwrite] getFriends error:", e.message);
     }
 
     return [];
@@ -631,32 +643,71 @@ export const sendFriendRequest = async (currentUserId: string, targetUserId: str
     if (currentUserId.startsWith('guest_')) return false;
 
     try {
-        const { error } = await supabase.from('friendships').insert({
-            requester_id: currentUserId,
-            receiver_id: targetUserId,
-            status: 'pending'
-        });
-        if (error) {
-            console.error("Error sending friend request:", error);
-            return false;
-        }
+        await databases.createDocument(
+            APPWRITE_DATABASE_ID,
+            'friendships',
+            ID.unique(),
+            {
+                requester_id: currentUserId,
+                receiver_id: targetUserId,
+                status: 'pending'
+            },
+            [
+                Permission.read(Role.user(currentUserId)),
+                Permission.read(Role.user(targetUserId)),
+                Permission.update(Role.user(currentUserId)),
+                Permission.update(Role.user(targetUserId)),
+                Permission.delete(Role.user(currentUserId)),
+                Permission.delete(Role.user(targetUserId))
+            ]
+        );
         return true;
-    } catch (e) {
-        console.warn(e);
+    } catch (e: any) {
+        console.error("[Appwrite] Error sending friend request:", e.message);
         return false;
     }
 };
 
 export const respondToFriendRequest = async (friendshipId: string, accept: boolean): Promise<boolean> => {
     try {
+        const currentUser = await account.get();
+
+        // Debug logs commented out after validation
+        /*
+        try {
+            const doc = await databases.getDocument(APPWRITE_DATABASE_ID, 'friendships', friendshipId);
+            console.log(`[DEBUG] Friendship Doc:`, doc);
+            console.log(`[DEBUG] Doc Permissions:`, doc.$permissions);
+            console.log(`[DEBUG] Current User:`, currentUser.$id);
+            console.log(`[DEBUG] Match Requester?`, doc.requester_id === currentUser.$id);
+            console.log(`[DEBUG] Match Receiver?`, doc.receiver_id === currentUser.$id);
+        } catch (fetchErr) {
+            console.warn("[DEBUG] Could not fetch doc to check permissions:", fetchErr);
+        }
+        */
+
+        console.log(`[FriendRequest] Processing ${friendshipId} action. Accept: ${accept}.`);
+
         if (accept) {
-            await supabase.from('friendships').update({ status: 'accepted' }).eq('id', friendshipId);
+            await databases.updateDocument(
+                APPWRITE_DATABASE_ID,
+                'friendships',
+                friendshipId,
+                { status: 'accepted' }
+            );
         } else {
-            await supabase.from('friendships').delete().eq('id', friendshipId);
+            console.log(`[FriendRequest] Attempting delete...`);
+            await databases.deleteDocument(
+                APPWRITE_DATABASE_ID,
+                'friendships',
+                friendshipId
+            );
         }
         return true;
-    } catch (e) { console.warn(e); }
-    return true;
+    } catch (e: any) {
+        console.error("[Appwrite] respondToFriendRequest failed:", e.message);
+        return false;
+    }
 };
 
 // --- INVITES ---
@@ -671,21 +722,108 @@ export const sendInvites = async (
     if (fromUser.id.startsWith('guest_')) return false;
 
     try {
-        const invites = friendIds.map(friendId => ({
-            from_user_id: fromUser.id,
-            to_user_id: friendId,
-            location_id: locationId,
-            location_name: locationName,
-            message: message || "Bora pro rolê!",
-            status: 'pending'
-        }));
+        const promises = friendIds.map(friendId =>
+            databases.createDocument(
+                APPWRITE_DATABASE_ID,
+                'invites',
+                ID.unique(),
+                {
+                    from_user_id: fromUser.id,
+                    to_user_id: friendId,
+                    location_id: locationId,
+                    location_name: locationName,
+                    message: message || "Bora pro rolê!",
+                    status: 'pending'
+                }
+            )
+        );
+        await Promise.all(promises);
+        return true;
+    } catch (e: any) {
+        console.error("[Appwrite] Erro ao enviar convite:", e.message);
+        return true;
+    }
+};
 
-        const { error } = await supabase.from('invites').insert(invites);
-        if (error) throw error;
+export const getPendingInvites = async (userId: string): Promise<Invite[]> => {
+    try {
+        const response = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'invites',
+            [Query.equal('to_user_id', userId), Query.equal('status', 'pending')]
+        );
+
+        return response.documents.map((i: any) => ({
+            id: i.$id,
+            fromUserId: i.from_user_id,
+            toUserId: i.to_user_id,
+            locationId: i.location_id,
+            locationName: i.location_name,
+            message: i.message,
+            status: i.status,
+            createdAt: new Date(i.$createdAt)
+        }));
+    } catch (e: any) {
+        console.error("[Appwrite] getPendingInvites failed:", e.message);
+        return [];
+    }
+};
+
+export const updateInviteStatus = async (inviteId: string, status: 'accepted' | 'declined'): Promise<boolean> => {
+    try {
+        await databases.updateDocument(
+            APPWRITE_DATABASE_ID,
+            'invites',
+            inviteId,
+            { status }
+        );
         return true;
-    } catch (e) {
-        console.error("Erro ao enviar convite:", e);
-        return true;
+    } catch (e: any) {
+        console.error("[Appwrite] updateInviteStatus failed:", e.message);
+        return false;
+    }
+};
+
+export const getPendingFriendRequests = async (userId: string): Promise<FriendUser[]> => {
+    try {
+        const response = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'friendships',
+            [Query.equal('receiver_id', userId), Query.equal('status', 'pending')]
+        );
+
+        if (response.documents.length === 0) return [];
+
+        const requesterIds = response.documents.map((f: any) => f.requester_id);
+
+        // Fetch profiles. Similar to getFriends, we list and filter if under 100 for MVP
+        const pResponse = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'profiles',
+            [Query.limit(100)]
+        );
+
+        const profiles = pResponse.documents.filter((p: any) => requesterIds.includes(p.userId));
+
+        return profiles.map((p: any) => {
+            const f = response.documents.find((fr: any) => fr.requester_id === p.userId);
+            return {
+                id: p.userId,
+                name: p.name,
+                nickname: p.nickname,
+                avatar: p.avatar,
+                points: p.points || 0,
+                xp: p.xp || 0,
+                level: p.level || 1,
+                badges: p.badges ? JSON.parse(p.badges) : [],
+                favorites: p.favorites ? JSON.parse(p.favorites) : [],
+                friendshipStatus: FriendshipStatus.PENDING_RECEIVED,
+                friendshipId: f?.$id
+            };
+        });
+    } catch (e: any) {
+        console.error("[Appwrite] getPendingFriendRequests failed:", e.message);
+        return [];
     }
 };
 
@@ -970,43 +1108,43 @@ export const searchLocations = async (query: string, userLat: number, userLng: n
 
     let dbResults: Location[] = [];
     try {
-        const { data } = await supabase
-            .from('locations')
-            .select('*')
-            .or(`name.ilike.%${query}%,nome.ilike.%${query}%`)
-            .limit(10);
+        const response = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'locations',
+            [Query.limit(50)]
+        );
 
-        if (data) {
-            dbResults = data.map((row: any) => {
+        dbResults = response.documents
+            .filter((row: any) =>
+                row.name?.toLowerCase().includes(query.toLowerCase()) ||
+                row.nome?.toLowerCase().includes(query.toLowerCase())
+            )
+            .map((row: any) => {
+                const stats = row.stats ? JSON.parse(row.stats) : { avgCrowd: 0, avgVibe: 0, avgPrice: 0, reviewCount: 0 };
                 const { isOpen, hours } = determineOpenStatus(row.type as LocationType);
                 return {
-                    id: row.id,
+                    id: row.$id,
                     name: row.name || row.nome || 'Sem Nome',
                     address: row.address || row.endereco || '',
                     type: row.type as LocationType,
-                    latitude: row.latitude,
-                    longitude: row.longitude,
-                    imageUrl: row.image_url,
-                    verified: row.verified,
-                    votesForVerification: row.votes_for_verification,
-                    isOfficial: row.is_official,
-                    ownerId: row.owner_id,
-                    officialDescription: row.official_description,
-                    instagram: row.instagram,
-                    whatsapp: row.whatsapp,
-                    stats: {
-                        avgPrice: 0, avgCrowd: 0, avgGender: 0, avgVibe: 0, reviewCount: 0,
-                        lastUpdated: new Date(),
-                        ...(row.stats || {})
-                    },
+                    latitude: row.lat || row.latitude || 0,
+                    longitude: row.lng || row.longitude || 0,
+                    imageUrl: row.image_url || row.imageUrl || '',
+                    verified: row.verified || false,
+                    votesForVerification: row.votes_for_verification || 0,
+                    isOfficial: row.is_official || false,
+                    ownerId: row.owner_id || '',
+                    officialDescription: row.official_description || '',
+                    instagram: row.instagram || '',
+                    whatsapp: row.whatsapp || '',
+                    stats: stats,
                     isOpen,
                     openingHours: hours,
                     reviews: [],
-                    distance: calculateDistance(userLat, userLng, row.latitude, row.longitude)
+                    distance: calculateDistance(userLat, userLng, row.lat || row.latitude, row.lng || row.longitude)
                 };
             });
-        }
-    } catch (e) { console.warn(e); }
+    } catch (e: any) { console.warn("[Appwrite] searchLocations failed:", e.message); }
 
     let apiResults: Location[] = [];
     try {
@@ -1075,383 +1213,233 @@ const generateFallbackLocations = (centerLat: number, centerLng: number, count: 
 };
 
 export const getNearbyRoles = async (lat: number, lng: number): Promise<Location[]> => {
-    let dbLocations: Location[] = [];
     try {
-        console.log(`[Supabase Vital] Testando conectividade bruta (CORS check)...`);
-        const baseUrl = (supabase as any).supabaseUrl || 'https://gwvnwsvaepxwjasdupks.supabase.co';
-        try {
-            const fetchPromise = fetch(`${baseUrl}/rest/v1/locations?select=id&limit=1`, {
-                headers: {
-                    'apikey': (supabase as any).supabaseKey,
-                    'Authorization': `Bearer ${(supabase as any).supabaseKey}`
-                }
-            });
-            const timeoutPromise = new Promise<never>((_, reject) =>
-                setTimeout(() => reject(new Error("Diagnostic Timeout")), 8000)
-            );
-            const rawTest = await Promise.race([fetchPromise, timeoutPromise]);
-            console.log(`[Supabase Vital] Conectividade Bruta OK:`, rawTest.status, rawTest.statusText);
-        } catch (rawErr: any) {
-            console.error(`[Supabase Vital] ERRO DE REDE BRUTO:`, rawErr.message);
-        }
-
-        console.log(`[Supabase Vital] Buscando dados via biblioteca (com timeout de 3s)...`);
-        const libFetch = supabase.from('locations').select('*');
-        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Supabase Library Timeout")), 3000));
-
-        const result: any = await Promise.race([libFetch, timeout]);
-        const { data, error } = result;
-
-        if (error) {
-            console.error("[Supabase Vital] Fetch error in getNearbyRoles:", error.message, error.details, error.hint);
-            throw error;
-        }
-
-        console.log(`[Supabase Vital] RAW DATA FROM DB:`, JSON.stringify(data));
-        console.log(`[Supabase Vital] Fetched ${data?.length || 0} rows total.`);
-
-        if (data) {
-            dbLocations = data.map((row: any) => {
-                const rawType = (row.type || row.tipo || 'Outro').toLowerCase();
-                let typeSelection = LocationType.OUTRO;
-                if (rawType === 'bar') typeSelection = LocationType.BAR;
-                else if (rawType === 'balada') typeSelection = LocationType.BALADA;
-                else if (rawType === 'pub') typeSelection = LocationType.PUB;
-                else if (rawType === 'restaurante') typeSelection = LocationType.RESTAURANTE;
-
-                const { isOpen, hours } = determineOpenStatus(typeSelection);
-
-                return {
-                    id: row.id,
-                    name: row.name || row.nome,
-                    address: row.address || row.endereco,
-                    type: typeSelection,
-                    latitude: row.latitude,
-                    longitude: row.longitude,
-                    imageUrl: row.image_url || row.url_imagem,
-                    verified: row.verified,
-                    votesForVerification: row.votes_for_verification,
-                    isOfficial: row.is_official,
-                    ownerId: row.owner_id,
-                    officialDescription: row.official_description,
-                    instagram: row.instagram,
-                    whatsapp: row.whatsapp,
-                    stats: {
-                        avgPrice: 0, avgCrowd: 0, avgGender: 0, avgVibe: 0, reviewCount: 0,
-                        lastUpdated: new Date(),
-                        ...(row.stats || {})
-                    } as any,
-                    isOpen,
-                    openingHours: hours,
-                    reviews: []
-                };
-            });
-        }
+        console.log(`[Appwrite] Fetching locations near [${lat}, ${lng}]`);
+        const response = await databases.listDocuments(APPWRITE_DATABASE_ID, 'locations', [Query.limit(100)]);
+        const dbLocations: Location[] = response.documents.map((doc: any) => {
+            const stats = doc.stats ? JSON.parse(doc.stats) : { avgCrowd: 0, avgVibe: 0, avgPrice: 0, reviewCount: 0 };
+            return {
+                id: doc.$id,
+                name: doc.name,
+                type: doc.type as LocationType,
+                latitude: doc.lat || doc.latitude || 0,
+                longitude: doc.lng || doc.longitude || 0,
+                address: doc.address || '',
+                officialDescription: doc.official_description || '',
+                imageUrl: doc.image_url || doc.imageUrl || '',
+                isOfficial: doc.is_official || false,
+                verified: doc.verified || false,
+                votesForVerification: doc.votes_for_verification || 0,
+                stats: stats,
+                isOpen: true,
+                openingHours: '24/7',
+                reviews: []
+            };
+        });
+        return dbLocations.map(loc => ({
+            ...loc,
+            distance: Math.round(calculateDistance(lat, lng, loc.latitude, loc.longitude))
+        })).sort((a, b) => (a.distance || 0) - (b.distance || 0));
     } catch (e: any) {
-        console.warn("Supabase Library failed, attempting Raw API Fallback...", e.message);
-
-        try {
-            const baseUrl = (supabase as any).supabaseUrl || 'https://gwvnwsvaepxwjasdupks.supabase.co';
-            const apiKey = (supabase as any).supabaseKey;
-
-            const fetchPromise = fetch(`${baseUrl}/rest/v1/locations?select=*`, {
-                headers: {
-                    'apikey': apiKey,
-                    'Authorization': `Bearer ${apiKey}`
-                }
-            });
-            const timeoutPromise = new Promise<never>((_, reject) =>
-                setTimeout(() => reject(new Error("Raw API Timeout")), 30000)
-            );
-
-            const response = await Promise.race([fetchPromise, timeoutPromise]);
-
-            if (!response.ok) throw new Error(`Raw API HTTP Error: ${response.status}`);
-
-            const rawData = await response.json();
-            console.log(`[Supabase Vital] RAW API FALLBACK SUCCESS:`, rawData.length, "rows");
-
-            dbLocations = rawData.map((row: any) => {
-                const rawType = (row.type || row.tipo || 'Outro').toLowerCase();
-                let typeSelection = LocationType.OUTRO;
-                if (rawType === 'bar') typeSelection = LocationType.BAR;
-                else if (rawType === 'balada') typeSelection = LocationType.BALADA;
-                else if (rawType === 'pub') typeSelection = LocationType.PUB;
-                else if (rawType === 'restaurante') typeSelection = LocationType.RESTAURANTE;
-
-                const { isOpen, hours } = determineOpenStatus(typeSelection);
-
-                return {
-                    id: row.id,
-                    name: row.name || row.nome,
-                    address: row.address || row.endereco,
-                    type: typeSelection,
-                    latitude: row.latitude,
-                    longitude: row.longitude,
-                    imageUrl: row.image_url || row.url_imagem,
-                    verified: row.verified,
-                    votesForVerification: row.votes_for_verification,
-                    isOfficial: row.is_official,
-                    ownerId: row.owner_id,
-                    officialDescription: row.official_description,
-                    instagram: row.instagram,
-                    whatsapp: row.whatsapp,
-                    stats: {
-                        avgPrice: 0, avgCrowd: 0, avgGender: 0, avgVibe: 0, reviewCount: 0,
-                        lastUpdated: new Date(),
-                        ...(row.stats || {})
-                    } as any,
-                    isOpen,
-                    openingHours: hours,
-                    reviews: []
-                };
-            });
-        } catch (rawErr: any) {
-            console.error("[Supabase Vital] FATAL: Raw API Fallback also failed:", rawErr.message);
-        }
+        console.error("[Appwrite] Error in getNearbyRoles:", e.message);
+        return generateFallbackLocations(lat, lng, 10);
     }
-
-    // Increase radius to 100km for better global discoverability
-    const nearbyDB = dbLocations.filter(l => {
-        const d = calculateDistance(lat, lng, l.latitude, l.longitude);
-        console.log(`[Supabase Vital] Distância para "${l.name}": ${d.toFixed(1)}m (Coords: ${l.latitude}, ${l.longitude} vs ${lat}, ${lng})`);
-        return d < 100000;
-    });
-    console.log(`[Supabase Vital] RESULTADO FINAL: ${nearbyDB.length} locais encontrados.`);
-
-    // --- PIVOT: COMMUNITY DRIVEN ONLY ---
-    // We disabled external APIs (OSM, Photon, Foursquare) to rely 100% on user submissions.
-    /* 
-        const mergedLocations = [...nearbyDB];
-        // External API logic removed for Community Driven Pivot
-        */
-
-    // ONLY RETURN USER GENERATED CONTENT (Supabase/Mock DB)
-    return nearbyDB.map(loc => ({
-        ...loc,
-        distance: Math.round(calculateDistance(lat, lng, loc.latitude, loc.longitude))
-    })).sort((a, b) => (a.distance || 0) - (b.distance || 0));
 };
 
 export const createLocation = async (data: Omit<Location, 'id' | 'stats' | 'distance' | 'reviews' | 'verified' | 'votesForVerification' | 'isOpen' | 'openingHours'>): Promise<Location> => {
-    const isOfficial = !!data.isOfficial;
-    const isVerified = isOfficial;
-
-    const defaultStats = {
-        avgPrice: 0,
-        avgCrowd: 0,
-        avgGender: 0,
-        avgVibe: 0,
-        reviewCount: 0,
-        lastUpdated: new Date().toISOString()
-    };
-    const finalImageUrl = data.imageUrl || DEFAULT_LOCATION_IMAGES[data.type] || DEFAULT_LOCATION_IMAGES[LocationType.OUTRO];
-    const { isOpen, hours } = determineOpenStatus(data.type);
-
     try {
-        console.log("[Supabase Diagnostic] Client Initialized:", !!supabase);
-        const payload: any = {
+        console.log("[Appwrite] Creating location:", data.name);
+
+        const payload = {
             name: data.name,
-            address: data.address,
-            type: data.type, // Remove toLowerCase() to stay compatible with enum/switch cases
-            latitude: data.latitude,
-            longitude: data.longitude,
-            image_url: finalImageUrl,
-            verified: isVerified,
-            is_official: isOfficial,
-            stats: defaultStats,
-            votes_for_verification: isVerified ? 10 : 0,
-            owner_id: data.ownerId,
-            official_description: data.officialDescription,
-            instagram: data.instagram,
-            whatsapp: data.whatsapp
+            address: data.address || '',
+            type: data.type,
+            lat: data.latitude,
+            lng: data.longitude,
+            image_url: data.imageUrl || DEFAULT_LOCATION_IMAGES[data.type],
+            verified: !!data.isOfficial,
+            is_official: !!data.isOfficial,
+            stats: JSON.stringify({ avgCrowd: 0, avgVibe: 0, avgPrice: 0, reviewCount: 0, lastUpdated: new Date().toISOString() }),
+            votes_for_verification: data.isOfficial ? 10 : 0,
+            owner_id: data.ownerId || '',
+            official_description: data.officialDescription || '',
+            instagram: data.instagram || '',
+            whatsapp: data.whatsapp || ''
         };
 
-        console.log("[Supabase Diagnostic] Submitting payload:", payload);
+        const result = await databases.createDocument(
+            APPWRITE_DATABASE_ID,
+            'locations',
+            ID.unique(),
+            payload
+        );
 
-        // Primary Supabase Insert with 30s Timeout Race
-        const insertPromise = supabase.from('locations').insert(payload).select();
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Supabase Timeout")), 30000));
-
-        let inserted = null;
-        let error = null;
-
-        try {
-            const result: any = await Promise.race([insertPromise, timeoutPromise]);
-            inserted = result.data;
-            error = result.error;
-        } catch (raceErr: any) {
-            console.warn("[Supabase] Insert race failed or timed out:", raceErr.message);
-            error = raceErr;
-        }
-
-        if (error || !inserted || inserted.length === 0) {
-            console.warn("[Supabase] Performing Raw API Fallback...");
-
-            // RAW API FALLBACK for Insert
-            const baseUrl = (supabase as any).supabaseUrl || 'https://gwvnwsvaepxwjasdupks.supabase.co';
-            const apiKey = (supabase as any).supabaseKey;
-
-            if (apiKey) {
-                try {
-                    const rawResponse = await fetch(`${baseUrl}/rest/v1/locations`, {
-                        method: 'POST',
-                        headers: {
-                            'apikey': apiKey,
-                            'Authorization': `Bearer ${apiKey}`,
-                            'Content-Type': 'application/json',
-                            'Prefer': 'return=representation'
-                        },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (rawResponse.ok) {
-                        const rawInserted = await rawResponse.json();
-                        if (rawInserted && rawInserted.length > 0) {
-                            const r = rawInserted[0];
-                            console.log("[Supabase Vital] RAW API INSERT SUCCESS:", r.id);
-                            return { ...data, imageUrl: finalImageUrl, id: r.id, verified: r.verified, votesForVerification: 0, stats: defaultStats as any, isOpen, openingHours: hours, reviews: [] };
-                        }
-                    } else {
-                        console.error("[Supabase Fallback] Raw API failed:", rawResponse.status);
-                    }
-                } catch (fallbackErr) {
-                    console.error("[Supabase Fallback] Error during raw fetch:", fallbackErr);
-                }
-            }
-
-            throw error || new Error("Falha ao inserir local");
-        }
-
-        const res = inserted[0];
-        console.log("Location created successfully:", res.id);
-        return { ...data, imageUrl: finalImageUrl, id: res.id, verified: res.verified, votesForVerification: res.votes_for_verification, stats: (res.stats || defaultStats) as any, isOpen, openingHours: hours, reviews: [] };
-
-    } catch (error) {
-        console.error("Falha ao criar local (usando modo offline):", error);
-        // Fallback para modo "offline/manual" para não travar o usuário
         return {
-            ...data,
-            imageUrl: finalImageUrl,
-            id: `temp_manual_${Date.now()}`,
-            verified: isVerified,
-            votesForVerification: 0,
-            stats: defaultStats as any,
-            isOpen, openingHours: hours, reviews: []
+            id: result.$id,
+            name: result.name,
+            type: result.type as LocationType,
+            latitude: result.lat,
+            longitude: result.lng,
+            address: result.address,
+            officialDescription: result.official_description,
+            imageUrl: result.image_url,
+            isOfficial: result.is_official,
+            verified: result.verified,
+            votesForVerification: result.votes_for_verification,
+            stats: JSON.parse(result.stats),
+            isOpen: true,
+            openingHours: '24/7',
+            reviews: []
         };
+    } catch (e: any) {
+        console.error("[Appwrite] createLocation failed:", e.message);
+        throw e;
     }
 };
 
 export const verifyLocation = async (id: string): Promise<Location | null> => {
-    if (id.startsWith('temp_')) return null;
     try {
-        const { data: loc } = await supabase.from('locations').select('votes_for_verification, verified, type').eq('id', id).single();
-        if (loc) {
-            const newCount = (loc.votes_for_verification || 0) + 1;
-            const newVerified = loc.verified || newCount >= 10;
-            const { isOpen, hours } = determineOpenStatus(loc.type as LocationType);
-            await supabase.from('locations').update({ votes_for_verification: newCount, verified: newVerified }).eq('id', id);
-            triggerHaptic(20);
-            return { ...loc, votesForVerification: newCount, verified: newVerified, isOpen, openingHours: hours } as any;
-        }
-    } catch (e) { console.warn(e); }
-    return null;
-}
+        const doc = await databases.getDocument(APPWRITE_DATABASE_ID, 'locations', id);
+        const newCount = (doc.votes_for_verification || 0) + 1;
+        const newVerified = doc.verified || newCount >= 10;
+
+        const response = await databases.updateDocument(
+            APPWRITE_DATABASE_ID,
+            'locations',
+            id,
+            {
+                votes_for_verification: newCount,
+                verified: newVerified
+            }
+        );
+
+        const stats = response.stats ? JSON.parse(response.stats) : { avgCrowd: 0, avgVibe: 0, avgPrice: 0, reviewCount: 0 };
+        return {
+            id: response.$id,
+            name: response.name,
+            type: response.type as LocationType,
+            latitude: response.lat,
+            longitude: response.lng,
+            address: response.address,
+            officialDescription: response.official_description,
+            imageUrl: response.image_url,
+            isOfficial: response.is_official,
+            verified: response.verified,
+            votesForVerification: response.votes_for_verification,
+            stats: stats,
+            isOpen: true,
+            openingHours: '24/7',
+            reviews: []
+        };
+    } catch (e: any) {
+        console.error("[Appwrite] verifyLocation failed:", e.message);
+        return null;
+    }
+};
 
 export const claimBusiness = async (locationId: string, ownerId: string, details: any): Promise<boolean> => {
-    if (locationId.startsWith('temp_')) return false;
     try {
-        const { error } = await supabase.from('locations').update({
-            is_official: true,
-            verified: true,
-            owner_id: ownerId,
-            official_description: details.description,
-            instagram: details.instagram,
-            whatsapp: details.whatsapp
-        }).eq('id', locationId);
-        if (!error) {
-            triggerHaptic([50, 100, 50]);
-            return true;
-        }
-    } catch (e) { console.warn(e); }
-    return false;
-}
+        await databases.updateDocument(
+            APPWRITE_DATABASE_ID,
+            'locations',
+            locationId,
+            {
+                is_official: true,
+                verified: true,
+                owner_id: ownerId,
+                official_description: details.description || '',
+                instagram: details.instagram || '',
+                whatsapp: details.whatsapp || ''
+            }
+        );
+        triggerHaptic([50, 100, 50]);
+        return true;
+    } catch (e: any) {
+        console.error("[Appwrite] claimBusiness failed:", e.message);
+        return false;
+    }
+};
 
 export const getReviewsForLocation = async (locationId: string): Promise<Review[]> => {
     if (locationId.startsWith('temp_')) return [];
 
-    const user = getUserProfile();
-    const blockedIds = user ? await getBlockedUsers(user.id) : [];
-
     try {
-        const { data } = await supabase
-            .from('reviews')
-            .select('*')
-            .eq('location_id', locationId)
-            .order('created_at', { ascending: false });
-        if (data) {
-            const allReviews = data.map((r: any) => ({
-                id: r.id,
-                locationId: r.location_id,
-                userId: r.user_id,
-                userName: r.user_name,
-                userAvatar: r.user_avatar,
-                price: r.price ?? r.nota_preco ?? 0,
-                crowd: r.crowd ?? r.nota_lotacao ?? 0,
-                gender: r.gender ?? r.nota_genero ?? 0,
-                vibe: r.vibe ?? r.nota_vibe ?? 0,
-                comment: r.comment ?? r.comentario ?? '',
-                createdAt: new Date(r.created_at)
-            }));
-            return allReviews.filter((r: Review) => !blockedIds.includes(r.userId));
-        }
-    } catch (e) { console.warn(e); }
-    return [];
-}
+        const response = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'reviews',
+            [
+                Query.equal('locationId', locationId),
+                Query.orderDesc('$createdAt')
+            ]
+        );
 
+        return response.documents.map((r: any) => ({
+            id: r.$id,
+            locationId: r.locationId,
+            userId: r.userId,
+            userName: r.userName,
+            userAvatar: r.userAvatar,
+            price: r.price || 0,
+            crowd: r.crowd || 0,
+            gender: r.gender || 0,
+            vibe: r.vibe || 0,
+            comment: r.comment || '',
+            createdAt: new Date(r.$createdAt)
+        }));
+    } catch (e: any) {
+        console.warn("[getReviewsForLocation] Failed to fetch from Appwrite:", e.message);
+        return [];
+    }
+};
+// ⚠️ ATENÇÃO: Esta função assume que você rodou o SQL de RESET do banco
 // ⚠️ ATENÇÃO: Esta função assume que você rodou o SQL de RESET do banco
 export const submitReview = async (review: Review, locationContext?: Location): Promise<boolean> => {
     let finalLocationId = review.locationId;
+    console.log(`[SubmitReview] Iniciando para locationId: ${finalLocationId}`);
 
     // 1. SYNC TEMP LOCATION
     if (review.locationId.startsWith('temp_')) {
-        if (!locationContext) return false;
+        console.log(`[SubmitReview] Location is TEMP. Syncing to DB...`);
+        if (!locationContext) {
+            console.error("[SubmitReview] Falta context para sync.");
+            return false;
+        }
+
         try {
-            // Simplificado: apenas tenta criar com colunas novas. Se falhar, é erro de banco.
             const payload = {
                 name: locationContext.name,
                 address: locationContext.address,
                 type: locationContext.type,
-                latitude: locationContext.latitude,
-                longitude: locationContext.longitude,
+                lat: locationContext.latitude,
+                lng: locationContext.longitude,
                 image_url: locationContext.imageUrl,
                 verified: true,
                 votes_for_verification: 10,
-                stats: locationContext.stats
+                is_official: false,
+                stats: JSON.stringify(locationContext.stats)
             };
-            const { data: results, error: insertError } = await supabase.from('locations').insert(payload).select();
-            if (!insertError && results && results.length > 0) {
-                finalLocationId = results[0].id;
-            } else {
-                // Fallback para banco antigo
-                const legacyPayload = { ...payload, nome: payload.name, endereco: payload.address, tipo: payload.type, url_imagem: payload.image_url };
-                const { data: retry, error: retryError } = await supabase.from('locations').insert(legacyPayload).select();
-                if (!retryError && retry && retry.length > 0) {
-                    finalLocationId = retry[0].id;
-                } else {
-                    return false;
-                }
-            }
-        } catch (e) { return false; }
+
+            const result = await databases.createDocument(
+                APPWRITE_DATABASE_ID,
+                'locations',
+                ID.unique(),
+                payload
+            );
+
+            finalLocationId = result.$id;
+            console.log(`[SubmitReview] Location synced! New ID: ${finalLocationId}`);
+        } catch (e: any) {
+            console.error("[SubmitReview] Appwrite sync failed:", e.message);
+            return false;
+        }
     }
 
     // 2. SUBMIT REVIEW - DIRECT & SIMPLE
-    // Apenas tenta inserir na tabela 'reviews'. Se falhar, é porque o usuário não rodou o SQL de fix.
     const payload = {
-        location_id: finalLocationId,
-        user_id: review.userId,
-        user_name: review.userName,
-        user_avatar: review.userAvatar,
+        locationId: finalLocationId,
+        userId: review.userId,
+        userName: review.userName,
+        userAvatar: review.userAvatar,
         price: review.price || 0,
         crowd: review.crowd || 0,
         vibe: review.vibe || 0,
@@ -1460,215 +1448,120 @@ export const submitReview = async (review: Review, locationContext?: Location): 
     };
 
     try {
-        const { error } = await supabase.from('reviews').insert(payload);
+        console.log("[SubmitReview] Inserting review to Appwrite...", payload);
 
-        if (error) {
-            console.error("SQL Error on Insert:", error);
-            console.warn(">> O USUÁRIO PRECISA RODAR O SCRIPT SQL DE RESET <<");
-            alert("Erro de banco de dados. Por favor, execute o script SQL de correção.");
-            return false;
+        // TIMEOUT PROTECTION
+        const insertPromise = databases.createDocument(
+            APPWRITE_DATABASE_ID,
+            'reviews',
+            ID.unique(),
+            payload
+        );
+
+        const timeoutPromise = new Promise<{ error: any }>((resolve) =>
+            setTimeout(() => resolve({ error: { message: 'Timeout' } }), 10000)
+        );
+
+        const result: any = await Promise.race([insertPromise, timeoutPromise]);
+
+        if (result.error || !result.$id) {
+            console.warn("[SubmitReview] Appwrite failed or timed out. Saving to Local Storage...");
+
+            // EMERGENCY FALLBACK TO LOCAL STORAGE
+            try {
+                const localReviews = JSON.parse(localStorage.getItem('dirole_offline_reviews') || '[]');
+                localReviews.push({
+                    ...review,
+                    locationId: finalLocationId,
+                    id: `offline_${Date.now()}`,
+                    createdAt: new Date(),
+                    isOffline: true
+                });
+                localStorage.setItem('dirole_offline_reviews', JSON.stringify(localReviews));
+                console.log("[SubmitReview] SAVED TO LOCAL STORAGE (OFFLINE MODE)");
+                return true;
+            } catch (lsErr) {
+                console.error("Local storage also failed", lsErr);
+                return false;
+            }
         }
 
-        // Success! Update stats
-        await updateUserProgress(review.userId, 10);
+        console.log("[SubmitReview] SUCCESS!");
 
-        // Update aggregated stats on location
-        const { data: allReviews } = await supabase.from('reviews').select('*').eq('location_id', finalLocationId);
-        if (allReviews && allReviews.length > 0) {
-            const count = allReviews.length;
-            const avgCrowd = allReviews.reduce((acc: number, r: any) => acc + (r.crowd || 0), 0) / count;
-            const avgVibe = allReviews.reduce((acc: number, r: any) => acc + (r.vibe || 0), 0) / count;
-            const avgPrice = allReviews.reduce((acc: number, r: any) => acc + (r.price || 0), 0) / count;
+        // Success! Update stats (Fire and forget)
+        updateUserProgress(review.userId, 10).catch(e => console.warn("XP update failed", e));
 
-            await supabase.from('locations').update({
-                stats: { avgCrowd, avgVibe, avgPrice, reviewCount: count, lastUpdated: new Date() }
-            }).eq('id', finalLocationId);
-        }
+        // Update aggregated stats on location (Fire and forget)
+        (async () => {
+            try {
+                const response = await databases.listDocuments(
+                    APPWRITE_DATABASE_ID,
+                    'reviews',
+                    [Query.equal('locationId', finalLocationId)]
+                );
+
+                if (response.documents.length > 0) {
+                    const allR = response.documents;
+                    const count = allR.length;
+                    const avgCrowd = allR.reduce((acc: number, r: any) => acc + (r.crowd || 0), 0) / count;
+                    const avgVibe = allR.reduce((acc: number, r: any) => acc + (r.vibe || 0), 0) / count;
+                    const avgPrice = allR.reduce((acc: number, r: any) => acc + (r.price || 0), 0) / count;
+
+                    await databases.updateDocument(
+                        APPWRITE_DATABASE_ID,
+                        'locations',
+                        finalLocationId,
+                        {
+                            stats: JSON.stringify({
+                                avgCrowd,
+                                avgVibe,
+                                avgPrice,
+                                reviewCount: count,
+                                lastUpdated: new Date().toISOString()
+                            })
+                        }
+                    );
+                }
+            } catch (err) { console.warn("Stats aggregation failed", err); }
+        })();
 
         triggerHaptic([50, 50]);
         return true;
 
-    } catch (e) {
-        console.error(e);
+    } catch (e: any) {
+        console.error("Exception in submitReview:", e);
         return false;
     }
 };
 
 export const getLeaderboard = async (scope: 'global' | 'friends' = 'global', currentUserId?: string): Promise<User[]> => {
     try {
-        let query = supabase.from('profiles').select('*').order('points', { ascending: false });
+        console.log(`[Appwrite] Fetching leaderboard (scope: ${scope})`);
 
-        if (scope === 'friends' && currentUserId) {
-            // Fetch friends first
-            const friendsQuery = supabase
-                .from('friendships')
-                .select('*')
-                .eq('status', 'accepted')
-                .or(`requester_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`);
-
-            const friendsTimeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Friends Query Timeout")), 3000));
-
-            const { data: friendships, error: friendError } = await Promise.race([friendsQuery, friendsTimeout]) as any;
-
-            if (friendError) {
-                console.error("[Leaderboard] Error fetching friends:", friendError);
-                throw friendError; // Throw to trigger fallback
-            }
-
-            const friendIds = friendships?.map((f: any) => f.requester_id === currentUserId ? f.receiver_id : f.requester_id) || [];
-
-            if (friendIds.length === 0) {
-                // No friends found, return empty list (Leaderboard will show 'Invite friends' state)
-                return [];
-            }
-
-            // Add current user to list so they see themselves in comparison
-            friendIds.push(currentUserId);
-            query = query.in('id', friendIds);
-        } else {
-            // Global scope
-            query = query.limit(50); // Increased limit
-        }
-
-        // Execute query with a robust timeout (8s)
-        const timeoutPromise = new Promise<{ data: null, error: any }>((_, reject) =>
-            setTimeout(() => reject(new Error("Leaderboard Query Timeout")), 3000)
+        // MVP: Global leaderboard only
+        const response = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'profiles',
+            [
+                Query.orderDesc('xp'),
+                Query.limit(50)
+            ]
         );
 
-        // Supabase query returns { data, error }
-        const response: any = await Promise.race([query, timeoutPromise]);
-
-        if (response.error) {
-            console.error("[Leaderboard] Database error:", response.error);
-            throw response.error;
-        }
-
-        if (response.data && response.data.length > 0) {
-            return response.data.map((p: any) => ({
-                ...p,
-                badges: p.badges || [],
-                favorites: p.favorites || [],
-                // Ensure numeric values
-                points: p.points || 0,
-                level: p.level || 1
-            }));
-        }
-
-        console.warn("[Leaderboard] returned empty list.");
-        return [];
-
+        return response.documents.map((doc: any) => ({
+            id: doc.userId,
+            name: doc.name,
+            nickname: doc.nickname,
+            avatar: doc.avatar,
+            points: doc.points || 0,
+            xp: doc.xp || 0,
+            level: doc.level || 1,
+            badges: doc.badges ? JSON.parse(doc.badges) : [],
+            favorites: []
+        }));
     } catch (e: any) {
-        console.warn("[Leaderboard] Standard fetch failed/timed out, attempting Raw API Fallback...", e.message);
-
-        try {
-            // RAW API FALLBACK
-            const baseUrl = (supabase as any).supabaseUrl || 'https://gwvnwsvaepxwjasdupks.supabase.co';
-            const apiKey = (supabase as any).supabaseKey;
-
-            if (!apiKey) throw new Error("No API Key available for fallback");
-
-            if (!apiKey) throw new Error("No API Key available for fallback");
-
-            let friendsIds: string[] = [];
-            let authHeader = `Bearer ${apiKey}`; // Default to Anon Key (Safe for Public Global)
-
-            if (scope === 'friends' && currentUserId) {
-                // FALLBACK FOR FRIENDS: Needs User Token
-                try {
-                    // SAFETY: Wrap getSession in timeout so we don't hang if Auth client is sick too
-                    const sessionPromise = supabase.auth.getSession();
-                    const timeoutPromise = new Promise<{ data: { session: any } }>((_, reject) => setTimeout(() => reject(new Error("Auth Timeout")), 2000));
-
-                    const { data: { session } } = await Promise.race([sessionPromise, timeoutPromise]);
-
-                    if (session?.access_token) {
-                        authHeader = `Bearer ${session.access_token}`;
-                    } else {
-                        console.warn("[Leaderboard Fallback] No session found, cannot fetch private friends.");
-                        return [];
-                    }
-                } catch (authErr) {
-                    console.warn("[Leaderboard Fallback] Auth check failed/timed out. Aborting friend fetch.");
-                    return [];
-                }
-
-                // 1. Get Friendships
-                const friendshipsUrl = `${baseUrl}/rest/v1/friendships?select=*&status=eq.accepted&or=(requester_id.eq.${currentUserId},receiver_id.eq.${currentUserId})`;
-                console.log("[Leaderboard Fallback] Fetching Friendships URL:", friendshipsUrl);
-
-                const fResponse = await fetch(friendshipsUrl, {
-                    headers: {
-                        'apikey': apiKey,
-                        'Authorization': authHeader
-                    }
-                });
-
-                if (fResponse.ok) {
-                    const friendships = await fResponse.json();
-                    console.log(`[Leaderboard Fallback] Found ${friendships.length} raw friendships via API.`);
-
-                    friendsIds = friendships.map((f: any) => f.requester_id === currentUserId ? f.receiver_id : f.requester_id);
-                    friendsIds.push(currentUserId); // Add self
-                } else {
-                    console.error(`[Leaderboard Fallback] Failed to fetch friendships. Status: ${fResponse.status}`);
-                    return [];
-                }
-
-                if (friendsIds.length === 0) {
-                    console.warn("[Leaderboard Fallback] No friend IDs extracted. Returning empty list.");
-                    return [];
-                }
-            }
-
-            let url = `${baseUrl}/rest/v1/profiles?select=*&order=points.desc`;
-
-            if (scope === 'friends' && currentUserId) {
-                if (friendsIds.length > 0) {
-                    url += `&id=in.(${friendsIds.join(',')})`;
-                }
-            } else {
-                url += '&limit=50';
-            }
-
-            console.log("[Leaderboard Fallback] Fetching Profiles URL:", url);
-
-            const fetchPromise = fetch(url, {
-                headers: {
-                    'apikey': apiKey,
-                    'Authorization': authHeader
-                }
-            });
-
-            // 10s Timeout for Raw API
-            const timeoutPromise = new Promise<never>((_, reject) =>
-                setTimeout(() => reject(new Error("Raw API Timeout")), 10000)
-            );
-
-            const response = await Promise.race([fetchPromise, timeoutPromise]);
-
-            if (!response.ok) throw new Error(`Raw API HTTP Error: ${response.status}`);
-
-            const rawData = await response.json();
-            console.log(`[Leaderboard] RAW API SUCCESS: ${rawData.length} users loaded.`);
-
-            return rawData.map((p: any) => ({
-                ...p,
-                badges: p.badges || [],
-                favorites: p.favorites || [],
-                points: p.points || 0,
-                level: p.level || 1
-            }));
-
-        } catch (rawErr: any) {
-            console.error("[Leaderboard] FATAL: Raw API Fallback also failed:", rawErr.message);
-            // LOAD CACHE ON FATAL ERROR
-            const cached = localStorage.getItem(`dirole_leaderboard_${scope}_${currentUserId || 'anon'}`);
-            if (cached) return JSON.parse(cached);
-
-            // Fallback: Show at least the current user from local storage
-            const localUser = getUserProfile();
-            return localUser ? [localUser] : [];
-        }
+        console.error("[getLeaderboard] Failed to fetch from Appwrite:", e.message);
+        return [];
     }
 };
 
@@ -1676,5 +1569,22 @@ export const generateMockActivity = (): ActivityFeedItem | null => { return null
 export const getEventsForLocation = async (location: Location): Promise<LocationEvent[]> => { return []; };
 export const getGalleryForLocation = async (locationId: string): Promise<GalleryItem[]> => { return []; };
 export const submitReport = async (report: Report): Promise<boolean> => {
-    try { await supabase.from('reports').insert({ target_id: report.targetId, target_type: report.targetType, reason: report.reason, details: report.details, reporter_id: report.reporterId }); return true; } catch (e) { return true; }
+    try {
+        await databases.createDocument(
+            APPWRITE_DATABASE_ID,
+            'reports',
+            ID.unique(),
+            {
+                target_id: report.targetId,
+                target_type: report.targetType,
+                reason: report.reason,
+                details: report.details || '',
+                reporter_id: report.reporterId
+            }
+        );
+        return true;
+    } catch (e: any) {
+        console.error("[Appwrite] submitReport failed:", e.message);
+        return true; // Return true to not block the user flow
+    }
 };
