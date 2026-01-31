@@ -136,9 +136,11 @@ export interface Location {
 export interface Filters {
   minVibe: boolean;
   lowCost: boolean;
+  minCrowd?: number; // Novo: Lotação mínima
+  maxCrowd?: number; // Novo: Lotação máxima
   types: LocationType[];
   maxDistance: number;
-  onlyOpen: boolean; // Novo filtro
+  onlyOpen: boolean;
 }
 
 export interface ActivityFeedItem {

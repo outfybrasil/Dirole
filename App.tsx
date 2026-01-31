@@ -65,10 +65,8 @@ function App() {
     const secret = urlParams.get('secret');
 
     if (userId && secret) {
-      console.log("[Auth] Verifying email...", userId);
       verifyEmail(userId, secret)
         .then(() => {
-          console.log("[Auth] Email verified successfully!");
           // Remove params from URL
           window.history.replaceState({}, '', window.location.pathname);
           // Show success toast (deferred until component mount logic handles it, or just generic alert for now)
@@ -146,7 +144,6 @@ function App() {
       if (locId) {
         const found = locations.find(l => l.id === locId);
         if (found) {
-          console.log("[DeepLink] Opening found location:", found.name);
           setSelectedLocation(found);
           setIsDetailsModalOpen(true);
           setMapTarget({ lat: found.latitude, lng: found.longitude });
@@ -230,11 +227,9 @@ function App() {
         }
 
         // 2. Verify with Appwrite Session
-        console.log("[Auth] Checking Appwrite session...");
         const session = await getCurrentSession();
 
         if (session) {
-          console.log("[Auth] Active session found:", session.userId);
 
           // CHECK EMAIL VERIFICATION
           if (session.emailVerification === false) {
@@ -478,6 +473,8 @@ function App() {
           types: [],     // Clear type filters (e.g. if user was filtering only 'Balada')
           minVibe: false, // Clear vibe filters
           lowCost: false,  // Clear cost filters
+          minCrowd: undefined,
+          maxCrowd: undefined,
           onlyOpen: false
         }));
       } else {
@@ -681,6 +678,12 @@ function App() {
     }
     if (filters.onlyOpen) {
       res = res.filter(l => l.isOpen);
+    }
+    if (filters.minCrowd) {
+      res = res.filter(l => l.stats.avgCrowd >= filters.minCrowd);
+    }
+    if (filters.maxCrowd) {
+      res = res.filter(l => l.stats.avgCrowd <= filters.maxCrowd);
     }
     if (filters.types.length > 0) {
       res = res.filter(l => filters.types.includes(l.type));

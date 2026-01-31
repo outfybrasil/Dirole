@@ -6,11 +6,12 @@ import { StepIdentity } from './StepIdentity';
 interface RegisterWizardProps {
     onBack: () => void;
     onComplete: (data: any) => Promise<void>;
+    onOpenPrivacy: () => void;
     isLoading: boolean;
     errorMsg: string | null;
 }
 
-export const RegisterWizard: React.FC<RegisterWizardProps> = ({ onBack, onComplete, isLoading, errorMsg }) => {
+export const RegisterWizard: React.FC<RegisterWizardProps> = ({ onBack, onComplete, onOpenPrivacy, isLoading, errorMsg }) => {
     const [step, setStep] = useState(1);
 
     // Form Data
@@ -23,8 +24,10 @@ export const RegisterWizard: React.FC<RegisterWizardProps> = ({ onBack, onComple
     const [nickname, setNickname] = useState('');
     const [avatar, setAvatar] = useState('😎');
     const [avatarFile, setAvatarFile] = useState<File | null>(null);
+    const [acceptedTerms, setAcceptedTerms] = useState(false);
 
     const handleNext = () => {
+        if (step === 1 && !acceptedTerms) return;
         setStep(prev => prev + 1);
     };
 
@@ -71,6 +74,8 @@ export const RegisterWizard: React.FC<RegisterWizardProps> = ({ onBack, onComple
                     email={email} setEmail={setEmail}
                     pass={pass} setPass={setPass}
                     confirmPass={confirmPass} setConfirmPass={setConfirmPass}
+                    acceptedTerms={acceptedTerms} setAcceptedTerms={setAcceptedTerms}
+                    onOpenPrivacy={onOpenPrivacy}
                     onNext={handleNext}
                     onBack={onBack}
                 />

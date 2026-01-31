@@ -7,6 +7,9 @@ interface StepCredentialsProps {
     setPass: (v: string) => void;
     confirmPass: string;
     setConfirmPass: (v: string) => void;
+    acceptedTerms: boolean;
+    setAcceptedTerms: (v: boolean) => void;
+    onOpenPrivacy: () => void;
     onNext: () => void;
     onBack: () => void;
 }
@@ -15,6 +18,8 @@ export const StepCredentials: React.FC<StepCredentialsProps> = ({
     email, setEmail,
     pass, setPass,
     confirmPass, setConfirmPass,
+    acceptedTerms, setAcceptedTerms,
+    onOpenPrivacy,
     onNext, onBack
 }) => {
     const [showPass, setShowPass] = useState(false);
@@ -81,6 +86,22 @@ export const StepCredentials: React.FC<StepCredentialsProps> = ({
                 </div>
             </div>
 
+            {/* LGPD Consent */}
+            <div className="flex items-start gap-4 px-2 py-4 mt-2 bg-white/5 rounded-2xl border border-white/5">
+                <div className="pt-1">
+                    <input
+                        type="checkbox"
+                        id="terms"
+                        checked={acceptedTerms}
+                        onChange={(e) => setAcceptedTerms(e.target.checked)}
+                        className="w-5 h-5 rounded border-white/30 bg-black/30 accent-dirole-primary cursor-pointer transition-all"
+                    />
+                </div>
+                <label htmlFor="terms" className="text-[10px] text-slate-400 font-medium leading-relaxed cursor-pointer select-none">
+                    Li e concordo com os <button type="button" onClick={onOpenPrivacy} className="text-dirole-primary hover:underline font-black uppercase">Termos de Uso e Política de Privacidade</button> do Dirole. Autorizo o tratamento dos meus dados para fins de funcionamento da plataforma.
+                </label>
+            </div>
+
             <div className="pt-4 flex gap-3">
                 <button
                     type="button"
@@ -91,7 +112,8 @@ export const StepCredentials: React.FC<StepCredentialsProps> = ({
                 </button>
                 <button
                     type="submit"
-                    className="flex-[2] bg-gradient-to-r from-dirole-primary to-dirole-secondary text-white font-bold py-3.5 rounded-xl shadow-lg active:scale-95 transition-all text-sm"
+                    disabled={!acceptedTerms}
+                    className="flex-[2] bg-gradient-to-r from-dirole-primary to-dirole-secondary text-white font-bold py-3.5 rounded-xl shadow-lg active:scale-95 transition-all text-sm disabled:opacity-50 disabled:grayscale"
                 >
                     Próximo
                 </button>

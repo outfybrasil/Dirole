@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { signUpWithEmail, signInWithEmail, signInWithGoogle, getCurrentSession, sendVerificationEmail } from '../services/authService';
-import { saveUserProfileLocal, triggerHaptic, syncUserProfile } from '../services/mockService';
+import { saveUserProfileLocal, triggerHaptic, syncUserProfile, isNicknameAvailable } from '../services/mockService';
 import { User } from '../types';
 import { PrivacyPolicyModal } from './PrivacyPolicyModal';
 import { RegisterWizard } from './Login/RegisterWizard';
@@ -96,6 +96,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         }
 
         try {
+            // Check nickname uniqueness
+            const available = await isNicknameAvailable(nickname);
+            if (!available) {
+                setErrorMsg("Este apelido já está em uso. Escolha outro.");
+                setIsLoading(false);
+                return;
+            }
+
             await signUpWithEmail(email, password, name);
 
             // Send verification email immediately
@@ -315,6 +323,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                                         <span>Entrar com Google</span>
                                     </button>
 
+                                    <p className="text-[10px] text-slate-500 text-center mt-3 leading-relaxed px-4">
+                                        Ao continuar, você concorda com nossos <button type="button" onClick={() => setIsPrivacyOpen(true)} className="text-slate-400 font-bold hover:underline">Termos de Uso e Política de Privacidade (LGPD)</button>.
+                                    </p>
+
                                     {errorMsg && <p className="text-red-400 text-xs text-center font-bold bg-red-500/10 p-2 rounded">{errorMsg}</p>}
 
                                     <div className="pt-4 border-t border-white/10 mt-4">
@@ -332,6 +344,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                             {isRegistering && (
                                 <RegisterWizard
                                     onBack={() => setIsRegistering(false)}
+                                    onOpenPrivacy={() => setIsPrivacyOpen(true)}
                                     isLoading={isLoading}
                                     errorMsg={errorMsg}
                                     onComplete={async (data) => {

@@ -58,37 +58,37 @@ export const MOOD_PRESETS: Mood[] = [
   {
     id: 'agito',
     label: '🔥 Agito',
-    description: 'Baladas e Pubs lotados',
+    description: 'Baladas e Pubs fervendo',
     color: 'from-orange-500 to-red-500',
-    filters: { minVibe: true, lowCost: false, types: [LocationType.BALADA, LocationType.PUB], maxDistance: 5, onlyOpen: false }
+    filters: { minVibe: true, lowCost: false, minCrowd: 2.3, types: [LocationType.BALADA, LocationType.PUB], maxDistance: 10, onlyOpen: false }
   },
   {
     id: 'jantar',
     label: '🍽️ Gastronomia',
     description: 'Restaurantes e Bistrôs',
     color: 'from-yellow-500 to-orange-400',
-    filters: { minVibe: false, lowCost: false, types: [LocationType.RESTAURANTE], maxDistance: 5, onlyOpen: false }
+    filters: { minVibe: false, lowCost: false, types: [LocationType.RESTAURANTE], maxDistance: 10, onlyOpen: false }
   },
   {
     id: 'date',
     label: '💘 Date',
     description: 'Bares e Restaurantes intimistas',
     color: 'from-pink-500 to-rose-500',
-    filters: { minVibe: true, lowCost: false, types: [LocationType.BAR, LocationType.RESTAURANTE], maxDistance: 5, onlyOpen: false }
+    filters: { minVibe: true, lowCost: false, maxCrowd: 2.3, types: [LocationType.BAR, LocationType.RESTAURANTE], maxDistance: 10, onlyOpen: false }
   },
   {
     id: 'economico',
     label: '💸 Fim de Mês',
     description: 'Preços baixos em qualquer lugar',
     color: 'from-green-500 to-emerald-600',
-    filters: { minVibe: false, lowCost: true, types: [], maxDistance: 5, onlyOpen: false }
+    filters: { minVibe: false, lowCost: true, types: [], maxDistance: 10, onlyOpen: false }
   },
   {
     id: 'resenha',
     label: '💬 Resenha',
     description: 'Bares e Pubs para conversar',
     color: 'from-blue-500 to-cyan-500',
-    filters: { minVibe: false, lowCost: false, types: [LocationType.BAR, LocationType.PUB], maxDistance: 5, onlyOpen: false }
+    filters: { minVibe: false, lowCost: false, maxCrowd: 1.8, types: [LocationType.BAR, LocationType.PUB], maxDistance: 10, onlyOpen: false }
   }
 ];
 

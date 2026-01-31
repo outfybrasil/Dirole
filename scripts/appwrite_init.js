@@ -48,7 +48,8 @@ const COLLECTIONS = [
             { key: 'favorites', type: 'string', size: 2000, required: false, default: '[]' }
         ],
         indexes: [
-            { key: 'idx_userId', type: 'unique', attributes: ['userId'] }
+            { key: 'idx_userId', type: 'unique', attributes: ['userId'] },
+            { key: 'idx_nickname', type: 'unique', attributes: ['nickname'] }
         ]
     },
     {

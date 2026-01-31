@@ -264,6 +264,32 @@ export const uploadAvatar = async (userId: string, webPath: string): Promise<str
     }
 };
 
+export const isNicknameAvailable = async (nickname: string, excludeUserId?: string): Promise<boolean> => {
+    try {
+        const cleanNickname = nickname.trim().toLowerCase();
+        if (!cleanNickname) return false;
+
+        const response = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'profiles',
+            [
+                Query.equal('nickname', cleanNickname),
+                Query.limit(1)
+            ]
+        );
+
+        if (response.documents.length === 0) return true;
+
+        // If we are checking for an update, it's okay if the found user is the current user
+        if (excludeUserId && response.documents[0].userId === excludeUserId) return true;
+
+        return false;
+    } catch (e: any) {
+        console.error("[Appwrite] isNicknameAvailable error:", e.message);
+        return false;
+    }
+};
+
 export const syncUserProfile = async (authId: string, meta: any): Promise<User | null> => {
     try {
         console.log(`[Appwrite Sync] Syncing user profile for ${authId}`);
@@ -321,8 +347,16 @@ export const syncUserProfile = async (authId: string, meta: any): Promise<User |
     }
 };
 
-export const updateUserProfile = async (userId: string, data: Partial<User>): Promise<boolean> => {
+export const updateUserProfile = async (userId: string, data: Partial<User>): Promise<{ success: boolean, error?: string }> => {
     try {
+        // 1. Check nickname uniqueness if it's being updated
+        if (data.nickname) {
+            const available = await isNicknameAvailable(data.nickname, userId);
+            if (!available) {
+                return { success: false, error: "Este apelido já está em uso." };
+            }
+        }
+
         const response = await databases.listDocuments(
             APPWRITE_DATABASE_ID,
             'profiles',
@@ -340,12 +374,12 @@ export const updateUserProfile = async (userId: string, data: Partial<User>): Pr
                     avatar: data.avatar
                 }
             );
-            return true;
+            return { success: true };
         }
-        return false;
+        return { success: false, error: "Perfil não encontrado." };
     } catch (e: any) {
         console.error("[Appwrite] updateUserProfile failed:", e.message);
-        return false;
+        return { success: false, error: e.message };
     }
 };
 

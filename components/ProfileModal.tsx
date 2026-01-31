@@ -149,14 +149,16 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
             // 3. Atualizar no Appwrite
             if (!updatedUser.id.startsWith('guest_')) {
-                try {
-                    await updateUserProfile(updatedUser.id, {
-                        name: trimmedName,
-                        nickname: trimmedNickname,
-                        avatar: finalAvatar
-                    });
-                } catch (sErr: any) {
-                    console.warn("[Profile] Appwrite update failed:", sErr.message);
+                const result = await updateUserProfile(updatedUser.id, {
+                    name: trimmedName,
+                    nickname: trimmedNickname,
+                    avatar: finalAvatar
+                });
+
+                if (!result.success) {
+                    if (onShowToast) onShowToast(result.error || "Erro ao atualizar perfil", 'error');
+                    setIsSaving(false);
+                    return;
                 }
             }
 
