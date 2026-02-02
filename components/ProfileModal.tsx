@@ -229,7 +229,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                             )}
                         </div>
                         <div>
-                            <h2 className="text-2xl font-black text-white leading-tight tracking-tight">{nickname || name || 'Paparazzo'}</h2>
+                            <h2 className="text-2xl font-black text-white leading-tight tracking-tighter italic uppercase pr-4 truncate">{nickname || name || 'Paparazzo'}</h2>
                             <p className="text-dirole-secondary font-black text-[10px] tracking-[0.2em] uppercase mt-1">
                                 {isGuest ? 'CONVIDADO' : currentLevel.label.toUpperCase()}
                             </p>

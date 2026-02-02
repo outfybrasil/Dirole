@@ -81,6 +81,9 @@ export const ListView: React.FC<ListViewProps> = ({ locations, onCheckIn, favori
                     <span className="px-2 py-0.5 rounded-md bg-dirole-primary/10 border border-dirole-primary/20 text-[8px] font-black text-dirole-primary uppercase tracking-widest">
                       {loc.type}
                     </span>
+                    <span className="text-[10px] font-black text-slate-500 tracking-widest ml-1">
+                      {'$'.repeat(Math.max(1, Math.min(3, Math.round(loc.stats.avgPrice || 1))))}
+                    </span>
                   </div>
                   <h3 className="font-black text-2xl text-white leading-tight mb-2 tracking-tight group-hover:text-dirole-primary transition-colors">{loc.name}</h3>
                   <p className="text-xs text-slate-400 truncate flex items-center gap-1.5 font-medium">

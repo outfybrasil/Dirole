@@ -395,12 +395,21 @@ function App() {
       const unsubscribeInvites = client.subscribe(
         `databases.${APPWRITE_DATABASE_ID}.collections.invites.documents`,
         (response: any) => {
-          console.log('[Realtime] Invite Event:', response.events);
+          console.warn('[Realtime DEBUG] RAW EVENT RECV:', response); // WARN level to see in noisy console
           const payload = response.payload;
           const events = response.events || [];
 
           const isCreate = events.some((e: string) => e.includes('.create'));
           const isUpdate = events.some((e: string) => e.includes('.update'));
+
+          console.log('[Realtime DEBUG] Checks:', {
+            isCreate,
+            isUpdate,
+            toUser: payload.to_user_id,
+            fromUser: payload.from_user_id,
+            myId: currentUser.id,
+            status: payload.status
+          });
 
           // 1. New Invite Receive (Someone invited ME to a location)
           if (isCreate && payload.to_user_id === currentUser.id) {
@@ -445,7 +454,9 @@ function App() {
     }
 
     // Initial count fetch
-    fetchNotificationCount(currentUser.id);
+    if (currentUser?.id) {
+      fetchNotificationCount(currentUser.id);
+    }
 
     return () => {
       console.log('[Realtime] Cleaning up subscription on unmount');
@@ -454,7 +465,8 @@ function App() {
         unsubscribeRef.current = null;
       }
     };
-  }, [currentUser, fetchNotificationCount, playNotificationSound]);
+    // CRITICAL FIX: Only restart subscription if USER ID changes, not if user XP/details change
+  }, [currentUser?.id, fetchNotificationCount, playNotificationSound]);
 
 
   // --- REALTIME NOTIFICATIONS (MIGRATED TO WEBSOCKET ABOVE) ---
@@ -1240,6 +1252,7 @@ function App() {
             onClose={() => setIsReviewModalOpen(false)}
             onSuccess={handleReviewSuccess}
             onLogout={handleLogout}
+            userLocation={userLocation}
           />
           <LocationDetailsModal
             location={selectedLocation}
@@ -1254,6 +1267,7 @@ function App() {
               message,
               type: type as any
             })}
+            userLocation={userLocation}
           />
           <ClaimBusinessModal
             location={selectedLocation}

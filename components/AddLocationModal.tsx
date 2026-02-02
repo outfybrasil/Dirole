@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { LocationType, User } from '../types';
 import { createLocation, triggerHaptic } from '../services/mockService';
 import { LOCATION_ICONS } from '../constants';
-import { Camera, CameraResultType } from '@capacitor/camera';
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 
 interface AddLocationModalProps {
   isOpen: boolean;
@@ -37,6 +37,23 @@ export const AddLocationModal: React.FC<AddLocationModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
+
+  const pickFromGallery = async () => {
+    try {
+      const image = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: true,
+        resultType: CameraResultType.Uri,
+        source: CameraSource.Photos
+      });
+
+      if (image.webPath) {
+        setImageUrl(image.webPath);
+      }
+    } catch (e) {
+      console.warn("Gallery pick failed:", e);
+    }
+  };
 
   const takePicture = async () => {
     try {
@@ -214,21 +231,23 @@ export const AddLocationModal: React.FC<AddLocationModalProps> = ({
 
             <div className="animate-fade-in" style={{ animationDelay: '400ms' }}>
               <label className="block text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Identidade Visual</label>
-              <div className="flex gap-3">
+              <div className="grid grid-cols-2 gap-4">
                 <button
                   type="button"
                   onClick={takePicture}
-                  className="bg-white/5 border border-white/10 rounded-2xl w-16 h-16 flex items-center justify-center text-white hover:bg-white/10 active:scale-95 transition-all shadow-inner shrink-0"
+                  className="bg-white/5 border border-white/10 rounded-3xl p-6 flex flex-col items-center justify-center gap-3 text-slate-400 hover:text-white hover:bg-white/10 active:scale-[0.98] transition-all shadow-inner group"
                 >
-                  <i className="fas fa-camera text-xl"></i>
+                  <i className="fas fa-camera text-2xl group-hover:scale-110 transition-transform text-dirole-primary"></i>
+                  <span className="text-[10px] font-black uppercase tracking-widest">Câmera</span>
                 </button>
-                <input
-                  type="url"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  className="flex-1 bg-white/5 border border-white/10 rounded-2xl p-5 text-xs text-white placeholder-slate-700 focus:outline-none focus:border-dirole-primary focus:bg-white/10 transition-all font-medium shadow-inner"
-                  placeholder="COLE A URL DA FOTO..."
-                />
+                <button
+                  type="button"
+                  onClick={pickFromGallery}
+                  className="bg-white/5 border border-white/10 rounded-3xl p-6 flex flex-col items-center justify-center gap-3 text-slate-400 hover:text-white hover:bg-white/10 active:scale-[0.98] transition-all shadow-inner group"
+                >
+                  <i className="fas fa-images text-2xl group-hover:scale-110 transition-transform text-dirole-secondary"></i>
+                  <span className="text-[10px] font-black uppercase tracking-widest">Galeria</span>
+                </button>
               </div>
               {imageUrl && (
                 <div className="mt-4 h-32 w-full rounded-2xl overflow-hidden border border-white/10 animate-scale-in">

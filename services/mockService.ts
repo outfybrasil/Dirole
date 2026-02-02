@@ -900,7 +900,7 @@ export const getPendingFriendRequests = async (userId: string): Promise<FriendUs
 
 // --- REAL DATA SERVICE ---
 
-const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+export const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371e3;
     const φ1 = lat1 * Math.PI / 180;
     const φ2 = lat2 * Math.PI / 180;
@@ -1368,8 +1368,29 @@ export const createLocation = async (data: Omit<Location, 'id' | 'stats' | 'dist
     }
 };
 
-export const verifyLocation = async (id: string): Promise<Location | null> => {
+export const verifyLocation = async (id: string, userId?: string): Promise<Location | null> => {
     try {
+        // 1. Check if user already verified this (if userId provided)
+        if (userId) {
+            try {
+                const existing = await databases.listDocuments(
+                    APPWRITE_DATABASE_ID,
+                    'verifications',
+                    [
+                        Query.equal('location_id', id),
+                        Query.equal('user_id', userId),
+                        Query.limit(1)
+                    ]
+                );
+                if (existing.total > 0) {
+                    console.warn("[VerifyLocation] User already verified this location.");
+                    return null;
+                }
+            } catch (e) {
+                console.warn("[VerifyLocation] Verifications collection might not exist, skipping check.");
+            }
+        }
+
         const doc = await databases.getDocument(APPWRITE_DATABASE_ID, 'locations', id);
         const newCount = (doc.votes_for_verification || 0) + 1;
         const newVerified = doc.verified || newCount >= 10;
@@ -1383,6 +1404,19 @@ export const verifyLocation = async (id: string): Promise<Location | null> => {
                 verified: newVerified
             }
         );
+
+        // 2. Track that this user verified (Fire and forget, try-catch included)
+        if (userId) {
+            databases.createDocument(
+                APPWRITE_DATABASE_ID,
+                'verifications',
+                ID.unique(),
+                {
+                    location_id: id,
+                    user_id: userId
+                }
+            ).catch(err => console.warn("[VerifyLocation] Could not save verification record:", err.message));
+        }
 
         const stats = response.stats ? JSON.parse(response.stats) : { avgCrowd: 0, avgVibe: 0, avgPrice: 0, reviewCount: 0 };
         return {
@@ -1405,6 +1439,23 @@ export const verifyLocation = async (id: string): Promise<Location | null> => {
     } catch (e: any) {
         console.error("[Appwrite] verifyLocation failed:", e.message);
         return null;
+    }
+};
+
+export const checkVerification = async (locationId: string, userId: string): Promise<boolean> => {
+    try {
+        const response = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'verifications',
+            [
+                Query.equal('location_id', locationId),
+                Query.equal('user_id', userId),
+                Query.limit(1)
+            ]
+        );
+        return response.total > 0;
+    } catch (e) {
+        return false;
     }
 };
 
@@ -1505,7 +1556,26 @@ export const submitReview = async (review: Review, locationContext?: Location): 
         }
     }
 
-    // 2. SUBMIT REVIEW - DIRECT & SIMPLE
+    // 2. CHECK FOR EXISTING REVIEW
+    try {
+        const existing = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'reviews',
+            [
+                Query.equal('locationId', finalLocationId),
+                Query.equal('userId', review.userId),
+                Query.limit(1)
+            ]
+        );
+        if (existing.total > 0) {
+            console.warn("[SubmitReview] User already reviewed this location.");
+            return true; // Return true as if successful, but don't duplicate
+        }
+    } catch (e) {
+        console.warn("[SubmitReview] Error checking existing review:", e);
+    }
+
+    // 3. SUBMIT REVIEW - DIRECT & SIMPLE
     const payload = {
         locationId: finalLocationId,
         userId: review.userId,
@@ -1614,7 +1684,7 @@ export const getLeaderboard = async (scope: 'global' | 'friends' = 'global', cur
             APPWRITE_DATABASE_ID,
             'profiles',
             [
-                Query.orderDesc('xp'),
+                Query.orderDesc('points'),
                 Query.limit(50)
             ]
         );

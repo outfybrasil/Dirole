@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Location, Review, LocationEvent, GalleryItem } from '../types';
 import { Thermometer } from './Thermometer';
-import { verifyLocation, triggerHaptic, getReviewsForLocation, getEventsForLocation, getGalleryForLocation, blockUser, submitReview, getUserProfile } from '../services/mockService';
+import { verifyLocation, triggerHaptic, getReviewsForLocation, getEventsForLocation, getGalleryForLocation, blockUser, submitReview, getUserProfile, checkVerification, calculateDistance } from '../services/mockService';
 
 interface LocationDetailsModalProps {
     location: Location | null;
@@ -12,6 +12,7 @@ interface LocationDetailsModalProps {
     onReport?: (id: string, type: 'location' | 'review' | 'photo', name?: string) => void;
     onInvite?: (loc: Location) => void;
     onShowToast?: (title: string, message: string, type: 'success' | 'error' | 'info') => void;
+    userLocation: { lat: number; lng: number } | null;
 }
 
 type TabType = 'overview' | 'agenda' | 'gallery';
@@ -24,7 +25,8 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
     onClaim,
     onReport,
     onInvite,
-    onShowToast
+    onShowToast,
+    userLocation
 }) => {
     const [activeTab, setActiveTab] = useState<TabType>('overview');
     const [hasVoted, setHasVoted] = useState(false);
@@ -35,6 +37,18 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
 
     // Quick Vote State
     const [isVoting, setIsVoting] = useState(false);
+
+    const distance = useMemo(() => {
+        if (!userLocation || !location) return null;
+        return calculateDistance(
+            userLocation.lat,
+            userLocation.lng,
+            location.latitude,
+            location.longitude
+        );
+    }, [userLocation, location]);
+
+    const isTooFar = distance !== null && distance > 300;
 
     useEffect(() => {
         if (isOpen && location) {
@@ -58,6 +72,19 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
                 setReviews(revs);
                 setEvents(evts);
                 setGallery(pics);
+
+                // Check if user already voted
+                const user = getUserProfile();
+                if (user) {
+                    if (revs.some(r => r.userId === user.id)) {
+                        setHasVoted(true);
+                    } else {
+                        // Check verifications collection specifically for the "Validar Local" button
+                        checkVerification(location.id, user.id).then(voted => {
+                            if (voted) setHasVoted(true);
+                        });
+                    }
+                }
             }).catch(err => {
                 console.error("Error loading location details:", err);
             }).finally(() => {
@@ -81,9 +108,26 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
     };
 
     const handleVerify = async () => {
+        const user = getUserProfile();
+        if (!user || user.id.startsWith('guest_')) {
+            alert("Faça login para validar locais!");
+            return;
+        }
+
+        // GEOFENCING CHECK
+        if (isTooFar) {
+            alert(`Você precisa estar no local para validar! 📍\nDistância atual: ${Math.round(distance || 0)}m`);
+            return;
+        }
+
+        if (!userLocation) {
+            alert("Ative seu GPS para validar este local!");
+            return;
+        }
+
         triggerHaptic();
         setHasVoted(true);
-        await verifyLocation(location.id);
+        await verifyLocation(location.id, user.id);
     }
 
     const handleQuickVote = async (crowdLevel: number, vibeLevel: number) => {
@@ -93,6 +137,17 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
                 onClose();
                 // Logic to redirect to login handled by parent usually, but here we just close
             }
+            return;
+        }
+
+        // GEOFENCING CHECK
+        if (isTooFar) {
+            alert(`Você precisa estar no local para o check-in rápido! 📍\nDistância atual: ${Math.round(distance || 0)}m`);
+            return;
+        }
+
+        if (!userLocation) {
+            alert("Ative seu GPS para fazer o check-in rápido!");
             return;
         }
 
@@ -181,29 +236,29 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
                     <div className="flex gap-2">
                         <button
                             onClick={() => handleQuickVote(3, 3)}
-                            disabled={isVoting}
-                            className="flex-1 bg-red-500/20 border border-red-500/50 hover:bg-red-500/40 text-white py-3 rounded-lg flex flex-col items-center gap-1 transition-all active:scale-95"
+                            disabled={isVoting || isTooFar}
+                            className={`flex-1 ${isTooFar ? 'bg-slate-800 border-white/5 text-slate-500 opacity-50 grayscale' : 'bg-red-500/20 border-red-500/50 hover:bg-red-500/40 text-white'} border py-3 rounded-lg flex flex-col items-center gap-1 transition-all active:scale-95`}
                         >
                             <span className="text-xl">🔥</span>
-                            <span className="text-[10px] font-bold uppercase">Bombando</span>
+                            <span className="text-[10px] font-bold uppercase">{isTooFar ? 'Bloqueado' : 'Bombando'}</span>
                         </button>
 
                         <button
                             onClick={() => handleQuickVote(2, 2)}
-                            disabled={isVoting}
-                            className="flex-1 bg-yellow-500/20 border border-yellow-500/50 hover:bg-yellow-500/40 text-white py-3 rounded-lg flex flex-col items-center gap-1 transition-all active:scale-95"
+                            disabled={isVoting || isTooFar}
+                            className={`flex-1 ${isTooFar ? 'bg-slate-800 border-white/5 text-slate-500 opacity-50 grayscale' : 'bg-yellow-500/20 border-yellow-500/50 hover:bg-yellow-500/40 text-white'} border py-3 rounded-lg flex flex-col items-center gap-1 transition-all active:scale-95`}
                         >
                             <span className="text-xl">🙂</span>
-                            <span className="text-[10px] font-bold uppercase">Legal</span>
+                            <span className="text-[10px] font-bold uppercase">{isTooFar ? 'Bloqueado' : 'Legal'}</span>
                         </button>
 
                         <button
                             onClick={() => handleQuickVote(1, 1)}
-                            disabled={isVoting}
-                            className="flex-1 bg-blue-500/20 border border-blue-500/50 hover:bg-blue-500/40 text-white py-3 rounded-lg flex flex-col items-center gap-1 transition-all active:scale-95"
+                            disabled={isVoting || isTooFar}
+                            className={`flex-1 ${isTooFar ? 'bg-slate-800 border-white/5 text-slate-500 opacity-50 grayscale' : 'bg-blue-500/20 border-blue-500/50 hover:bg-blue-500/40 text-white'} border py-3 rounded-lg flex flex-col items-center gap-1 transition-all active:scale-95`}
                         >
                             <span className="text-xl">🧊</span>
-                            <span className="text-[10px] font-bold uppercase">Vazio</span>
+                            <span className="text-[10px] font-bold uppercase">{isTooFar ? 'Bloqueado' : 'Vazio'}</span>
                         </button>
                     </div>
                 </div>
@@ -268,7 +323,11 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
                         <p className="text-[10px] text-slate-400">Este local foi criado recentemente pela comunidade.</p>
                     </div>
                     {!hasVoted ? (
-                        <button onClick={handleVerify} className="px-3 py-1.5 bg-yellow-600 text-white text-xs font-bold rounded-lg hover:bg-yellow-500 transition-colors whitespace-nowrap">
+                        <button
+                            onClick={handleVerify}
+                            disabled={isTooFar}
+                            className={`px-3 py-1.5 ${isTooFar ? 'bg-slate-800 text-slate-500 border border-white/10 cursor-not-allowed' : 'bg-yellow-600 text-white hover:bg-yellow-500 transition-colors'} text-xs font-bold rounded-lg whitespace-nowrap`}
+                        >
                             Validar Local
                         </button>
                     ) : (
@@ -476,6 +535,9 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
                                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${location.verified ? 'text-dirole-primary bg-dirole-primary/10 border-dirole-primary/20' : 'text-slate-400 bg-slate-800/50 border-white/10'}`}>
                                         {location.type}
                                     </span>
+                                    <span className="text-xs font-black text-slate-500 tracking-[0.2em] ml-2">
+                                        {'$'.repeat(Math.max(1, Math.min(3, Math.round(location.stats.avgPrice || 1))))}
+                                    </span>
                                     {location.verified && <span className="text-[10px] text-green-400 font-bold flex items-center gap-1"><i className="fas fa-check-circle"></i> Oficial</span>}
                                 </div>
                                 <h2 className="text-4xl font-black text-white leading-none tracking-tight mb-2">{location.name}</h2>
@@ -550,10 +612,16 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
 
                     <button
                         onClick={() => { triggerHaptic(); onClose(); onCheckIn(location); }}
-                        className="w-full bg-gradient-to-r from-dirole-primary to-dirole-secondary text-white font-black py-4 rounded-2xl shadow-[0_5px_20px_rgba(139,92,246,0.3)] hover:shadow-[0_5px_30px_rgba(139,92,246,0.5)] active:scale-95 transition-all flex items-center justify-center gap-2 border border-white/10"
+                        disabled={isTooFar}
+                        className={`w-full ${isTooFar ? 'bg-slate-800 text-slate-500 border-white/5 cursor-not-allowed grayscale shadow-none' : 'bg-gradient-to-r from-dirole-primary to-dirole-secondary text-white shadow-[0_5px_20px_rgba(139,92,246,0.3)] hover:shadow-[0_5px_30px_rgba(139,92,246,0.5)]'} font-black py-4 rounded-2xl active:scale-95 transition-all flex items-center justify-center gap-2 border border-white/10`}
                     >
-                        <i className="fas fa-edit"></i> CHECK-IN DETALHADO
+                        <i className="fas fa-edit"></i> {isTooFar ? 'LONGE DEMAIS' : 'CHECK-IN DETALHADO'}
                     </button>
+                    {isTooFar && (
+                        <p className="text-center text-[10px] font-black text-red-500/80 uppercase tracking-[0.2em] mt-3 animate-pulse">
+                            📍 Fora de alcance ({Math.round(distance || 0)}m / Limite 300m)
+                        </p>
+                    )}
                 </div>
 
             </div>

@@ -30,13 +30,15 @@ const createCustomIcon = (location: Location) => {
   const borderClass = location.verified ? 'border-2 border-white' : 'border-2 border-dashed border-slate-400 opacity-90';
   const bgClass = location.verified ? 'bg-slate-900' : 'bg-slate-800';
 
-  // Pulse Effect logic (Subtle Glow)
-  // Only for verified locations that are "Hot" (High Vibe + Moderate/High Crowd)
+  // Enhanced Heatmap logic (Prominent Glow)
   const isHot = location.verified && location.stats.avgVibe > 2.3 && location.stats.avgCrowd > 1.6;
 
-  // Using animate-pulse with a blur for a "Glow" effect instead of the aggressive ping
+  // Using a double-ring effect for a premium "Heatmap" feel
   const pulseHtml = isHot
-    ? `<div class="absolute -inset-2 rounded-full bg-dirole-secondary/40 blur-sm animate-pulse z-0"></div>`
+    ? `
+      <div class="absolute -inset-2 rounded-full bg-gradient-to-r from-dirole-primary to-dirole-secondary opacity-60 blur-md animate-pulse z-0"></div>
+      <div class="absolute -inset-1 rounded-full bg-white/20 animate-ping z-0 opacity-40"></div>
+    `
     : '';
 
   return L.divIcon({

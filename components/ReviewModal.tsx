@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Location, Review, User } from '../types';
-import { submitReview, triggerHaptic } from '../services/mockService';
+import { submitReview, triggerHaptic, calculateDistance } from '../services/mockService';
 import { MOCK_USER_ID } from '../constants';
 
 interface ReviewModalProps {
@@ -11,9 +11,10 @@ interface ReviewModalProps {
   onClose: () => void;
   onSuccess: (points: number) => void;
   onLogout?: () => void;
+  userLocation: { lat: number; lng: number } | null;
 }
 
-export const ReviewModal: React.FC<ReviewModalProps> = ({ location, currentUser, isOpen, onClose, onSuccess, onLogout }) => {
+export const ReviewModal: React.FC<ReviewModalProps> = ({ location, currentUser, isOpen, onClose, onSuccess, onLogout, userLocation }) => {
   // Simplified State - Defaults to "Average" (2)
   const [crowd, setCrowd] = useState(2);
   const [price, setPrice] = useState(2);
@@ -23,6 +24,18 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({ location, currentUser,
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isGuest = currentUser?.id.startsWith('guest_');
+
+  const distance = useMemo(() => {
+    if (!userLocation || !location) return null;
+    return calculateDistance(
+      userLocation.lat,
+      userLocation.lng,
+      location.latitude,
+      location.longitude
+    );
+  }, [userLocation, location]);
+
+  const isTooFar = distance !== null && distance > 300;
 
   if (!isOpen) return null;
 
@@ -39,6 +52,21 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({ location, currentUser,
     }
 
     setIsSubmitting(true);
+
+    setIsSubmitting(true);
+
+    // GEOFENCING CHECK (Extra safety)
+    if (isTooFar) {
+      alert(`Você está muito longe para fazer check-in! 📍\nDistância atual: ${Math.round(distance || 0)}m`);
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!userLocation) {
+      alert("Não conseguimos validar sua localização. Ative o GPS e tente novamente!");
+      setIsSubmitting(false);
+      return;
+    }
 
     const review: Review = {
       userId: currentUser?.id || MOCK_USER_ID,
@@ -259,10 +287,12 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({ location, currentUser,
           <div className="pt-4 animate-fade-in" style={{ animationDelay: '600ms' }}>
             <button
               type="submit"
-              disabled={isSubmitting}
+              disabled={isSubmitting || isTooFar}
               className={`w-full font-black py-5 rounded-[1.5rem] shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3 text-xs uppercase tracking-[0.2em] ${isGuest
                 ? 'bg-white/5 text-slate-500 border border-white/5'
-                : 'bg-white text-black hover:bg-slate-200'
+                : isTooFar
+                  ? 'bg-slate-800 text-slate-500 border border-white/5 cursor-not-allowed'
+                  : 'bg-white text-black hover:bg-slate-200'
                 }`}
             >
               {isSubmitting ? (
@@ -271,6 +301,11 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({ location, currentUser,
                 isGuest ? 'FAZER LOGIN' : 'CONFIRMAR CHECK-IN'
               )}
             </button>
+            {isTooFar && (
+              <p className="text-center text-[10px] font-bold text-red-500/80 uppercase tracking-widest mt-4 animate-pulse">
+                📍 Você está a {Math.round(distance || 0)}m (Limite: 300m)
+              </p>
+            )}
           </div>
         </form>
       </div>
