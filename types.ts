@@ -206,6 +206,7 @@ export interface Story {
   id: string;
   userId: string;
   userName: string;
+  userNickname?: string;
   userAvatar: string;
   locationId: string;
   locationName: string;

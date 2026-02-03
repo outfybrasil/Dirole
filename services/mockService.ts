@@ -1745,6 +1745,7 @@ export const submitReport = async (report: Report): Promise<boolean> => {
 export const createStory = async (
     userId: string,
     userName: string,
+    userNickname: string,
     userAvatar: string,
     locationId: string,
     locationName: string,
@@ -1761,6 +1762,7 @@ export const createStory = async (
             {
                 user_id: userId,
                 user_name: userName,
+                user_nickname: userNickname,
                 user_avatar: userAvatar,
                 location_id: locationId,
                 location_name: locationName,
@@ -1795,6 +1797,7 @@ export const getStoriesByLocation = async (locationId: string): Promise<any[]> =
             id: doc.$id,
             userId: doc.user_id,
             userName: doc.user_name,
+            userNickname: doc.user_nickname,
             userAvatar: doc.user_avatar,
             locationId: doc.location_id,
             locationName: doc.location_name,

@@ -543,7 +543,7 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
                                 className="w-full h-full object-cover"
                             />
                             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
-                                <p className="text-white text-xs font-bold truncate">{story.userName}</p>
+                                <p className="text-white text-xs font-bold truncate">{story.userNickname || story.userName}</p>
                             </div>
                         </button>
                     ))}

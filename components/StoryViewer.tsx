@@ -99,7 +99,7 @@ export const StoryViewer: React.FC<StoryViewerProps> = ({
                     <div className="flex items-center gap-3">
                         <UserAvatar avatar={currentStory.userAvatar} className="!w-10 !h-10" />
                         <div>
-                            <p className="text-white font-black text-sm">{currentStory.userName}</p>
+                            <p className="text-white font-black text-sm">{currentStory.userNickname || currentStory.userName}</p>
                             <p className="text-white/60 text-xs">{timeAgo(currentStory.createdAt)}</p>
                         </div>
                     </div>

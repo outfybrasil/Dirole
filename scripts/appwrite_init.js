@@ -125,6 +125,7 @@ const COLLECTIONS = [
         attributes: [
             { key: 'user_id', type: 'string', size: 255, required: true },
             { key: 'user_name', type: 'string', size: 255, required: true },
+            { key: 'user_nickname', type: 'string', size: 255, required: false },
             { key: 'user_avatar', type: 'string', size: 500, required: true },
             { key: 'location_id', type: 'string', size: 255, required: true },
             { key: 'location_name', type: 'string', size: 255, required: true },
