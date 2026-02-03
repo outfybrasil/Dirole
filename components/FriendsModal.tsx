@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { User, FriendUser, FriendshipStatus } from '../types';
 import { getFriends, searchUsers, sendFriendRequest, respondToFriendRequest, triggerHaptic, getSuggestedUsers, blockUser } from '../services/mockService';
 import UserAvatar from './UserAvatar';
+import { CapacitorNfc } from '@capgo/capacitor-nfc';
 
 interface FriendsModalProps {
     isOpen: boolean;
@@ -34,9 +35,25 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
     const [isNfcWriting, setIsNfcWriting] = useState(false);
 
     useEffect(() => {
-        if ('NDEFReader' in window) {
-            setHasNfc(true);
-        }
+        const checkNfc = async () => {
+            try {
+                // Check if we are in a native environment or browser
+                if (window.location.protocol.startsWith('http') && !('NDEFReader' in window)) {
+                    return; // Browser without NFC
+                }
+
+                const { status } = await CapacitorNfc.getStatus();
+                if (status === 'NFC_OK' || status === 'NFC_DISABLED') {
+                    setHasNfc(true);
+                }
+            } catch (e) {
+                console.warn('NFC Check failed:', e);
+                if ('NDEFReader' in window) {
+                    setHasNfc(true);
+                }
+            }
+        };
+        checkNfc();
     }, []);
 
     const isGuest = currentUser?.id.startsWith('guest_');
@@ -135,18 +152,52 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
         triggerHaptic();
         setIsNfcWriting(true);
 
+        const profileUrl = `https://dirole.appwrite.network/u/${currentUser.id}`;
+
         try {
-            // @ts-ignore - Web NFC API
-            const ndef = new NDEFReader();
-            await ndef.write({
-                records: [{ recordType: "url", data: `https://dirole.appwrite.network/u/${currentUser.id}` }]
+            // Helper to encode NDEF URL record
+            const createUrlRecord = (url: string) => {
+                const urlBytes = new TextEncoder().encode(url.replace('https://', ''));
+                return {
+                    tnf: 1, // Well Known
+                    type: [85], // 'U'
+                    id: [],
+                    payload: [4, ...Array.from(urlBytes)] // 4 = https:// prefix
+                };
+            };
+
+            const record = createUrlRecord(profileUrl);
+
+            // On iOS, we MUST call startScanning before write
+            await CapacitorNfc.startScanning({
+                alertMessage: "Aproxime um dispositivo ou tag NFC para compartilhar seu perfil."
             });
-            triggerHaptic([50, 50, 50]);
-            alert("Perfil compartilhado via NFC com sucesso!");
+
+            // Listen for tag discovery to write
+            const listener = await CapacitorNfc.addListener('nfcEvent', async () => {
+                try {
+                    await CapacitorNfc.write({ records: [record] });
+                    triggerHaptic([50, 50, 50]);
+                    alert("Perfil compartilhado via NFC com sucesso!");
+                    await CapacitorNfc.stopScanning();
+                    setIsNfcWriting(false);
+                    listener.remove();
+                } catch (e) {
+                    console.error("Write failed:", e);
+                }
+            });
+
+            // Timeout after 30 seconds
+            setTimeout(async () => {
+                if (isNfcWriting) {
+                    await CapacitorNfc.stopScanning();
+                    setIsNfcWriting(false);
+                    listener.remove();
+                }
+            }, 30000);
+
         } catch (error) {
-            console.error(error);
-            // alert("Erro ao compartilhar via NFC. Aproxime de outro dispositivo.");
-        } finally {
+            console.error("NFC shared failed:", error);
             setIsNfcWriting(false);
         }
     };

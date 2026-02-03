@@ -100,6 +100,11 @@ android {
     }
 }
 ```
+**Verifique as permissões no `AndroidManifest.xml`:**
+- `CAMERA` ✅
+- `ACCESS_FINE_LOCATION` ✅
+- `ACCESS_COARSE_LOCATION` ✅
+- `NFC` ✅
 
 #### C. Build Release
 ```bash
@@ -281,7 +286,16 @@ cd android
 npx cap sync android --force
 ```
 
-## Checklist Final
+## 📡 Configuração de NFC (iOS)
+
+Para o NFC funcionar no iPhone, você precisa fazer duas coisas no **Xcode**:
+
+1.  **Capabilities:** No seu projeto, vá em *Signing & Capabilities* e clique em *+ Capability*. Adicione **NFC Tag Reading**.
+2.  **Info.plist:** Adicione a chave `Privacy - NFC Scan Usage Description` com uma mensagem (ex: "Usado para compartilhar seu perfil com amigos por proximidade").
+
+---
+
+## checklist Final
 
 - [ ] Build web sem erros (`npm run build`)
 - [ ] Capacitor sync (`npx cap sync android`)
