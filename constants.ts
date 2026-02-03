@@ -37,11 +37,24 @@ export const LEVEL_THRESHOLDS = [
 ];
 
 export const BADGES: Badge[] = [
+  // Original Badges
   { id: 'first_checkin', icon: '🏳️', name: 'Primeiro Passo', description: 'Fez o primeiro check-in' },
   { id: 'night_owl', icon: '🦉', name: 'Coruja', description: 'Check-in após as 02:00' },
   { id: 'party_animal', icon: '🎉', name: 'Inimigo do Fim', description: '3 Check-ins na mesma noite' },
   { id: 'critic', icon: '✍️', name: 'Crítico Michelin', description: 'Escreveu 5 comentários' },
   { id: 'trendsetter', icon: '🔥', name: 'Influencer', description: 'Descobriu um local novo' },
+
+  // Gamification 2.0 - New Badges
+  { id: 'enemy_of_dawn', icon: '🌙', name: 'Inimigo da Madrugada', description: 'Check-in após as 04:00' },
+  { id: 'nomad', icon: '🗺️', name: 'Nômade', description: 'Visitou 10+ locais diferentes' },
+  { id: 'foodie', icon: '🍽️', name: 'Crítico Gastronômico', description: '10+ reviews em restaurantes' },
+  { id: 'regional_king_north', icon: '👑', name: 'Rei do Norte', description: 'Dominou a região Norte' },
+  { id: 'regional_king_south', icon: '👑', name: 'Rei do Sul', description: 'Dominou a região Sul' },
+  { id: 'regional_king_center', icon: '👑', name: 'Rei do Centro', description: 'Dominou a região Central' },
+  { id: 'early_bird', icon: '⏰', name: 'Madrugadão', description: '5+ check-ins entre 2am-6am' },
+  { id: 'social_butterfly', icon: '🦋', name: 'Borboleta Social', description: 'Convidou 5+ amigos' },
+  { id: 'verified_helper', icon: '✅', name: 'Verificador', description: 'Ajudou a verificar 10+ locais' },
+  { id: 'photo_pro', icon: '📸', name: 'Fotógrafo', description: 'Enviou 20+ fotos' },
 ];
 
 // --- MOODS ---
@@ -126,4 +139,52 @@ export const getVibeLabel = (val: number) => {
   if (val <= 1.6) return 'Padrão';
   if (val <= 2.3) return 'Agradável';
   return 'UAU!';
+};
+
+// --- HEATMAP VISUAL CONSTANTS ---
+
+export const HEATMAP_COLORS = {
+  FERVENDO: {
+    gradient: 'from-red-500 via-orange-500 to-yellow-500',
+    glow: 'rgba(239, 68, 68, 0.6)', // red-500 with opacity
+    border: '#ef4444',
+    pulse: true
+  },
+  ANIMADO: {
+    gradient: 'from-yellow-500 to-amber-500',
+    glow: 'rgba(234, 179, 8, 0.5)', // yellow-500 with opacity
+    border: '#eab308',
+    pulse: false
+  },
+  TRANQUILO: {
+    gradient: 'from-blue-500 to-cyan-500',
+    glow: 'rgba(59, 130, 246, 0.4)', // blue-500 with opacity
+    border: '#3b82f6',
+    pulse: false
+  },
+  ANTIGO: {
+    gradient: 'from-slate-600 to-slate-700',
+    glow: 'rgba(71, 85, 105, 0.3)', // slate-600 with opacity
+    border: '#475569',
+    pulse: false
+  }
+};
+
+export const getHeatmapIntensity = (avgCrowd: number, avgVibe: number, lastUpdated?: string | Date) => {
+  // Check if data is stale (>4 hours)
+  if (lastUpdated) {
+    const diff = Date.now() - new Date(lastUpdated).getTime();
+    const hours = diff / (1000 * 60 * 60);
+    if (hours >= 4) return HEATMAP_COLORS.ANTIGO;
+  }
+
+  // No data
+  if (avgCrowd === 0 && avgVibe === 0) return HEATMAP_COLORS.ANTIGO;
+
+  // Calculate combined intensity (weighted: 60% crowd, 40% vibe)
+  const intensity = (avgCrowd * 0.6) + (avgVibe * 0.4);
+
+  if (intensity > 2.3) return HEATMAP_COLORS.FERVENDO;
+  if (intensity > 1.6) return HEATMAP_COLORS.ANIMADO;
+  return HEATMAP_COLORS.TRANQUILO;
 };

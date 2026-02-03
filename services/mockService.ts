@@ -1288,7 +1288,7 @@ export const getNearbyRoles = async (lat: number, lng: number): Promise<Location
         console.log(`[Appwrite] Fetching locations near [${lat}, ${lng}]`);
         const response = await databases.listDocuments(APPWRITE_DATABASE_ID, 'locations', [Query.limit(100)]);
         const dbLocations: Location[] = response.documents.map((doc: any) => {
-            const stats = doc.stats ? JSON.parse(doc.stats) : { avgCrowd: 0, avgVibe: 0, avgPrice: 0, reviewCount: 0 };
+            const stats = doc.stats ? JSON.parse(doc.stats) : { avgCrowd: 0, avgVibe: 0, avgPrice: 0, avgGender: 0, reviewCount: 0, lastUpdated: new Date() };
             return {
                 id: doc.$id,
                 name: doc.name,
@@ -1635,34 +1635,44 @@ export const submitReview = async (review: Review, locationContext?: Location): 
         // Update aggregated stats on location (Fire and forget)
         (async () => {
             try {
+                const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
+
                 const response = await databases.listDocuments(
                     APPWRITE_DATABASE_ID,
                     'reviews',
-                    [Query.equal('locationId', finalLocationId)]
+                    [
+                        Query.equal('locationId', finalLocationId),
+                        Query.greaterThan('$createdAt', sixHoursAgo.toISOString())
+                    ]
                 );
 
-                if (response.documents.length > 0) {
-                    const allR = response.documents;
-                    const count = allR.length;
-                    const avgCrowd = allR.reduce((acc: number, r: any) => acc + (r.crowd || 0), 0) / count;
-                    const avgVibe = allR.reduce((acc: number, r: any) => acc + (r.vibe || 0), 0) / count;
-                    const avgPrice = allR.reduce((acc: number, r: any) => acc + (r.price || 0), 0) / count;
+                const allR = response.documents;
+                const count = allR.length;
 
-                    await databases.updateDocument(
-                        APPWRITE_DATABASE_ID,
-                        'locations',
-                        finalLocationId,
-                        {
-                            stats: JSON.stringify({
-                                avgCrowd,
-                                avgVibe,
-                                avgPrice,
-                                reviewCount: count,
-                                lastUpdated: new Date().toISOString()
-                            })
-                        }
-                    );
+                let avgCrowd = 0;
+                let avgVibe = 0;
+                let avgPrice = 0;
+
+                if (count > 0) {
+                    avgCrowd = allR.reduce((acc: number, r: any) => acc + (r.crowd || 0), 0) / count;
+                    avgVibe = allR.reduce((acc: number, r: any) => acc + (r.vibe || 0), 0) / count;
+                    avgPrice = allR.reduce((acc: number, r: any) => acc + (r.price || 0), 0) / count;
                 }
+
+                await databases.updateDocument(
+                    APPWRITE_DATABASE_ID,
+                    'locations',
+                    finalLocationId,
+                    {
+                        stats: JSON.stringify({
+                            avgCrowd,
+                            avgVibe,
+                            avgPrice,
+                            reviewCount: count,
+                            lastUpdated: new Date().toISOString()
+                        })
+                    }
+                );
             } catch (err) { console.warn("Stats aggregation failed", err); }
         })();
 
@@ -1727,5 +1737,160 @@ export const submitReport = async (report: Report): Promise<boolean> => {
     } catch (e: any) {
         console.error("[Appwrite] submitReport failed:", e.message);
         return true; // Return true to not block the user flow
+    }
+};
+
+// ===== DIROLE STORIES =====
+
+export const createStory = async (
+    userId: string,
+    userName: string,
+    userAvatar: string,
+    locationId: string,
+    locationName: string,
+    photoUrl: string
+): Promise<boolean> => {
+    try {
+        const now = new Date();
+        const expiresAt = new Date(now.getTime() + 6 * 60 * 60 * 1000); // 6 hours
+
+        await databases.createDocument(
+            APPWRITE_DATABASE_ID,
+            'stories',
+            ID.unique(),
+            {
+                user_id: userId,
+                user_name: userName,
+                user_avatar: userAvatar,
+                location_id: locationId,
+                location_name: locationName,
+                photo_url: photoUrl,
+                created_at: now.toISOString(),
+                expires_at: expiresAt.toISOString(),
+                viewed_by: JSON.stringify([])
+            }
+        );
+        return true;
+    } catch (e: any) {
+        console.error("[createStory] Failed:", e.message);
+        return false;
+    }
+};
+
+export const getStoriesByLocation = async (locationId: string): Promise<any[]> => {
+    try {
+        const now = new Date().toISOString();
+        const response = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'stories',
+            [
+                Query.equal('location_id', locationId),
+                Query.greaterThan('expires_at', now),
+                Query.orderDesc('created_at'),
+                Query.limit(50)
+            ]
+        );
+
+        return response.documents.map((doc: any) => ({
+            id: doc.$id,
+            userId: doc.user_id,
+            userName: doc.user_name,
+            userAvatar: doc.user_avatar,
+            locationId: doc.location_id,
+            locationName: doc.location_name,
+            photoUrl: doc.photo_url,
+            createdAt: new Date(doc.created_at),
+            expiresAt: new Date(doc.expires_at),
+            viewedBy: JSON.parse(doc.viewed_by || '[]')
+        }));
+    } catch (e: any) {
+        console.error("[getStoriesByLocation] Failed:", e.message);
+        return [];
+    }
+};
+
+export const getStoryCountsByLocations = async (locationIds: string[]): Promise<Record<string, number>> => {
+    try {
+        const now = new Date().toISOString();
+        const counts: Record<string, number> = {};
+
+        // Fetch all active stories for these locations
+        const response = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'stories',
+            [
+                Query.greaterThan('expires_at', now),
+                Query.limit(1000)
+            ]
+        );
+
+        // Count stories per location
+        response.documents.forEach((doc: any) => {
+            const locId = doc.location_id;
+            if (locationIds.includes(locId)) {
+                counts[locId] = (counts[locId] || 0) + 1;
+            }
+        });
+
+        return counts;
+    } catch (e: any) {
+        console.error("[getStoryCountsByLocations] Failed:", e.message);
+        return {};
+    }
+};
+
+export const markStoryAsViewed = async (storyId: string, userId: string): Promise<boolean> => {
+    try {
+        // Get current story
+        const story = await databases.getDocument(
+            APPWRITE_DATABASE_ID,
+            'stories',
+            storyId
+        );
+
+        const viewedBy = JSON.parse(story.viewed_by || '[]');
+        if (!viewedBy.includes(userId)) {
+            viewedBy.push(userId);
+            await databases.updateDocument(
+                APPWRITE_DATABASE_ID,
+                'stories',
+                storyId,
+                { viewed_by: JSON.stringify(viewedBy) }
+            );
+        }
+        return true;
+    } catch (e: any) {
+        console.error("[markStoryAsViewed] Failed:", e.message);
+        return false;
+    }
+};
+
+export const cleanupExpiredStories = async (): Promise<number> => {
+    try {
+        const now = new Date().toISOString();
+        const response = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'stories',
+            [
+                Query.lessThan('expires_at', now),
+                Query.limit(100)
+            ]
+        );
+
+        let deleted = 0;
+        for (const doc of response.documents) {
+            await databases.deleteDocument(
+                APPWRITE_DATABASE_ID,
+                'stories',
+                doc.$id
+            );
+            deleted++;
+        }
+
+        console.log(`[cleanupExpiredStories] Deleted ${deleted} expired stories`);
+        return deleted;
+    } catch (e: any) {
+        console.error("[cleanupExpiredStories] Failed:", e.message);
+        return 0;
     }
 };

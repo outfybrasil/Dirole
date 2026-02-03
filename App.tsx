@@ -20,7 +20,7 @@ import { NotificationsModal } from './components/NotificationsModal';
 import { QRScannerModal } from './components/QRScannerModal';
 
 import { Location, Filters, User } from './types';
-import { getNearbyRoles, getUserProfile, toggleFavorite, syncUserProfile, triggerHaptic, requestNotificationPermission, sendLocalNotification, searchLocations, getUserById, client, APPWRITE_DATABASE_ID, getPendingFriendRequests } from './services/mockService';
+import { getNearbyRoles, getUserProfile, toggleFavorite, syncUserProfile, triggerHaptic, requestNotificationPermission, sendLocalNotification, searchLocations, getUserById, client, APPWRITE_DATABASE_ID, getPendingFriendRequests, getStoryCountsByLocations } from './services/mockService';
 import { INITIAL_CENTER } from './constants';
 import { getCurrentSession, signOut, verifyEmail } from './services/authService';
 import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
@@ -30,6 +30,7 @@ import UserAvatar from './components/UserAvatar';
 import { OnboardingModal } from './components/OnboardingModal';
 import { LandingPage } from './components/LandingPage';
 import { VerificationPendingScreen } from './components/VerificationPendingScreen';
+import { StoryCamera } from './components/StoryCamera';
 
 function App() {
   const [showSplash, setShowSplash] = useState(true);
@@ -115,6 +116,9 @@ function App() {
   const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isStoryCameraOpen, setIsStoryCameraOpen] = useState(false);
+  const [storyLocation, setStoryLocation] = useState<Location | null>(null);
+  const [storyCounts, setStoryCounts] = useState<Record<string, number>>({});
 
 
   const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
@@ -1262,6 +1266,11 @@ function App() {
             onClaim={handleOpenClaim}
             onReport={handleOpenReport}
             onInvite={handleOpenInvite}
+            onPostStory={(loc) => {
+              triggerHaptic();
+              setStoryLocation(loc);
+              setIsStoryCameraOpen(true);
+            }}
             onShowToast={(title, message, type) => addToast({
               title,
               message,
@@ -1384,7 +1393,24 @@ function App() {
         currentUser={currentUser}
       />
 
-
+      {/* Story Camera */}
+      {isStoryCameraOpen && storyLocation && (
+        <StoryCamera
+          isOpen={isStoryCameraOpen}
+          locationId={storyLocation.id}
+          locationName={storyLocation.name}
+          onClose={() => setIsStoryCameraOpen(false)}
+          onStoryPosted={() => {
+            setIsStoryCameraOpen(false);
+            setStoryLocation(null);
+            addToast({
+              title: "Story Postado! 📸",
+              message: "Seu story ficará visível por 6 horas.",
+              type: 'success'
+            });
+          }}
+        />
+      )}
 
       <OnboardingModal
         isOpen={showOnboarding}

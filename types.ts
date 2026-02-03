@@ -175,3 +175,42 @@ export interface Route {
   likes: number;
   completions: number; // How many people finished it
 }
+
+// --- SOCIAL MATCH (VIBE CHECK) ---
+
+export enum VibeType {
+  DANCE = 'dance',
+  DRINK = 'drink',
+  FLIRT = 'flirt'
+}
+
+export interface UserVibe {
+  userId: string;
+  vibeType: VibeType;
+  locationId?: string; // Optional: if they're already at a location
+  createdAt: Date;
+  expiresAt: Date; // Valid for 6 hours
+}
+
+export interface LocationVibeCount {
+  locationId: string;
+  danceCount: number;
+  drinkCount: number;
+  flirtCount: number;
+  lastUpdated: Date;
+}
+
+// --- DIROLE STORIES ---
+
+export interface Story {
+  id: string;
+  userId: string;
+  userName: string;
+  userAvatar: string;
+  locationId: string;
+  locationName: string;
+  photoUrl: string; // Appwrite Storage URL
+  createdAt: Date;
+  expiresAt: Date; // createdAt + 6h
+  viewedBy: string[]; // Array of user IDs who viewed this story
+}
