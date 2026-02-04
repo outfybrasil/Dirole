@@ -20,15 +20,18 @@ import { NotificationsModal } from './components/NotificationsModal';
 import { QRScannerModal } from './components/QRScannerModal';
 
 import { Location, Filters, User } from './types';
-import { getNearbyRoles, getUserProfile, toggleFavorite, syncUserProfile, triggerHaptic, requestNotificationPermission, sendLocalNotification, searchLocations, getUserById } from './services/mockService';
+import { getNearbyRoles, getUserProfile, toggleFavorite, syncUserProfile, triggerHaptic, requestNotificationPermission, sendLocalNotification, searchLocations, getUserById, client, APPWRITE_DATABASE_ID, getPendingFriendRequests, getStoryCountsByLocations } from './services/mockService';
 import { INITIAL_CENTER } from './constants';
-import { getCurrentSession, signOut } from './services/authService';
+import { getCurrentSession, signOut, verifyEmail } from './services/authService';
 import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
 import { DataPrivacyModal } from './components/DataPrivacyModal';
 import { Geolocation } from '@capacitor/geolocation';
 import UserAvatar from './components/UserAvatar';
 import { OnboardingModal } from './components/OnboardingModal';
 import { LandingPage } from './components/LandingPage';
+import { VerificationPendingScreen } from './components/VerificationPendingScreen';
+import { StoryCamera } from './components/StoryCamera';
+import { PWAInstallBanner } from './components/PWAInstallBanner';
 
 function App() {
   const [showSplash, setShowSplash] = useState(true);
@@ -37,6 +40,8 @@ function App() {
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
+  const [isEmailUnverified, setIsEmailUnverified] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState('');
 
   // User State  // --- 0. DEV SANITY: CLEAR SERVICE WORKERS ---
   useEffect(() => {
@@ -55,6 +60,28 @@ function App() {
       setIsAddModalOpen(true);
     };
     window.addEventListener('open-add-location', handleOpenAdd);
+
+    // CHECK FOR EMAIL VERIFICATION CALLBACK
+    const urlParams = new URLSearchParams(window.location.search);
+    const userId = urlParams.get('userId');
+    const secret = urlParams.get('secret');
+
+    if (userId && secret) {
+      verifyEmail(userId, secret)
+        .then(() => {
+          // Remove params from URL
+          window.history.replaceState({}, '', window.location.pathname);
+          // Show success toast (deferred until component mount logic handles it, or just generic alert for now)
+          alert("E-mail verificado com sucesso! 🎉 Você pode usar o app agora.");
+          // Force reload to update session state if logged in
+          window.location.reload();
+        })
+        .catch((err) => {
+          console.error("[Auth] Verification failed", err);
+          alert("Falha ao verificar e-mail. O link pode ter expirado.");
+        });
+    }
+
     return () => window.removeEventListener('open-add-location', handleOpenAdd);
   }, []);
 
@@ -90,10 +117,14 @@ function App() {
   const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isStoryCameraOpen, setIsStoryCameraOpen] = useState(false);
+  const [storyLocation, setStoryLocation] = useState<Location | null>(null);
+  const [storyCounts, setStoryCounts] = useState<Record<string, number>>({});
 
 
   const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
   const [friendsModalTab, setFriendsModalTab] = useState<'my_friends' | 'requests' | 'search'>('my_friends');
+  const [friendsModalView, setFriendsModalView] = useState<'default' | 'qr'>('default');
 
   const [reportTarget, setReportTarget] = useState<{ id: string, type: 'location' | 'review' | 'photo' | 'user', name?: string } | null>(null);
 
@@ -110,6 +141,66 @@ function App() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const startY = useRef(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // PWA Install Prompt State
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: any) => {
+      // Prevent the mini-infobar from appearing on mobile
+      e.preventDefault();
+      // Stash the event so it can be triggered later.
+      setDeferredPrompt(e);
+      // Update UI notify the user they can install the PWA
+      setShowInstallBanner(true);
+      console.log('beforeinstallprompt event was fired');
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
+  }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+
+    triggerHaptic();
+    // Show the install prompt
+    deferredPrompt.prompt();
+    // Wait for the user to respond to the prompt
+    const { outcome } = await deferredPrompt.userChoice;
+    console.log(`User response to the install prompt: ${outcome}`);
+    // We've used the prompt, and can't use it again, throw it away
+    setDeferredPrompt(null);
+    setShowInstallBanner(false);
+  };
+
+  const dismissInstallBanner = () => {
+    triggerHaptic();
+    setShowInstallBanner(false);
+  };
+
+  // DEEP LINKING: Handle ?loc=ID to open location details automatically on load
+  useEffect(() => {
+    if (locations.length > 0 && hasInitialLoad && !selectedLocation) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const locId = urlParams.get('loc');
+      if (locId) {
+        const found = locations.find(l => l.id === locId);
+        if (found) {
+          setSelectedLocation(found);
+          setIsDetailsModalOpen(true);
+          setMapTarget({ lat: found.latitude, lng: found.longitude });
+          // Clean the URL so refresh doesn't keep opening it
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+      }
+    }
+  }, [locations, hasInitialLoad, selectedLocation]);
+
   const REFRESH_THRESHOLD = 80;
 
   // Initial Filters - Default 1km
@@ -183,11 +274,18 @@ function App() {
         }
 
         // 2. Verify with Appwrite Session
-        console.log("[Auth] Checking Appwrite session...");
         const session = await getCurrentSession();
 
         if (session) {
-          console.log("[Auth] Active session found:", session.userId);
+
+          // CHECK EMAIL VERIFICATION
+          if (session.emailVerification === false) {
+            console.log("[Auth] Email not verified. Blocking access.");
+            setIsEmailUnverified(true);
+            setVerificationEmail(session.email);
+            // We still assume user is "logged in" for session purposes, but UI is blocked
+            // return; // Optional: stop profile sync if unverified
+          }
 
           // Sync profile
           const syncedUser = await syncUserProfile(session.userId, {
@@ -225,21 +323,230 @@ function App() {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
-  const fetchNotificationCount = useCallback(async (userId: string) => {
+  const previousCountRef = useRef(0);
+  const unsubscribeRef = useRef<(() => void) | null>(null);
+  const isSubscribingRef = useRef(false);
+
+  // Play notification sound using Web Audio API
+  const playNotificationSound = useCallback(() => {
     try {
-      // Appwrite notification count placeholder (can be implemented with databases.listDocuments)
-      setNotificationCount(0);
-    } catch (e) { console.error(e); }
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+
+      // Pleasant notification tone (C major chord - 523.25 Hz)
+      oscillator.frequency.setValueAtTime(523.25, audioContext.currentTime);
+      gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+      oscillator.start(audioContext.currentTime);
+      oscillator.stop(audioContext.currentTime + 0.5);
+    } catch (e) {
+      console.warn('[Sound] Failed to play notification:', e);
+    }
   }, []);
 
+
+  const fetchNotificationCount = useCallback(async (userId: string) => {
+    try {
+      const pendingRequests = await getPendingFriendRequests(userId);
+      const newCount = pendingRequests.length;
+
+      // If count increased, trigger feedback
+      if (newCount > previousCountRef.current && previousCountRef.current > 0) {
+        playNotificationSound();
+        triggerHaptic();
+        sendLocalNotification(
+          '🔔 Novo Convite!',
+          'Você recebeu um novo pedido de amizade'
+        );
+      }
+
+      previousCountRef.current = newCount;
+      setNotificationCount(newCount);
+    } catch (e) {
+      console.error('[Notifications] Failed to fetch friend requests:', e);
+    }
+  }, [playNotificationSound]);
+
+  // Real-time friend request notifications via Appwrite WebSocket
   useEffect(() => {
-    if (currentUser) {
+    if (!currentUser || currentUser.id.startsWith('guest_')) {
+      console.log('[Realtime] Skipping subscription (no user or guest)');
+      return;
+    }
+
+    // Prevent multiple simultaneous subscriptions
+    if (isSubscribingRef.current) {
+      console.log('[Realtime] Subscription already in progress, skipping...');
+      return;
+    }
+
+    console.log('[Realtime] Setting up friendship notifications for user:', currentUser.id);
+
+    // Cleanup previous subscription
+    if (unsubscribeRef.current) {
+      console.log('[Realtime] Cleaning up previous subscription');
+      try {
+        unsubscribeRef.current();
+      } catch (err) {
+        console.warn('[Realtime] Error during cleanup:', err);
+      }
+      unsubscribeRef.current = null;
+    }
+
+    // Mark as subscribing
+    isSubscribingRef.current = true;
+
+    // Add small delay to ensure previous connection is fully closed
+    const subscriptionTimeout = setTimeout(() => {
+
+      // Subscribe to friendships collection
+      try {
+        const unsubscribeFriendships = client.subscribe(
+          `databases.${APPWRITE_DATABASE_ID}.collections.friendships.documents`,
+          (response: any) => {
+            console.log('[Realtime] Friendship event:', response.events, response.payload);
+
+            const payload = response.payload;
+            const events = response.events || [];
+
+            // Only react to CREATE events where current user is receiver and status is pending
+            const isCreate = events.some((e: string) => e.includes('.create'));
+            const isUpdate = events.some((e: string) => e.includes('.update'));
+            const isForMe = payload.receiver_id === currentUser.id;
+            const iSentIt = payload.requester_id === currentUser.id;
+            const isPending = payload.status === 'pending';
+            const isAccepted = payload.status === 'accepted';
+
+            // 1. New request FOR ME
+            if (isCreate && isForMe && isPending) {
+              console.log('[Realtime] 🔔 NEW FRIEND REQUEST received!');
+              playNotificationSound();
+              triggerHaptic();
+              addToast({
+                title: 'Novo Convite! 📩',
+                message: 'Alguém quer ser seu amigo no Dirole.',
+                type: 'info'
+              });
+              sendLocalNotification('🔔 Novo Convite!', 'Você recebeu um novo pedido de amizade!');
+              fetchNotificationCount(currentUser.id);
+            }
+
+            // 2. Request I sent was ACCEPTED
+            if (isUpdate && iSentIt && isAccepted) {
+              console.log('[Realtime] 🎉 FRIEND REQUEST ACCEPTED!');
+              playNotificationSound();
+              triggerHaptic();
+              addToast({
+                title: 'Convite Aceito! 🤝',
+                message: 'Vocês agora são amigos! Bora dominar o mapa.',
+                type: 'success'
+              });
+              sendLocalNotification('🤝 Amizade Confirmada!', 'Seu convite de amizade foi aceito!');
+
+              // Update local user state to reflect new friends list
+              const updated = getUserProfile();
+              if (updated) setCurrentUser(updated);
+            }
+          }
+        );
+
+        // --- INVITES LISTENER (New) ---
+        const unsubscribeInvites = client.subscribe(
+          `databases.${APPWRITE_DATABASE_ID}.collections.invites.documents`,
+          (response: any) => {
+            console.warn('[Realtime DEBUG] RAW EVENT RECV:', response); // WARN level to see in noisy console
+            const payload = response.payload;
+            const events = response.events || [];
+
+            const isCreate = events.some((e: string) => e.includes('.create'));
+            const isUpdate = events.some((e: string) => e.includes('.update'));
+
+            console.log('[Realtime DEBUG] Checks:', {
+              isCreate,
+              isUpdate,
+              toUser: payload.to_user_id,
+              fromUser: payload.from_user_id,
+              myId: currentUser.id,
+              status: payload.status
+            });
+
+            // 1. New Invite Receive (Someone invited ME to a location)
+            if (isCreate && payload.to_user_id === currentUser.id) {
+              console.log('[Realtime] 🎫 NEW LOCATION INVITE received!');
+              playNotificationSound();
+              triggerHaptic();
+              addToast({
+                title: 'Chamado pro Rolê! 🍻',
+                message: `Convite para ${payload.location_name || 'um local'}.`,
+                type: 'info',
+                actionLabel: 'Ver',
+                action: () => setIsNotificationsModalOpen(true)
+              });
+              sendLocalNotification('🍻 Chamado pro Rolê!', 'Você foi convidado para sair!');
+              // Refresh notification count if you have separate counters for invites
+            }
+
+            // 2. My Invite was Accepted (I invited someone, and they accepted)
+            if (isUpdate && payload.from_user_id === currentUser.id && payload.status === 'accepted') {
+              console.log('[Realtime] 🚀 LOCATION INVITE ACCEPTED!');
+              playNotificationSound();
+              triggerHaptic();
+              addToast({
+                title: 'Confirmado! 🚀',
+                message: 'Seu convite para o rolê foi aceito.',
+                type: 'success'
+              });
+              sendLocalNotification('🚀 Confirmado!', 'Seu convite para o rolê foi aceito.');
+            }
+          }
+        );
+
+        unsubscribeRef.current = () => {
+          try {
+            unsubscribeFriendships();
+            unsubscribeInvites();
+          } catch (err) {
+            console.warn('[Realtime] Error during unsubscribe:', err);
+          }
+        };
+
+        isSubscribingRef.current = false;
+        console.log('[Realtime] ✅ Subscription active for friendships AND invites');
+
+      } catch (err) {
+        console.error('[Realtime] Subscription failed:', err);
+        isSubscribingRef.current = false;
+      }
+    }, 100); // Small delay to ensure clean reconnection
+
+    // Initial count fetch
+    if (currentUser?.id) {
       fetchNotificationCount(currentUser.id);
     }
-  }, [currentUser, fetchNotificationCount]);
+
+    return () => {
+      console.log('[Realtime] Cleaning up subscription on unmount');
+      clearTimeout(subscriptionTimeout);
+      isSubscribingRef.current = false;
+      if (unsubscribeRef.current) {
+        try {
+          unsubscribeRef.current();
+        } catch (err) {
+          console.warn('[Realtime] Error during cleanup on unmount:', err);
+        }
+        unsubscribeRef.current = null;
+      }
+    };
+    // CRITICAL FIX: Only restart subscription if USER ID changes, not if user XP/details change
+  }, [currentUser?.id, fetchNotificationCount, playNotificationSound]);
 
 
-  // --- REALTIME NOTIFICATIONS (DISABLED FOR MIGRATION) ---
+  // --- REALTIME NOTIFICATIONS (MIGRATED TO WEBSOCKET ABOVE) ---
   /*
   useEffect(() => {
     if (!currentUser) return;
@@ -301,6 +608,8 @@ function App() {
           types: [],     // Clear type filters (e.g. if user was filtering only 'Balada')
           minVibe: false, // Clear vibe filters
           lowCost: false,  // Clear cost filters
+          minCrowd: undefined,
+          maxCrowd: undefined,
           onlyOpen: false
         }));
       } else {
@@ -505,6 +814,12 @@ function App() {
     if (filters.onlyOpen) {
       res = res.filter(l => l.isOpen);
     }
+    if (filters.minCrowd) {
+      res = res.filter(l => l.stats.avgCrowd >= filters.minCrowd);
+    }
+    if (filters.maxCrowd) {
+      res = res.filter(l => l.stats.avgCrowd <= filters.maxCrowd);
+    }
     if (filters.types.length > 0) {
       res = res.filter(l => filters.types.includes(l.type));
     }
@@ -563,6 +878,8 @@ function App() {
     setIsNotificationsModalOpen(true);
     setNotificationCount(0); // Clear badge on open
   }, []);
+
+
 
   const handleOpenInvite = useCallback((loc: Location) => {
     setSelectedLocation(loc);
@@ -695,6 +1012,17 @@ function App() {
     return <LandingPage onEnter={() => setShowLogin(true)} />;
   }
 
+  // --- 2.5 VERIFICATION BARRIER ---
+  // If user is logged in (currentUser exists) BUT email is unverified, show pending screen
+  if (isEmailUnverified) {
+    return (
+      <VerificationPendingScreen
+        email={verificationEmail}
+        onVerified={() => window.location.reload()}
+      />
+    );
+  }
+
   // --- 3. MAIN APP (Only rendered after login) ---
   return (
     <div className="fixed inset-0 h-[100dvh] w-full flex flex-col bg-[#0f0518] text-white font-sans overflow-hidden">
@@ -756,10 +1084,16 @@ function App() {
               </div>
             </button>
             <button
-              onClick={() => { triggerHaptic(); setIsQRScannerOpen(true); }}
-              className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition-all active:scale-90"
+              onClick={() => {
+                triggerHaptic();
+                // CHANGE: Open Friends Modal with QR view directly instead of Scanner
+                setFriendsModalView('qr');
+                setFriendsModalTab('my_friends');
+                setIsFriendsModalOpen(true);
+              }}
+              className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center border border-white/10 hover:bg-white/10 active:scale-95 transition-all shadow-lg backdrop-blur-md"
             >
-              <i className="fas fa-qrcode"></i>
+              <i className="fas fa-qrcode text-white text-sm"></i>
             </button>
           </div>
         </div>
@@ -995,6 +1329,7 @@ function App() {
             onClose={() => setIsReviewModalOpen(false)}
             onSuccess={handleReviewSuccess}
             onLogout={handleLogout}
+            userLocation={userLocation}
           />
           <LocationDetailsModal
             location={selectedLocation}
@@ -1004,6 +1339,17 @@ function App() {
             onClaim={handleOpenClaim}
             onReport={handleOpenReport}
             onInvite={handleOpenInvite}
+            onPostStory={(loc) => {
+              triggerHaptic();
+              setStoryLocation(loc);
+              setIsStoryCameraOpen(true);
+            }}
+            onShowToast={(title, message, type) => addToast({
+              title,
+              message,
+              type: type as any
+            })}
+            userLocation={userLocation}
           />
           <ClaimBusinessModal
             location={selectedLocation}
@@ -1054,9 +1400,11 @@ function App() {
           onClose={() => {
             setIsFriendsModalOpen(false);
             setScannedUser(null);
+            setFriendsModalView('default'); // Reset view on close
           }}
           currentUser={currentUser}
           initialTab={friendsModalTab}
+          initialView={friendsModalView}
           scannedUser={scannedUser}
           onLogout={handleLogout}
           onOpenScanner={() => {
@@ -1118,12 +1466,36 @@ function App() {
         currentUser={currentUser}
       />
 
-
+      {/* Story Camera */}
+      {isStoryCameraOpen && storyLocation && (
+        <StoryCamera
+          isOpen={isStoryCameraOpen}
+          locationId={storyLocation.id}
+          locationName={storyLocation.name}
+          onClose={() => setIsStoryCameraOpen(false)}
+          onStoryPosted={() => {
+            setIsStoryCameraOpen(false);
+            setStoryLocation(null);
+            addToast({
+              title: "Story Postado! 📸",
+              message: "Seu story ficará visível por 6 horas.",
+              type: 'success'
+            });
+          }}
+        />
+      )}
 
       <OnboardingModal
         isOpen={showOnboarding}
         onClose={() => setShowOnboarding(false)}
       />
+
+      {showInstallBanner && (
+        <PWAInstallBanner
+          onInstall={handleInstallClick}
+          onDismiss={dismissInstallBanner}
+        />
+      )}
     </div>
   );
 }

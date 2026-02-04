@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { signUpWithEmail, signInWithEmail, signInWithGoogle, getCurrentSession } from '../services/authService';
-import { saveUserProfileLocal, triggerHaptic, syncUserProfile } from '../services/mockService';
+import { signUpWithEmail, signInWithEmail, signInWithGoogle, getCurrentSession, sendVerificationEmail } from '../services/authService';
+import { saveUserProfileLocal, triggerHaptic, syncUserProfile, isNicknameAvailable } from '../services/mockService';
 import { User } from '../types';
 import { PrivacyPolicyModal } from './PrivacyPolicyModal';
+import { RegisterWizard } from './Login/RegisterWizard';
 
 interface LoginScreenProps {
     onLoginSuccess: (user: User) => void;
@@ -48,6 +49,13 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         try {
             await signInWithEmail(email, password);
             const session = await getCurrentSession();
+
+            // CHECK VERIFICATION
+            if (session && session.emailVerification === false) {
+                window.location.reload(); // App.tsx will catch this and show VerificationScreen
+                return;
+            }
+
             if (session) {
                 const user = await syncUserProfile(session.userId, { email: session.email, name: session.name });
                 if (user) {
@@ -88,24 +96,34 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         }
 
         try {
+            // Check nickname uniqueness
+            const available = await isNicknameAvailable(nickname);
+            if (!available) {
+                setErrorMsg("Este apelido já está em uso. Escolha outro.");
+                setIsLoading(false);
+                return;
+            }
+
             await signUpWithEmail(email, password, name);
+
+            // Send verification email immediately
+            await sendVerificationEmail();
+
+            // Sync profile explicitly before reload (optional but good for data consistency)
             const session = await getCurrentSession();
             if (session) {
-                const syncedUser = await syncUserProfile(session.userId, {
+                await syncUserProfile(session.userId, {
                     name,
                     nickname,
                     email,
                     avatar,
                     gender
                 });
-                if (syncedUser) {
-                    onLoginSuccess(syncedUser);
-                    return;
-                }
             }
 
-            setIsLoading(false);
-            setIsSuccess(true);
+            // Reload to force App.tsx to see the unverified session and block access
+            window.location.reload();
+
         } catch (error: any) {
             console.error(error);
             if (error.message?.includes("already registered") || error.code === 409) {
@@ -305,6 +323,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                                         <span>Entrar com Google</span>
                                     </button>
 
+                                    <p className="text-[10px] text-slate-500 text-center mt-3 leading-relaxed px-4">
+                                        Ao continuar, você concorda com nossos <button type="button" onClick={() => setIsPrivacyOpen(true)} className="text-slate-400 font-bold hover:underline">Termos de Uso e Política de Privacidade (LGPD)</button>.
+                                    </p>
+
                                     {errorMsg && <p className="text-red-400 text-xs text-center font-bold bg-red-500/10 p-2 rounded">{errorMsg}</p>}
 
                                     <div className="pt-4 border-t border-white/10 mt-4">
@@ -320,116 +342,71 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                             )}
 
                             {isRegistering && (
-                                <form onSubmit={handleRegister} className="w-full space-y-3 animate-fade-in">
-                                    <div className="mb-4">
-                                        <label className="block text-xs font-bold text-slate-400 uppercase mb-2 text-center">Escolha seu Avatar</label>
-                                        <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar justify-start sm:justify-center">
-                                            {AVATARS.map(av => (
-                                                <button
-                                                    key={av}
-                                                    type="button"
-                                                    onClick={() => setAvatar(av)}
-                                                    className={`w-10 h-10 rounded-full flex items-center justify-center text-xl shrink-0 transition-all ${avatar === av ? 'bg-dirole-primary scale-110 border-2 border-white' : 'bg-white/5 border border-white/10'}`}
-                                                >
-                                                    {av}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
+                                <RegisterWizard
+                                    onBack={() => setIsRegistering(false)}
+                                    onOpenPrivacy={() => setIsPrivacyOpen(true)}
+                                    isLoading={isLoading}
+                                    errorMsg={errorMsg}
+                                    onComplete={async (data) => {
+                                        // Map wizard data to existing state vars for existing logic compatibility if needed, OR just call signUp here
+                                        const { email: wEmail, pass: wPass, name: wName, age: wAge, gender: wGender, nickname: wNickname, avatar: wAvatar } = data;
 
-                                    <input
-                                        type="text"
-                                        value={name}
-                                        onChange={(e) => setName(e.target.value)}
-                                        placeholder="Nome Completo"
-                                        required
-                                        className="w-full bg-black/30 border border-white/10 rounded-xl p-3 text-white focus:border-dirole-primary focus:outline-none backdrop-blur-sm"
-                                    />
+                                        // Calculate actual age from birth year for database storage
+                                        const currentYear = new Date().getFullYear();
+                                        const calculatedAge = currentYear - parseInt(wAge);
 
-                                    <div className="flex gap-2">
-                                        <input
-                                            type="text"
-                                            value={nickname}
-                                            onChange={(e) => setNickname(e.target.value)}
-                                            placeholder="Apelido (ex: Guga)"
-                                            required
-                                            className="flex-[2] bg-black/30 border border-white/10 rounded-xl p-3 text-white focus:border-dirole-primary focus:outline-none backdrop-blur-sm"
-                                        />
-                                        <input
-                                            type="number"
-                                            value={age}
-                                            onChange={(e) => setAge(e.target.value)}
-                                            placeholder="Idade"
-                                            required
-                                            min="18"
-                                            max="99"
-                                            className="flex-1 bg-black/30 border border-white/10 rounded-xl p-3 text-white focus:border-dirole-primary focus:outline-none backdrop-blur-sm"
-                                        />
-                                    </div>
+                                        // Set local state just in case existing error logic relies on it? 
+                                        // Actually better to just call logic directly using the data from wizard.
 
-                                    <select
-                                        value={gender}
-                                        onChange={(e) => setGender(e.target.value)}
-                                        className="w-full bg-black/30 border border-white/10 rounded-xl p-3 text-white focus:border-dirole-primary focus:outline-none appearance-none backdrop-blur-sm"
-                                    >
-                                        <option value="Outro">Prefiro não dizer / Outro</option>
-                                        <option value="Masculino">Masculino</option>
-                                        <option value="Feminino">Feminino</option>
-                                    </select>
+                                        // Temporary shim to reuse handleRegister logic structure or rewrite it inline here.
+                                        setIsLoading(true);
+                                        setErrorMsg(null);
 
-                                    <input
-                                        type="email"
-                                        value={email}
-                                        onChange={(e) => setEmail(e.target.value)}
-                                        placeholder="Email"
-                                        required
-                                        className="w-full bg-black/30 border border-white/10 rounded-xl p-3 text-white focus:border-dirole-primary focus:outline-none backdrop-blur-sm"
-                                    />
+                                        try {
+                                            // Duplicate logic for safety and clarity in this new wizard flow
+                                            const user = await signUpWithEmail(wEmail, wPass, wName); // This actually logs them in too usually, unless we changed it.
 
-                                    <input
-                                        type="password"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        placeholder="Senha (mín. 6 caracteres)"
-                                        required
-                                        minLength={6}
-                                        className="w-full bg-black/30 border border-white/10 rounded-xl p-3 text-white focus:border-dirole-primary focus:outline-none backdrop-blur-sm"
-                                    />
+                                            // Handling Photo Upload
+                                            let finalAvatar = wAvatar;
+                                            if (data.avatarFile) {
+                                                try {
+                                                    const { uploadFile } = await import('../services/mockService');
+                                                    finalAvatar = await uploadFile(data.avatarFile);
+                                                } catch (uploadErr) {
+                                                    console.error("Failed to upload avatar, falling back to emoji", uploadErr);
+                                                }
+                                            }
 
-                                    <input
-                                        type="password"
-                                        value={confirmPassword}
-                                        onChange={(e) => setConfirmPassword(e.target.value)}
-                                        placeholder="Confirmar Senha"
-                                        required
-                                        minLength={6}
-                                        className="w-full bg-black/30 border border-white/10 rounded-xl p-3 text-white focus:border-dirole-primary focus:outline-none backdrop-blur-sm"
-                                    />
+                                            await sendVerificationEmail();
 
-                                    {/* EULA CHECKBOX */}
-                                    <div className="flex items-start gap-2 px-1 pt-2">
-                                        <input
-                                            type="checkbox"
-                                            id="terms"
-                                            checked={acceptedTerms}
-                                            onChange={(e) => setAcceptedTerms(e.target.checked)}
-                                            className="mt-1 w-4 h-4 rounded border-white/30 bg-black/30 accent-dirole-primary"
-                                        />
-                                        <label htmlFor="terms" className="text-xs text-slate-400">
-                                            Li e concordo com os <button type="button" onClick={() => setIsPrivacyOpen(true)} className="text-dirole-primary hover:underline font-bold">Termos de Uso e Política de Privacidade</button>.
-                                        </label>
-                                    </div>
+                                            // Sync profile
+                                            const session = await getCurrentSession();
 
-                                    {errorMsg && <p className="text-red-400 text-xs text-center font-bold bg-red-500/10 p-2 rounded">{errorMsg}</p>}
+                                            if (session) {
+                                                await syncUserProfile(session.userId, {
+                                                    name: wName,
+                                                    nickname: wNickname,
+                                                    email: wEmail,
+                                                    avatar: finalAvatar,
+                                                    gender: wGender,
+                                                    age: calculatedAge.toString()
+                                                });
+                                            }
 
-                                    <button
-                                        type="submit"
-                                        disabled={isLoading || !acceptedTerms}
-                                        className="w-full bg-gradient-to-r from-dirole-primary to-dirole-secondary text-white font-bold py-4 rounded-xl shadow-lg active:scale-95 transition-all flex items-center justify-center mt-4 disabled:opacity-50 disabled:grayscale"
-                                    >
-                                        {isLoading ? <i className="fas fa-circle-notch fa-spin"></i> : 'Criar Conta e Entrar'}
-                                    </button>
-                                </form>
+                                            // Reload page to trigger App.tsx verification check
+                                            window.location.reload();
+
+                                        } catch (error: any) {
+                                            console.error(error);
+                                            if (error.message?.includes("already registered") || error.code === 409) {
+                                                setErrorMsg("Este e-mail já está cadastrado.");
+                                            } else {
+                                                setErrorMsg(error.message || "Erro ao criar conta.");
+                                            }
+                                            setIsLoading(false);
+                                        }
+                                    }}
+                                />
                             )}
                         </>
                     )}

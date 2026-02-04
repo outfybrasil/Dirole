@@ -18,8 +18,11 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
     // Robust check for image vs emoji
     const isImage = React.useMemo(() => {
         if (!avatar) return false;
-        const urlPattern = /^(https?:\/\/|data:|blob:|file:|capacitor:)/i;
-        return urlPattern.test(avatar);
+        // Allow relative paths (starting with /) or absolute URLs
+        const urlPattern = /^(https?:\/\/|data:|blob:|file:|capacitor:|\/)/i;
+        // Also allow if it clearly looks like a file path (has extension)
+        const hasExtension = /\.(png|jpg|jpeg|gif|webp|svg)$/i.test(avatar);
+        return urlPattern.test(avatar) || hasExtension;
     }, [avatar]);
 
     React.useEffect(() => {
@@ -53,10 +56,14 @@ const UserAvatar: React.FC<UserAvatarProps> = ({
         <div className={containerClasses} onClick={onClick}>
             {isImage && !hasError ? (
                 <img
-                    src={avatar!}
+                    src={avatar!.startsWith('http') ? `${avatar}${avatar.includes('?') ? '&' : '?'}t=${Date.now()}` : avatar!}
                     alt="Avatar"
                     className="w-full h-full object-cover"
-                    onError={() => setHasError(true)}
+                    onError={(e) => {
+                        // console.log("Image failed to load (retried):", avatar); // DEBUG
+                        setHasError(true);
+                        e.currentTarget.style.display = 'none';
+                    }}
                 />
             ) : (
                 <span className="flex items-center justify-center">

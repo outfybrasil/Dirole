@@ -3,19 +3,30 @@ import React, { useState, useEffect } from 'react';
 import { User, FriendUser, FriendshipStatus } from '../types';
 import { getFriends, searchUsers, sendFriendRequest, respondToFriendRequest, triggerHaptic, getSuggestedUsers, blockUser } from '../services/mockService';
 import UserAvatar from './UserAvatar';
+import { CapacitorNfc } from '@capgo/capacitor-nfc';
+
+// Type declaration for Capacitor
+declare global {
+    interface Window {
+        Capacitor?: {
+            isNativePlatform?: () => boolean;
+        };
+    }
+}
 
 interface FriendsModalProps {
     isOpen: boolean;
     onClose: () => void;
     currentUser: User | null;
     initialTab?: 'my_friends' | 'requests' | 'search';
+    initialView?: 'default' | 'qr';
     onLogout?: () => void;
     onOpenScanner?: () => void;
     scannedUser?: User | null;
     onShowToast?: (title: string, message: string, type: 'success' | 'error' | 'info') => void;
 }
 
-export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, currentUser, initialTab = 'my_friends', onLogout, onOpenScanner, scannedUser, onShowToast }) => {
+export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, currentUser, initialTab = 'my_friends', initialView = 'default', onLogout, onOpenScanner, scannedUser, onShowToast }) => {
     const [activeTab, setActiveTab] = useState<'my_friends' | 'requests' | 'search'>(initialTab);
     const [friends, setFriends] = useState<FriendUser[]>([]);
     const [requests, setRequests] = useState<FriendUser[]>([]);
@@ -33,9 +44,46 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
     const [isNfcWriting, setIsNfcWriting] = useState(false);
 
     useEffect(() => {
-        if ('NDEFReader' in window) {
-            setHasNfc(true);
-        }
+        const checkNfc = async () => {
+            try {
+                // Check if running in Capacitor native environment
+                const isNative = window.Capacitor?.isNativePlatform?.();
+
+                if (isNative) {
+                    // Native app (iOS/Android)
+                    try {
+                        const { status } = await CapacitorNfc.getStatus();
+                        console.log('[NFC] Capacitor NFC Status:', status);
+
+                        // NFC_OK means NFC is available and enabled
+                        // NFC_DISABLED means NFC hardware exists but is turned off
+                        // Both cases mean the device HAS NFC capability
+                        if (status === 'NFC_OK' || status === 'NFC_DISABLED') {
+                            setHasNfc(true);
+                            console.log('[NFC] ✅ NFC hardware detected via Capacitor');
+                        } else {
+                            console.log('[NFC] ❌ NFC not available:', status);
+                        }
+                    } catch (e: any) {
+                        console.warn('[NFC] Capacitor check failed:', e.message);
+                        // Do not force hasNfc(true) if it failed, as it might lead to a broken UI
+                        setHasNfc(false);
+                    }
+                } else {
+                    // Web browser - check for Web NFC API
+                    if ('NDEFReader' in window) {
+                        console.log('[NFC] ✅ Web NFC API detected');
+                        setHasNfc(true);
+                    } else {
+                        console.log('[NFC] ❌ Web NFC API not available');
+                    }
+                }
+            } catch (e) {
+                console.error('[NFC] Unexpected error during NFC check:', e);
+                setHasNfc(false);
+            }
+        };
+        checkNfc();
     }, []);
 
     const isGuest = currentUser?.id.startsWith('guest_');
@@ -48,6 +96,10 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
                 setShowQrCode(true);
                 setScanResult(scannedUser);
                 setIsScanning(false);
+            } else if (initialView === 'qr') {
+                setShowQrCode(true);
+                setScanResult(null);
+                setIsScanning(false);
             } else {
                 setShowQrCode(false); // Reset QR state on open
                 setIsScanning(false);
@@ -55,7 +107,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
             }
             setScanError(null);
         }
-    }, [isOpen, initialTab, scannedUser]);
+    }, [isOpen, initialTab, scannedUser, initialView]);
 
     useEffect(() => {
         if (isOpen && currentUser && !isGuest) {
@@ -91,12 +143,12 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
         setSearchResults(prev => prev.map(u => u.id === targetId ? { ...u, friendshipStatus: FriendshipStatus.PENDING_SENT } : u));
         setSuggestedUsers(prev => prev.map(u => u.id === targetId ? { ...u, friendshipStatus: FriendshipStatus.PENDING_SENT } : u));
 
-        const success = await sendFriendRequest(currentUser.id, targetId);
-        if (success) {
+        const result = await sendFriendRequest(currentUser.id, targetId);
+        if (result.success) {
             if (onShowToast) onShowToast("Convite Enviado! 📨", "Aguarde a aprovação do seu amigo.", 'success');
         } else {
             // Rollback if needed, but for now just warn
-            if (onShowToast) onShowToast("Erro ao enviar", "Tente novamente.", 'error');
+            if (onShowToast) onShowToast("Erro ao enviar", result.error || "Tente novamente.", 'error');
         }
     };
 
@@ -130,18 +182,77 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
         triggerHaptic();
         setIsNfcWriting(true);
 
+        const profileUrl = `https://dirole.appwrite.network/u/${currentUser.id}`;
+
         try {
-            // @ts-ignore - Web NFC API
-            const ndef = new NDEFReader();
-            await ndef.write({
-                records: [{ recordType: "url", data: `https://dirole.appwrite.network/u/${currentUser.id}` }]
-            });
-            triggerHaptic([50, 50, 50]);
-            alert("Perfil compartilhado via NFC com sucesso!");
+            const isNative = window.Capacitor?.isNativePlatform?.();
+
+            if (isNative) {
+                // --- NATIVE FLOW (Capacitor) ---
+                // Helper to encode NDEF URL record
+                const createUrlRecord = (url: string) => {
+                    const urlBytes = new TextEncoder().encode(url.replace('https://', ''));
+                    return {
+                        tnf: 1, // Well Known
+                        type: [85], // 'U'
+                        id: [],
+                        payload: [4, ...Array.from(urlBytes)] // 4 = https:// prefix
+                    };
+                };
+
+                const record = createUrlRecord(profileUrl);
+
+                // On iOS, we MUST call startScanning before write
+                await CapacitorNfc.startScanning({
+                    alertMessage: "Aproxime um dispositivo ou tag NFC para compartilhar seu perfil."
+                });
+
+                // Listen for tag discovery to write
+                const listener = await CapacitorNfc.addListener('nfcEvent', async () => {
+                    try {
+                        await CapacitorNfc.write({ records: [record] });
+                        triggerHaptic([50, 50, 50]);
+                        if (onShowToast) onShowToast("Sucesso! 🎉", "Perfil compartilhado via NFC.", 'success');
+                        else alert("Perfil compartilhado via NFC com sucesso!");
+                        await CapacitorNfc.stopScanning();
+                        setIsNfcWriting(false);
+                        listener.remove();
+                    } catch (e) {
+                        console.error("Write failed:", e);
+                    }
+                });
+
+                // Timeout after 30 seconds
+                setTimeout(async () => {
+                    if (isNfcWriting) {
+                        try {
+                            await CapacitorNfc.stopScanning();
+                        } catch (e) { }
+                        setIsNfcWriting(false);
+                        listener.remove();
+                    }
+                }, 30000);
+            } else if ('NDEFReader' in window) {
+                // --- WEB FLOW (Chrome Android) ---
+                try {
+                    // @ts-ignore - NDEFReader is not in standard TS types yet
+                    const ndef = new window.NDEFReader();
+                    await ndef.write(profileUrl);
+
+                    triggerHaptic([50, 50, 50]);
+                    if (onShowToast) onShowToast("Sucesso! 🎉", "Link gravado na tag NFC.", 'success');
+                    else alert("Link gravado na tag NFC!");
+                    setIsNfcWriting(false);
+                } catch (error: any) {
+                    console.error("Web NFC failed:", error);
+                    if (onShowToast) onShowToast("Erro NFC", "Não foi possível gravar na tag. Verifique se o NFC está ativo.", 'error');
+                    setIsNfcWriting(false);
+                }
+            } else {
+                setIsNfcWriting(false);
+            }
         } catch (error) {
-            console.error(error);
-            // alert("Erro ao compartilhar via NFC. Aproxime de outro dispositivo.");
-        } finally {
+            console.error("NFC shared failed:", error);
             setIsNfcWriting(false);
         }
     };
@@ -190,64 +301,103 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
         );
     }
 
-    const renderUserCard = (user: FriendUser, type: 'friend' | 'request' | 'search') => (
-        <div key={user.id} className="bg-white/5 border border-white/5 rounded-xl p-3 flex items-center justify-between mb-2 hover:bg-white/10 transition-colors">
-            <div className="flex items-center gap-3">
-                <div className="w-10 h-10 shrink-0">
-                    <UserAvatar avatar={user.avatar} size="md" />
+    const renderUserCard = (user: FriendUser, type: 'friend' | 'request' | 'search') => {
+        const isSelf = currentUser && user.id === currentUser.id;
+
+        return (
+            <div key={user.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between mb-2 group relative overflow-hidden active:bg-white/10 transition-colors">
+                <div className="flex items-center gap-3">
+                    <div className="relative">
+                        <UserAvatar avatar={user.avatar} size="md" />
+                        {user.level && (
+                            <div className="absolute -bottom-1 -right-1 bg-yellow-500 text-black text-[8px] font-black px-1.5 py-0.5 rounded-full border border-[#0f0518]">
+                                {user.level}
+                            </div>
+                        )}
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-white text-sm">{user.name}</h4>
+                        <p className="text-xs text-slate-500 font-medium">@{user.nickname}</p>
+                    </div>
                 </div>
-                <div>
-                    <p className="font-bold text-white text-sm">{user.name}</p>
-                    <p className="text-xs text-slate-500">Lvl {user.level} • {Math.floor(user.points / 10)} check-ins</p>
-                    {type === 'friend' && user.lastCheckIn && (
-                        <p className="text-[10px] text-dirole-primary flex items-center gap-1 mt-0.5 animate-pulse">
-                            <i className="fas fa-map-marker-alt"></i> No {user.lastCheckIn}
-                        </p>
+
+                <div className="flex items-center gap-2">
+                    {/* BUSCA: Botões Dinâmicos */}
+                    {type === 'search' && !isSelf && (
+                        <>
+                            {user.friendshipStatus === FriendshipStatus.NONE && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); handleSendRequest(user.id); }}
+                                    className="bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all active:scale-90 shadow-lg shadow-indigo-500/20"
+                                >
+                                    Adicionar
+                                </button>
+                            )}
+                            {user.friendshipStatus === FriendshipStatus.PENDING_SENT && (
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter bg-white/5 px-2 py-1 rounded-md">
+                                    Solicitado
+                                </span>
+                            )}
+                            {user.friendshipStatus === FriendshipStatus.PENDING_RECEIVED && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); handleResponse(user.friendshipId || '', true); }}
+                                    className="bg-green-500 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all active:scale-90"
+                                >
+                                    Aceitar
+                                </button>
+                            )}
+                            {user.friendshipStatus === FriendshipStatus.ACCEPTED && (
+                                <div className="w-8 h-8 rounded-full bg-green-500/10 flex items-center justify-center text-green-500">
+                                    <i className="fas fa-check text-xs"></i>
+                                </div>
+                            )}
+                        </>
                     )}
-                </div>
-            </div>
 
-            <div>
-                {type === 'request' && user.friendshipId && (
-                    <div className="flex gap-2">
-                        <button onClick={() => handleResponse(user.friendshipId!, true)} className="w-8 h-8 rounded-full bg-green-500/20 text-green-500 flex items-center justify-center hover:bg-green-500/40 transition-colors">
-                            <i className="fas fa-check"></i>
-                        </button>
-                        <button onClick={() => handleResponse(user.friendshipId!, false)} className="w-8 h-8 rounded-full bg-red-500/20 text-red-500 flex items-center justify-center hover:bg-red-500/40 transition-colors">
-                            <i className="fas fa-times"></i>
-                        </button>
-                    </div>
-                )}
-
-                {type === 'search' && (
-                    <div className="flex gap-1">
-                        {user.friendshipStatus === FriendshipStatus.NONE && (
-                            <button onClick={() => handleSendRequest(user.id)} className="px-3 py-1.5 bg-dirole-primary/20 text-dirole-primary text-xs font-bold rounded-lg border border-dirole-primary/50 active:scale-95 transition-transform">
-                                Adicionar
-                            </button>
-                        )}
-                        {user.friendshipStatus === FriendshipStatus.PENDING_SENT && (
-                            <span className="text-xs text-slate-500 italic bg-white/5 px-2 py-1 rounded">Enviado</span>
-                        )}
-                        {user.friendshipStatus === FriendshipStatus.ACCEPTED && (
-                            <span className="text-xs text-green-500 font-bold flex items-center gap-1"><i className="fas fa-check"></i> Amigo</span>
-                        )}
-                        <button onClick={() => handleBlock(user.id)} className="w-8 h-8 flex items-center justify-center text-slate-600 hover:text-red-500" title="Bloquear">
-                            <i className="fas fa-ban"></i>
-                        </button>
-                    </div>
-                )}
-
-                {type === 'friend' && (
-                    <div className="flex items-center gap-2">
+                    {/* AMIGOS / REQUESTS: Botões Standard */}
+                    {type === 'friend' && (
                         <button className="text-slate-500 text-xs hover:text-white p-2">
                             <i className="fas fa-chevron-right"></i>
                         </button>
-                    </div>
-                )}
+                    )}
+
+                    {type === 'request' && (
+                        <div className="flex gap-2">
+                            <button
+                                onClick={(e) => { e.stopPropagation(); handleResponse(user.friendshipId || '', true); }}
+                                className="bg-indigo-500 text-white px-3 py-2 rounded-xl text-[10px] font-black uppercase shadow-lg shadow-indigo-500/20 active:scale-95"
+                            >
+                                Aceitar
+                            </button>
+                            <button
+                                onClick={(e) => { e.stopPropagation(); handleResponse(user.friendshipId || '', false); }}
+                                className="bg-white/5 text-slate-400 px-3 py-2 rounded-xl text-[10px] font-black uppercase hover:bg-white/10 active:scale-95 border border-white/5"
+                            >
+                                Recusar
+                            </button>
+                        </div>
+                    )}
+
+                    {/* DENÚNCIA: Sempre visível se não for eu */}
+                    {!isSelf && (
+                        <button
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (confirm(`Deseja denunciar ${user.name}? Nossa equipe analisará o perfil.`)) {
+                                    if (onShowToast) onShowToast("Denúncia Enviada", "Obrigado por sua colaboração.", 'info');
+                                    else alert("Denúncia enviada.");
+                                }
+                            }}
+                            className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 hover:text-red-500 hover:bg-red-500/10 transition-all sm:opacity-0 group-hover:opacity-100"
+                            title="Denunciar Usuário"
+                        >
+                            <i className="fas fa-flag text-xs"></i>
+                        </button>
+                    )}
+                </div>
             </div>
-        </div>
-    );
+        );
+    };
 
     return (
         <div className="fixed inset-0 z-[500] flex items-end sm:items-center justify-center pointer-events-none">
@@ -316,56 +466,66 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
                         <div className="w-full flex flex-col items-center justify-start min-h-full py-8 animate-fade-in">
 
                             {!isScanning && !scanResult && (
-                                <div className="w-full max-w-[340px] bg-[#120822] rounded-[2.5rem] p-6 sm:p-8 shadow-2xl relative flex flex-col items-center border border-white/5 overflow-hidden">
+                                <div className="w-full max-w-[300px] bg-[#1a1a2e] border border-white/10 rounded-[2.5rem] p-6 shadow-[0_0_50px_rgba(0,0,0,0.5)] relative flex flex-col items-center overflow-hidden animate-slide-up mx-auto mb-4">
 
-                                    {/* Gradient Animating BG */}
-                                    <div className="absolute inset-0 bg-gradient-to-br from-dirole-primary/5 via-transparent to-dirole-secondary/5 pointer-events-none"></div>
-
-                                    {/* Avatar */}
-                                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full p-1 bg-gradient-to-tr from-dirole-primary to-dirole-secondary shadow-[0_0_20px_rgba(139,92,246,0.3)] relative z-10 mb-4 sm:mb-6 shrink-0">
-                                        <UserAvatar
-                                            avatar={currentUser?.avatar}
-                                            size="lg"
-                                            className="w-full h-full border-2 border-slate-900"
-                                        />
+                                    {/* Header / Avatar */}
+                                    <div className="flex flex-col items-center mb-5 z-10">
+                                        <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-tr from-dirole-primary to-dirole-secondary shadow-[0_0_20px_rgba(139,92,246,0.3)] mb-3">
+                                            <UserAvatar
+                                                avatar={currentUser?.avatar}
+                                                size="lg"
+                                                className="w-full h-full border-2 border-[#1a1a2e]"
+                                            />
+                                        </div>
+                                        <h3 className="text-lg font-black text-white mb-1 leading-none truncate max-w-[220px]">
+                                            {currentUser?.name}
+                                        </h3>
+                                        <p className="text-dirole-secondary text-[10px] font-black tracking-[0.2em] uppercase opacity-80">
+                                            @{currentUser?.nickname}
+                                        </p>
                                     </div>
 
-                                    {/* Info */}
-                                    <h3 className="text-lg sm:text-2xl font-black text-white mb-1 tracking-tight text-center leading-tight break-words w-full px-2">
-                                        {currentUser?.name?.toUpperCase()}
-                                    </h3>
-                                    <p className="text-dirole-primary text-[10px] sm:text-xs font-black tracking-[0.2em] mb-6 sm:mb-8 text-center truncate w-full px-4">
-                                        @{currentUser?.nickname?.toUpperCase() || 'USUARIO'}
-                                    </p>
-
-                                    {/* QR Code */}
-                                    <div className="bg-white p-3 sm:p-4 rounded-3xl mb-6 sm:mb-8 shadow-[0_0_40px_rgba(255,255,255,0.1)] group transition-all hover:scale-[1.02] shrink-0">
-                                        <img src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=dirole:${currentUser?.id}&color=000000`} alt="QR Code" className="w-48 h-48" />
+                                    {/* QR Code - White Background for readability */}
+                                    <div className="bg-white p-3 rounded-2xl mb-6 shadow-[0_0_30px_rgba(255,255,255,0.1)] shrink-0">
+                                        <img src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=dirole:${currentUser?.id}&color=000000`} alt="QR Code" className="w-40 h-40 mix-blend-multiply" />
                                     </div>
 
-                                    {/* Level Pill */}
-                                    <div className="bg-yellow-500/10 px-4 py-1.5 rounded-full border border-yellow-500/20 shadow-inner">
-                                        <span className="text-[10px] font-black text-yellow-500 tracking-[0.3em] uppercase">
-                                            ELITE NÍVEL {currentUser?.level}
-                                        </span>
-                                    </div>
-
-                                    {/* NFC Option */}
-                                    {hasNfc && (
+                                    {/* Actions */}
+                                    <div className="w-full flex gap-3">
                                         <button
-                                            onClick={shareViaNFC}
-                                            disabled={isNfcWriting}
-                                            className={`mt-4 sm:mt-6 w-full max-w-[280px] flex items-center justify-center gap-3 px-4 py-3 sm:px-6 rounded-2xl transition-all border ${isNfcWriting ? 'bg-blue-600 shadow-[0_0_20px_rgba(37,99,235,0.5)] border-blue-500' : 'bg-white/5 hover:bg-white/10 border-white/10'}`}
+                                            onClick={startScan}
+                                            className="flex-1 bg-white text-black font-black py-3.5 rounded-xl flex flex-col items-center justify-center gap-1 hover:bg-slate-200 transition-all shadow-lg active:scale-95"
                                         >
-                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${isNfcWriting ? 'bg-white text-blue-600' : 'bg-blue-500 text-white'}`}>
-                                                <i className={`fas fa-wifi rotate-90 ${isNfcWriting ? 'animate-ping' : ''}`}></i>
-                                            </div>
-                                            <div className="text-left min-w-0 flex-1">
-                                                <p className={`text-xs font-bold uppercase tracking-wider truncate ${isNfcWriting ? 'text-white' : 'text-white'}`}>Aproximar</p>
-                                                <p className={`text-[10px] truncate ${isNfcWriting ? 'text-blue-100' : 'text-slate-400'}`}>{isNfcWriting ? 'Aproxime celular...' : 'Toque para ativar NFC'}</p>
-                                            </div>
+                                            <i className="fas fa-camera text-base"></i>
+                                            <span className="text-[10px] uppercase tracking-wider">Escanear</span>
                                         </button>
-                                    )}
+
+                                        <button
+                                            onClick={() => {
+                                                if (hasNfc) {
+                                                    shareViaNFC();
+                                                } else {
+                                                    const message = window.Capacitor?.isNativePlatform?.()
+                                                        ? "NFC não disponível neste dispositivo. Verifique se o NFC está ativado nas configurações."
+                                                        : "NFC não suportado neste navegador. Use o QR Code ou abra no app.";
+                                                    if (onShowToast) onShowToast("NFC Indisponível", message, "error");
+                                                    else alert(message);
+                                                }
+                                            }}
+                                            className={`flex-1 font-black py-3.5 rounded-xl flex flex-col items-center justify-center gap-1 transition-all shadow-lg active:scale-95 border ${hasNfc ? 'bg-dirole-primary text-white border-dirole-primary hover:bg-dirole-primary/80' : 'bg-white/5 text-slate-500 border-white/10 hover:bg-white/10 cursor-not-allowed'}`}
+                                            disabled={!hasNfc}
+                                        >
+                                            <i className="fas fa-wifi rotate-90 text-base"></i>
+                                            <span className="text-[10px] uppercase tracking-wider">NFC</span>
+                                            {!hasNfc && <span className="text-[8px] opacity-60">N/D</span>}
+                                        </button>
+                                    </div>
+
+                                    {/* ID Label */}
+                                    <div className="mt-4 text-[9px] font-black text-slate-600 uppercase tracking-widest">
+                                        DIROLE ID
+                                    </div>
+
                                 </div>
                             )}
 
@@ -437,20 +597,51 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
 
                             {
                                 !isScanning && !scanResult && (
-                                    <div className="mt-10 w-full max-w-[300px]">
-                                        <button onClick={startScan} className="w-full bg-white text-black font-black py-5 rounded-[1.5rem] flex items-center justify-center gap-4 hover:bg-slate-200 transition-all shadow-xl active:scale-95 text-xs uppercase tracking-[0.2em]">
-                                            <i className="fas fa-camera text-lg"></i>
-                                            <span>Escanear Amigo</span>
-                                        </button>
-                                        <p className="text-[10px] font-bold text-slate-500 text-center mt-6 max-w-[220px] mx-auto leading-relaxed">
-                                            Aponte a câmera para o QR Code de outro usuário para conectarem.
-                                        </p>
-                                    </div>
+                                    <p className="text-[10px] font-bold text-slate-500 text-center mt-2 max-w-[220px] mx-auto leading-relaxed opacity-50">
+                                        Mostre este código para conectar
+                                    </p>
                                 )
                             }
                         </div>
                     ) : (
                         <div className="animate-fade-in-up">
+                            <div className="flex gap-2 mb-6 bg-white/5 p-1 rounded-xl">
+                                <button
+                                    onClick={() => { triggerHaptic(); setActiveTab('requests'); }}
+                                    className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'requests'
+                                        ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
+                                        : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                        }`}
+                                >
+                                    Solicitações
+                                    {requests.length > 0 && (
+                                        <span className="ml-2 px-2 py-0.5 text-xs bg-red-500 text-white rounded-full">
+                                            {requests.length}
+                                        </span>
+                                    )}
+                                </button>
+                                <button
+                                    onClick={() => { triggerHaptic(); setActiveTab('my_friends'); }}
+                                    className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'my_friends'
+                                        ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
+                                        : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                        }`}
+                                >
+                                    Amigos
+                                    <span className="ml-2 text-xs opacity-60">
+                                        {friends.length}
+                                    </span>
+                                </button>
+                                <button
+                                    onClick={() => { triggerHaptic(); setActiveTab('search'); }}
+                                    className={`flex-1 py-3 px-4 rounded-lg text-sm font-medium transition-all ${activeTab === 'search'
+                                        ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/25'
+                                        : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                        }`}
+                                >
+                                    Buscar
+                                </button>
+                            </div>
                             {activeTab === 'my_friends' && (
                                 <div className="space-y-3">
                                     {requests.length > 0 && (

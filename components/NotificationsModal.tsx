@@ -12,7 +12,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({ isOpen, 
     const [invites, setInvites] = useState<Invite[]>([]);
     const [friendRequests, setFriendRequests] = useState<FriendUser[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'invites' | 'friends'>('invites');
+    const [activeTab, setActiveTab] = useState<'invites' | 'friends'>('friends');
 
     useEffect(() => {
         if (isOpen) {
@@ -79,16 +79,16 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({ isOpen, 
                 <div className="px-8 mb-6">
                     <div className="flex bg-white/5 p-1 rounded-2xl border border-white/5">
                         <button
-                            onClick={() => setActiveTab('invites')}
-                            className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'invites' ? 'bg-dirole-primary text-white shadow-lg' : 'text-slate-500'}`}
-                        >
-                            Convites ({invites.length})
-                        </button>
-                        <button
                             onClick={() => setActiveTab('friends')}
                             className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'friends' ? 'bg-dirole-primary text-white shadow-lg' : 'text-slate-500'}`}
                         >
                             Pedidos ({friendRequests.length})
+                        </button>
+                        <button
+                            onClick={() => setActiveTab('invites')}
+                            className={`flex-1 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'invites' ? 'bg-dirole-primary text-white shadow-lg' : 'text-slate-500'}`}
+                        >
+                            Convites ({invites.length})
                         </button>
                     </div>
                 </div>
@@ -160,7 +160,7 @@ export const NotificationsModal: React.FC<NotificationsModalProps> = ({ isOpen, 
                                         </button>
                                         <button
                                             onClick={() => handleFriendAction(user.friendshipId!, false)}
-                                            className="w-10 h-10 rounded-xl bg-white/5 text-slate-500 flex items-center justify-center active:scale-90 transition-all font-black text-lg"
+                                            className="w-10 h-10 rounded-xl bg-red-500/20 text-red-500 flex items-center justify-center active:scale-90 transition-all font-black text-lg border border-red-500/20 shadow-lg shadow-red-900/20"
                                         >
                                             ×
                                         </button>

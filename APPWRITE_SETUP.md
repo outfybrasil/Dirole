@@ -53,7 +53,10 @@ appwrite deploy
 Abaixo estão os detalhes caso precise verificar algo manualmente:
 
 #### Coleção: `profiles`
-*   **Permissions**: Vá em Settings da coleção e adicione "Any" com permissão de `Create`, `Read`, `Update`.
+*   **Permissions**: Vá em Settings da coleção e configure:
+    *   **Role: Users** -> `Create`
+    *   **Role: Any** -> `Read` (para que outros vejam seu perfil)
+    *   **Document Security**: Ative a "Document Security" (nas configurações da coleção). Isso garantirá que somente o dono do documento possa editá-lo. (O script de init já tenta configurar isso).
 *   **Attributes**:
     *   `name` (string)
     *   `nickname` (string)
@@ -64,7 +67,9 @@ Abaixo estão os detalhes caso precise verificar algo manualmente:
     *   `email` (string)
 
 #### Coleção: `reviews`
-*   **Permissions**: Adicione "Any" com `Create`, `Read`.
+*   **Permissions**: 
+    *   **Role: Users** -> `Create`
+    *   **Role: Any** -> `Read`
 *   **Attributes**:
     *   `locationId` (string)
     *   `userId` (string)
@@ -87,7 +92,18 @@ Abaixo estão os detalhes caso precise verificar algo manualmente:
 
 ### 5. Criar Bucket de Armazenamento
 Vá em **Storage** > **Create Bucket** (ID: `avatars`).
-*   **Permissions**: Adicione "Any" com permissão de `Create`, `Read`, `Update`.
+*   **Permissions**: 
+    *   **Role: Users** -> `Create`
+    *   **Role: Any** -> `Read`
+    *   **File Security**: Ative a "File Security" para que apenas quem enviou possa deletar/editar sua foto.
+
+### 6. Índices de Segurança (RECOMENDADO) 🛡️
+Para evitar duplicidade e garantir performance:
+1.  **Coleção `profiles`**: Crie um índice para o atributo `nickname`.
+    *   **Type**: `Unique`
+    *   **Key**: `nickname`
+2.  **Coleção `profiles`**: Crie um índice para `userId` (Unique).
+3.  **Coleção `friendships`**: Crie um índice (Key) para `requester_id` e outro para `receiver_id`.
 
 ---
 **Quando terminar, me envie os IDs do seu Projeto e do seu Banco de Dados!**

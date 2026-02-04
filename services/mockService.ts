@@ -1,7 +1,33 @@
 import { Location, LocationType, User, Filters, FriendshipStatus, Route, Review, ActivityFeedItem, LocationEvent, GalleryItem, Report, FriendUser, Invite } from '../types';
 import { BADGES, LEVEL_THRESHOLDS, DEFAULT_LOCATION_IMAGES } from '../constants';
-import { databases, storage, APPWRITE_DATABASE_ID, APPWRITE_BUCKET_ID, APPWRITE_PROJECT_ID } from './appwriteClient';
-import { ID, Query, OAuthProvider } from 'appwrite';
+import client, { databases, storage, account, APPWRITE_DATABASE_ID, APPWRITE_BUCKET_ID, APPWRITE_PROJECT_ID } from './appwriteClient';
+export { client, databases, storage, account, APPWRITE_DATABASE_ID };
+import {
+    Account,
+    ID,
+    Query,
+    Databases,
+    Storage,
+    Permission,
+    Role
+} from 'appwrite';
+
+// --- FILE UPLOAD ---
+export const uploadFile = async (file: File): Promise<string> => {
+    try {
+        const result = await storage.createFile(
+            APPWRITE_BUCKET_ID,
+            ID.unique(),
+            file
+        );
+        // Get view URL
+        const fileUrl = storage.getFileView(APPWRITE_BUCKET_ID, result.$id);
+        return fileUrl.toString();
+    } catch (e: any) {
+        console.error("Upload failed:", e);
+        throw e;
+    }
+};
 
 // MOCK ROUTES
 const MOCK_ROUTES: Route[] = [
@@ -153,17 +179,27 @@ export const blockUser = async (blockerId: string, blockedId: string): Promise<b
 };
 
 export const getBlockedUsers = async (userId: string): Promise<string[]> => {
+    // TEMPORARY FIX: Collection 'blocked_users' might not exist yet.
+    // Returning empty array to prevent 404s and app crash.
+    // console.warn("[Appwrite] getBlockedUsers: Blocked users collection not ready. Returning empty list.");
+    return [];
+
+    /* 
+    // ORIGINAL CODE (Commented out until collection is verified)
     try {
         const response = await databases.listDocuments(
             APPWRITE_DATABASE_ID,
-            'blocked_users',
-            [Query.equal('blocker_id', userId)]
+            'blocked_users', // Ensure this ID exists in Appwrite
+            [
+                Query.equal('blocker_id', userId)
+            ]
         );
-
-        return response.documents.map((b: any) => b.blocked_id);
-    } catch (e) {
+        return response.documents.map((doc: any) => doc.blocked_id);
+    } catch (e: any) {
+        console.error("[Appwrite] getBlockedUsers error:", e.message);
         return [];
     }
+    */
 };
 
 // --- USER PROFILE MANAGEMENT ---
@@ -171,10 +207,28 @@ export const getBlockedUsers = async (userId: string): Promise<string[]> => {
 export const uploadAvatar = async (userId: string, webPath: string): Promise<string | null> => {
     try {
         console.log(`[Appwrite Storage] Uploading avatar for user: ${userId}`);
+        console.log(`[Appwrite Storage] Source webPath: ${webPath}`);
+
         const response = await fetch(webPath);
-        if (!response.ok) throw new Error("Local file fetch failed");
+        if (!response.ok) {
+            throw new Error(`Local file fetch failed: ${response.status} ${response.statusText}`);
+        }
+
         const blob = await response.blob();
+        console.log(`[Appwrite Storage] Blob size: ${blob.size} bytes`);
+        console.log(`[Appwrite Storage] Blob type: ${blob.type}`);
+
+        // Validate file size (max 5MB)
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        if (blob.size === 0) {
+            throw new Error("File is empty (0 bytes)");
+        }
+        if (blob.size > maxSize) {
+            throw new Error(`File too large: ${(blob.size / 1024 / 1024).toFixed(2)}MB (max 5MB)`);
+        }
+
         const file = new File([blob], `avatar_${userId}.jpg`, { type: 'image/jpeg' });
+        console.log(`[Appwrite Storage] File created: ${file.name}, ${file.size} bytes`);
 
         const result = await storage.createFile(
             APPWRITE_BUCKET_ID,
@@ -182,13 +236,57 @@ export const uploadAvatar = async (userId: string, webPath: string): Promise<str
             file
         );
 
-        // Appwrite Public URL for view
-        const projectUrl = `https://cloud.appwrite.io/v1/storage/buckets/${APPWRITE_BUCKET_ID}/files/${result.$id}/view?project=${APPWRITE_PROJECT_ID}`;
-        console.log("[Appwrite Storage] Public URL:", projectUrl);
-        return projectUrl;
+        console.log(`[Appwrite Storage] Upload SUCCESS! File ID: ${result.$id}`);
+
+        // Use SDK method to get proper view URL (includes correct endpoint + auth)
+        const viewUrl = storage.getFileView(APPWRITE_BUCKET_ID, result.$id);
+
+        console.log("[Appwrite Storage] SDK View URL:", viewUrl.toString());
+
+        // Test if URL is accessible
+        try {
+            const testResponse = await fetch(viewUrl.toString());
+            console.log(`[Appwrite Storage] URL Test: ${testResponse.status} ${testResponse.statusText}`);
+            if (!testResponse.ok) {
+                console.error("[Appwrite Storage] URL is NOT accessible! Status:", testResponse.status);
+            } else {
+                console.log("[Appwrite Storage] ✅ URL is accessible!");
+            }
+        } catch (testErr) {
+            console.error("[Appwrite Storage] URL accessibility test failed:", testErr);
+        }
+
+        return viewUrl.toString();
     } catch (e: any) {
         console.error("[Appwrite Storage] FATAL ERROR in uploadAvatar:", e.message || e);
+        console.error("[Appwrite Storage] Full error object:", e);
         return null;
+    }
+};
+
+export const isNicknameAvailable = async (nickname: string, excludeUserId?: string): Promise<boolean> => {
+    try {
+        const cleanNickname = nickname.trim().toLowerCase();
+        if (!cleanNickname) return false;
+
+        const response = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'profiles',
+            [
+                Query.equal('nickname', cleanNickname),
+                Query.limit(1)
+            ]
+        );
+
+        if (response.documents.length === 0) return true;
+
+        // If we are checking for an update, it's okay if the found user is the current user
+        if (excludeUserId && response.documents[0].userId === excludeUserId) return true;
+
+        return false;
+    } catch (e: any) {
+        console.error("[Appwrite] isNicknameAvailable error:", e.message);
+        return false;
     }
 };
 
@@ -215,7 +313,7 @@ export const syncUserProfile = async (authId: string, meta: any): Promise<User |
                     name: meta.full_name || meta.name || 'Novo Usuário',
                     nickname: meta.nickname || '',
                     email: meta.email || '',
-                    avatar: meta.avatar_url || '😎',
+                    avatar: meta.avatar || meta.avatar_url || '😎',
                     points: 0,
                     xp: 0,
                     level: 1,
@@ -225,7 +323,26 @@ export const syncUserProfile = async (authId: string, meta: any): Promise<User |
             );
         } else {
             profileDoc = response.documents[0];
-            console.log("[Appwrite Sync] Match found! Profile loaded.");
+            console.log("[Appwrite Sync] Profile found. Updating with new data...");
+
+            // Update existing profile with new data if provided
+            const updateData: any = {};
+            if (meta.name || meta.full_name) updateData.name = meta.full_name || meta.name;
+            if (meta.nickname) updateData.nickname = meta.nickname;
+            if (meta.email) updateData.email = meta.email;
+            if (meta.avatar || meta.avatar_url) updateData.avatar = meta.avatar || meta.avatar_url;
+            if (meta.gender) updateData.gender = meta.gender;
+
+            // Only update if there's data to update
+            if (Object.keys(updateData).length > 0) {
+                profileDoc = await databases.updateDocument(
+                    APPWRITE_DATABASE_ID,
+                    'profiles',
+                    profileDoc.$id,
+                    updateData
+                );
+                console.log("[Appwrite Sync] Profile updated successfully");
+            }
         }
 
         const user: User = {
@@ -249,8 +366,16 @@ export const syncUserProfile = async (authId: string, meta: any): Promise<User |
     }
 };
 
-export const updateUserProfile = async (userId: string, data: Partial<User>): Promise<boolean> => {
+export const updateUserProfile = async (userId: string, data: Partial<User>): Promise<{ success: boolean, error?: string }> => {
     try {
+        // 1. Check nickname uniqueness if it's being updated
+        if (data.nickname) {
+            const available = await isNicknameAvailable(data.nickname, userId);
+            if (!available) {
+                return { success: false, error: "Este apelido já está em uso." };
+            }
+        }
+
         const response = await databases.listDocuments(
             APPWRITE_DATABASE_ID,
             'profiles',
@@ -268,12 +393,12 @@ export const updateUserProfile = async (userId: string, data: Partial<User>): Pr
                     avatar: data.avatar
                 }
             );
-            return true;
+            return { success: true };
         }
-        return false;
+        return { success: false, error: "Perfil não encontrado." };
     } catch (e: any) {
         console.error("[Appwrite] updateUserProfile failed:", e.message);
-        return false;
+        return { success: false, error: e.message };
     }
 };
 
@@ -567,11 +692,44 @@ export const getFriends = async (currentUserId: string): Promise<FriendUser[]> =
     return [];
 };
 
-export const sendFriendRequest = async (currentUserId: string, targetUserId: string): Promise<boolean> => {
-    if (currentUserId.startsWith('guest_')) return false;
+export const sendFriendRequest = async (currentUserId: string, targetUserId: string): Promise<{ success: boolean, error?: string }> => {
+    console.log(`[Appwrite] Attempting to send friend request from ${currentUserId} to ${targetUserId}`);
+
+    if (!currentUserId || !targetUserId) {
+        return { success: false, error: "IDs de usuário ausentes" };
+    }
+
+    if (currentUserId.startsWith('guest_')) {
+        return { success: false, error: "Usuários convidados não podem enviar convites" };
+    }
+
+    if (currentUserId === targetUserId) {
+        return { success: false, error: "Você não pode adicionar a si mesmo" };
+    }
 
     try {
-        await databases.createDocument(
+        // Check if relationship already exists
+        const existing = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'friendships',
+            [
+                Query.or([
+                    Query.and([Query.equal('requester_id', currentUserId), Query.equal('receiver_id', targetUserId)]),
+                    Query.and([Query.equal('requester_id', targetUserId), Query.equal('receiver_id', currentUserId)])
+                ])
+            ]
+        );
+
+        if (existing.total > 0) {
+            const rel = existing.documents[0];
+            if (rel.status === 'accepted') return { success: false, error: "Vocês já são amigos!" };
+            if (rel.status === 'pending') {
+                if (rel.requester_id === currentUserId) return { success: false, error: "Você já enviou um convite." };
+                else return { success: false, error: "Você já tem um convite pendente desta pessoa." };
+            }
+        }
+
+        const doc = await databases.createDocument(
             APPWRITE_DATABASE_ID,
             'friendships',
             ID.unique(),
@@ -579,17 +737,47 @@ export const sendFriendRequest = async (currentUserId: string, targetUserId: str
                 requester_id: currentUserId,
                 receiver_id: targetUserId,
                 status: 'pending'
-            }
+            },
+            [
+                Permission.read(Role.user(currentUserId)),
+                Permission.read(Role.users()), // Allow other users to see the request
+                Permission.update(Role.user(currentUserId)),
+                Permission.update(Role.users()), // Allow the target user to update status to accepted/rejected
+                Permission.delete(Role.user(currentUserId)),
+                Permission.delete(Role.users()) // Allow either party to delete/cancel
+            ]
         );
-        return true;
+        console.log(`[Appwrite] ✅ Friend request created! Doc ID: ${doc.$id}`);
+        return { success: true };
     } catch (e: any) {
-        console.error("[Appwrite] Error sending friend request:", e.message);
-        return false;
+        console.error("[Appwrite] ❌ FATAL Error sending friend request:", e);
+        return {
+            success: false,
+            error: e.message || "Erro desconhecido no Appwrite"
+        };
     }
 };
 
 export const respondToFriendRequest = async (friendshipId: string, accept: boolean): Promise<boolean> => {
     try {
+        const currentUser = await account.get();
+
+        // Debug logs commented out after validation
+        /*
+        try {
+            const doc = await databases.getDocument(APPWRITE_DATABASE_ID, 'friendships', friendshipId);
+            console.log(`[DEBUG] Friendship Doc:`, doc);
+            console.log(`[DEBUG] Doc Permissions:`, doc.$permissions);
+            console.log(`[DEBUG] Current User:`, currentUser.$id);
+            console.log(`[DEBUG] Match Requester?`, doc.requester_id === currentUser.$id);
+            console.log(`[DEBUG] Match Receiver?`, doc.receiver_id === currentUser.$id);
+        } catch (fetchErr) {
+            console.warn("[DEBUG] Could not fetch doc to check permissions:", fetchErr);
+        }
+        */
+
+        console.log(`[FriendRequest] Processing ${friendshipId} action. Accept: ${accept}.`);
+
         if (accept) {
             await databases.updateDocument(
                 APPWRITE_DATABASE_ID,
@@ -598,6 +786,7 @@ export const respondToFriendRequest = async (friendshipId: string, accept: boole
                 { status: 'accepted' }
             );
         } else {
+            console.log(`[FriendRequest] Attempting delete...`);
             await databases.deleteDocument(
                 APPWRITE_DATABASE_ID,
                 'friendships',
@@ -730,7 +919,7 @@ export const getPendingFriendRequests = async (userId: string): Promise<FriendUs
 
 // --- REAL DATA SERVICE ---
 
-const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+export const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371e3;
     const φ1 = lat1 * Math.PI / 180;
     const φ2 = lat2 * Math.PI / 180;
@@ -1118,7 +1307,7 @@ export const getNearbyRoles = async (lat: number, lng: number): Promise<Location
         console.log(`[Appwrite] Fetching locations near [${lat}, ${lng}]`);
         const response = await databases.listDocuments(APPWRITE_DATABASE_ID, 'locations', [Query.limit(100)]);
         const dbLocations: Location[] = response.documents.map((doc: any) => {
-            const stats = doc.stats ? JSON.parse(doc.stats) : { avgCrowd: 0, avgVibe: 0, avgPrice: 0, reviewCount: 0 };
+            const stats = doc.stats ? JSON.parse(doc.stats) : { avgCrowd: 0, avgVibe: 0, avgPrice: 0, avgGender: 0, reviewCount: 0, lastUpdated: new Date() };
             return {
                 id: doc.$id,
                 name: doc.name,
@@ -1198,8 +1387,29 @@ export const createLocation = async (data: Omit<Location, 'id' | 'stats' | 'dist
     }
 };
 
-export const verifyLocation = async (id: string): Promise<Location | null> => {
+export const verifyLocation = async (id: string, userId?: string): Promise<Location | null> => {
     try {
+        // 1. Check if user already verified this (if userId provided)
+        if (userId) {
+            try {
+                const existing = await databases.listDocuments(
+                    APPWRITE_DATABASE_ID,
+                    'verifications',
+                    [
+                        Query.equal('location_id', id),
+                        Query.equal('user_id', userId),
+                        Query.limit(1)
+                    ]
+                );
+                if (existing.total > 0) {
+                    console.warn("[VerifyLocation] User already verified this location.");
+                    return null;
+                }
+            } catch (e) {
+                console.warn("[VerifyLocation] Verifications collection might not exist, skipping check.");
+            }
+        }
+
         const doc = await databases.getDocument(APPWRITE_DATABASE_ID, 'locations', id);
         const newCount = (doc.votes_for_verification || 0) + 1;
         const newVerified = doc.verified || newCount >= 10;
@@ -1213,6 +1423,19 @@ export const verifyLocation = async (id: string): Promise<Location | null> => {
                 verified: newVerified
             }
         );
+
+        // 2. Track that this user verified (Fire and forget, try-catch included)
+        if (userId) {
+            databases.createDocument(
+                APPWRITE_DATABASE_ID,
+                'verifications',
+                ID.unique(),
+                {
+                    location_id: id,
+                    user_id: userId
+                }
+            ).catch(err => console.warn("[VerifyLocation] Could not save verification record:", err.message));
+        }
 
         const stats = response.stats ? JSON.parse(response.stats) : { avgCrowd: 0, avgVibe: 0, avgPrice: 0, reviewCount: 0 };
         return {
@@ -1235,6 +1458,23 @@ export const verifyLocation = async (id: string): Promise<Location | null> => {
     } catch (e: any) {
         console.error("[Appwrite] verifyLocation failed:", e.message);
         return null;
+    }
+};
+
+export const checkVerification = async (locationId: string, userId: string): Promise<boolean> => {
+    try {
+        const response = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'verifications',
+            [
+                Query.equal('location_id', locationId),
+                Query.equal('user_id', userId),
+                Query.limit(1)
+            ]
+        );
+        return response.total > 0;
+    } catch (e) {
+        return false;
     }
 };
 
@@ -1335,7 +1575,26 @@ export const submitReview = async (review: Review, locationContext?: Location): 
         }
     }
 
-    // 2. SUBMIT REVIEW - DIRECT & SIMPLE
+    // 2. CHECK FOR EXISTING REVIEW
+    try {
+        const existing = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'reviews',
+            [
+                Query.equal('locationId', finalLocationId),
+                Query.equal('userId', review.userId),
+                Query.limit(1)
+            ]
+        );
+        if (existing.total > 0) {
+            console.warn("[SubmitReview] User already reviewed this location.");
+            return true; // Return true as if successful, but don't duplicate
+        }
+    } catch (e) {
+        console.warn("[SubmitReview] Error checking existing review:", e);
+    }
+
+    // 3. SUBMIT REVIEW - DIRECT & SIMPLE
     const payload = {
         locationId: finalLocationId,
         userId: review.userId,
@@ -1395,34 +1654,44 @@ export const submitReview = async (review: Review, locationContext?: Location): 
         // Update aggregated stats on location (Fire and forget)
         (async () => {
             try {
+                const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000);
+
                 const response = await databases.listDocuments(
                     APPWRITE_DATABASE_ID,
                     'reviews',
-                    [Query.equal('locationId', finalLocationId)]
+                    [
+                        Query.equal('locationId', finalLocationId),
+                        Query.greaterThan('$createdAt', sixHoursAgo.toISOString())
+                    ]
                 );
 
-                if (response.documents.length > 0) {
-                    const allR = response.documents;
-                    const count = allR.length;
-                    const avgCrowd = allR.reduce((acc: number, r: any) => acc + (r.crowd || 0), 0) / count;
-                    const avgVibe = allR.reduce((acc: number, r: any) => acc + (r.vibe || 0), 0) / count;
-                    const avgPrice = allR.reduce((acc: number, r: any) => acc + (r.price || 0), 0) / count;
+                const allR = response.documents;
+                const count = allR.length;
 
-                    await databases.updateDocument(
-                        APPWRITE_DATABASE_ID,
-                        'locations',
-                        finalLocationId,
-                        {
-                            stats: JSON.stringify({
-                                avgCrowd,
-                                avgVibe,
-                                avgPrice,
-                                reviewCount: count,
-                                lastUpdated: new Date().toISOString()
-                            })
-                        }
-                    );
+                let avgCrowd = 0;
+                let avgVibe = 0;
+                let avgPrice = 0;
+
+                if (count > 0) {
+                    avgCrowd = allR.reduce((acc: number, r: any) => acc + (r.crowd || 0), 0) / count;
+                    avgVibe = allR.reduce((acc: number, r: any) => acc + (r.vibe || 0), 0) / count;
+                    avgPrice = allR.reduce((acc: number, r: any) => acc + (r.price || 0), 0) / count;
                 }
+
+                await databases.updateDocument(
+                    APPWRITE_DATABASE_ID,
+                    'locations',
+                    finalLocationId,
+                    {
+                        stats: JSON.stringify({
+                            avgCrowd,
+                            avgVibe,
+                            avgPrice,
+                            reviewCount: count,
+                            lastUpdated: new Date().toISOString()
+                        })
+                    }
+                );
             } catch (err) { console.warn("Stats aggregation failed", err); }
         })();
 
@@ -1444,7 +1713,7 @@ export const getLeaderboard = async (scope: 'global' | 'friends' = 'global', cur
             APPWRITE_DATABASE_ID,
             'profiles',
             [
-                Query.orderDesc('xp'),
+                Query.orderDesc('points'),
                 Query.limit(50)
             ]
         );
@@ -1487,5 +1756,163 @@ export const submitReport = async (report: Report): Promise<boolean> => {
     } catch (e: any) {
         console.error("[Appwrite] submitReport failed:", e.message);
         return true; // Return true to not block the user flow
+    }
+};
+
+// ===== DIROLE STORIES =====
+
+export const createStory = async (
+    userId: string,
+    userName: string,
+    userNickname: string,
+    userAvatar: string,
+    locationId: string,
+    locationName: string,
+    photoUrl: string
+): Promise<boolean> => {
+    try {
+        const now = new Date();
+        const expiresAt = new Date(now.getTime() + 6 * 60 * 60 * 1000); // 6 hours
+
+        await databases.createDocument(
+            APPWRITE_DATABASE_ID,
+            'stories',
+            ID.unique(),
+            {
+                user_id: userId,
+                user_name: userName,
+                user_avatar: userAvatar,
+                location_id: locationId,
+                location_name: locationName,
+                photo_url: photoUrl,
+                created_at: now.toISOString(),
+                expires_at: expiresAt.toISOString(),
+                viewed_by: JSON.stringify([])
+            }
+        );
+        console.log('[createStory] Story created successfully!');
+        return true;
+    } catch (e: any) {
+        console.error("[createStory] Failed:", e.message);
+        return false;
+    }
+};
+
+export const getStoriesByLocation = async (locationId: string): Promise<any[]> => {
+    try {
+        const now = new Date().toISOString();
+        const response = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'stories',
+            [
+                Query.equal('location_id', locationId),
+                Query.greaterThan('expires_at', now),
+                Query.orderDesc('created_at'),
+                Query.limit(50)
+            ]
+        );
+
+        return response.documents.map((doc: any) => ({
+            id: doc.$id,
+            userId: doc.user_id,
+            userName: doc.user_name,
+            userNickname: doc.user_nickname,
+            userAvatar: doc.user_avatar,
+            locationId: doc.location_id,
+            locationName: doc.location_name,
+            photoUrl: doc.photo_url,
+            createdAt: new Date(doc.created_at),
+            expiresAt: new Date(doc.expires_at),
+            viewedBy: JSON.parse(doc.viewed_by || '[]')
+        }));
+    } catch (e: any) {
+        console.error("[getStoriesByLocation] Failed:", e.message);
+        return [];
+    }
+};
+
+export const getStoryCountsByLocations = async (locationIds: string[]): Promise<Record<string, number>> => {
+    try {
+        const now = new Date().toISOString();
+        const counts: Record<string, number> = {};
+
+        // Fetch all active stories for these locations
+        const response = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'stories',
+            [
+                Query.greaterThan('expires_at', now),
+                Query.limit(1000)
+            ]
+        );
+
+        // Count stories per location
+        response.documents.forEach((doc: any) => {
+            const locId = doc.location_id;
+            if (locationIds.includes(locId)) {
+                counts[locId] = (counts[locId] || 0) + 1;
+            }
+        });
+
+        return counts;
+    } catch (e: any) {
+        console.error("[getStoryCountsByLocations] Failed:", e.message);
+        return {};
+    }
+};
+
+export const markStoryAsViewed = async (storyId: string, userId: string): Promise<boolean> => {
+    try {
+        // Get current story
+        const story = await databases.getDocument(
+            APPWRITE_DATABASE_ID,
+            'stories',
+            storyId
+        );
+
+        const viewedBy = JSON.parse(story.viewed_by || '[]');
+        if (!viewedBy.includes(userId)) {
+            viewedBy.push(userId);
+            await databases.updateDocument(
+                APPWRITE_DATABASE_ID,
+                'stories',
+                storyId,
+                { viewed_by: JSON.stringify(viewedBy) }
+            );
+        }
+        return true;
+    } catch (e: any) {
+        console.error("[markStoryAsViewed] Failed:", e.message);
+        return false;
+    }
+};
+
+export const cleanupExpiredStories = async (): Promise<number> => {
+    try {
+        const now = new Date().toISOString();
+        const response = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'stories',
+            [
+                Query.lessThan('expires_at', now),
+                Query.limit(100)
+            ]
+        );
+
+        let deleted = 0;
+        for (const doc of response.documents) {
+            await databases.deleteDocument(
+                APPWRITE_DATABASE_ID,
+                'stories',
+                doc.$id
+            );
+            deleted++;
+        }
+
+        console.log(`[cleanupExpiredStories] Deleted ${deleted} expired stories`);
+        return deleted;
+    } catch (e: any) {
+        console.error("[cleanupExpiredStories] Failed:", e.message);
+        return 0;
     }
 };

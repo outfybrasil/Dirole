@@ -9,11 +9,17 @@ coverage
 # Production
 dist
 build
+www
+
+# Native folders (Capacitor/React Native)
+/android
+/ios
 
 # Misc
 .DS_Store
 Thumbs.db
 *.pem
+*.log
 
 # Debug
 npm-debug.log*
@@ -36,3 +42,7 @@ yarn-error.log*
 *.njsproj
 *.sln
 *.sw?
+.eslintcache
+
+# Local history
+.history/

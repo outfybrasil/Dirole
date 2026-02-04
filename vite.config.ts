@@ -22,6 +22,9 @@ export default defineConfig(({ mode }) => {
     },
     build: {
       target: 'es2020'
+    },
+    optimizeDeps: {
+      include: ['appwrite']
     }
   };
 });

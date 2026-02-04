@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Location, Review, LocationEvent, GalleryItem } from '../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Location, Review, LocationEvent, GalleryItem, Story } from '../types';
 import { Thermometer } from './Thermometer';
-import { verifyLocation, triggerHaptic, getReviewsForLocation, getEventsForLocation, getGalleryForLocation, blockUser, submitReview, getUserProfile } from '../services/mockService';
+import { verifyLocation, triggerHaptic, getReviewsForLocation, getEventsForLocation, getGalleryForLocation, blockUser, submitReview, getUserProfile, checkVerification, calculateDistance, getStoriesByLocation, markStoryAsViewed } from '../services/mockService';
+import { StoryViewer } from './StoryViewer';
 
 interface LocationDetailsModalProps {
     location: Location | null;
@@ -11,9 +12,12 @@ interface LocationDetailsModalProps {
     onClaim?: (loc: Location) => void;
     onReport?: (id: string, type: 'location' | 'review' | 'photo', name?: string) => void;
     onInvite?: (loc: Location) => void;
+    onPostStory?: (loc: Location) => void;
+    onShowToast?: (title: string, message: string, type: 'success' | 'error' | 'info') => void;
+    userLocation: { lat: number; lng: number } | null;
 }
 
-type TabType = 'overview' | 'agenda' | 'gallery';
+type TabType = 'overview' | 'agenda' | 'gallery' | 'stories';
 
 export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
     location,
@@ -22,17 +26,34 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
     onCheckIn,
     onClaim,
     onReport,
-    onInvite
+    onInvite,
+    onPostStory,
+    onShowToast,
+    userLocation
 }) => {
     const [activeTab, setActiveTab] = useState<TabType>('overview');
     const [hasVoted, setHasVoted] = useState(false);
     const [reviews, setReviews] = useState<Review[]>([]);
     const [events, setEvents] = useState<LocationEvent[]>([]);
     const [gallery, setGallery] = useState<GalleryItem[]>([]);
+    const [stories, setStories] = useState<Story[]>([]);
+    const [isStoryViewerOpen, setIsStoryViewerOpen] = useState(false);
     const [loadingData, setLoadingData] = useState(false);
 
     // Quick Vote State
     const [isVoting, setIsVoting] = useState(false);
+
+    const distance = useMemo(() => {
+        if (!userLocation || !location) return null;
+        return calculateDistance(
+            userLocation.lat,
+            userLocation.lng,
+            location.latitude,
+            location.longitude
+        );
+    }, [userLocation, location]);
+
+    const isTooFar = distance !== null && distance > 300;
 
     useEffect(() => {
         if (isOpen && location) {
@@ -51,11 +72,26 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
             Promise.all([
                 getReviewsForLocation(location.id),
                 getEventsForLocation(location),
-                getGalleryForLocation(location.id)
-            ]).then(([revs, evts, pics]) => {
+                getGalleryForLocation(location.id),
+                getStoriesByLocation(location.id)
+            ]).then(([revs, evts, pics, strs]) => {
                 setReviews(revs);
                 setEvents(evts);
                 setGallery(pics);
+                setStories(strs);
+
+                // Check if user already voted
+                const user = getUserProfile();
+                if (user) {
+                    if (revs.some(r => r.userId === user.id)) {
+                        setHasVoted(true);
+                    } else {
+                        // Check verifications collection specifically for the "Validar Local" button
+                        checkVerification(location.id, user.id).then(voted => {
+                            if (voted) setHasVoted(true);
+                        });
+                    }
+                }
             }).catch(err => {
                 console.error("Error loading location details:", err);
             }).finally(() => {
@@ -79,9 +115,26 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
     };
 
     const handleVerify = async () => {
+        const user = getUserProfile();
+        if (!user || user.id.startsWith('guest_')) {
+            alert("Faça login para validar locais!");
+            return;
+        }
+
+        // GEOFENCING CHECK
+        if (isTooFar) {
+            alert(`Você precisa estar no local para validar! 📍\nDistância atual: ${Math.round(distance || 0)}m`);
+            return;
+        }
+
+        if (!userLocation) {
+            alert("Ative seu GPS para validar este local!");
+            return;
+        }
+
         triggerHaptic();
         setHasVoted(true);
-        await verifyLocation(location.id);
+        await verifyLocation(location.id, user.id);
     }
 
     const handleQuickVote = async (crowdLevel: number, vibeLevel: number) => {
@@ -91,6 +144,17 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
                 onClose();
                 // Logic to redirect to login handled by parent usually, but here we just close
             }
+            return;
+        }
+
+        // GEOFENCING CHECK
+        if (isTooFar) {
+            alert(`Você precisa estar no local para o check-in rápido! 📍\nDistância atual: ${Math.round(distance || 0)}m`);
+            return;
+        }
+
+        if (!userLocation) {
+            alert("Ative seu GPS para fazer o check-in rápido!");
             return;
         }
 
@@ -138,12 +202,15 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
 
     const handleShare = async () => {
         triggerHaptic();
+        const shareUrl = `${window.location.origin}/?loc=${location.id}`;
+        const shareText = `Olha esse rolê no Dirole: ${location.name} - ${location.address}`;
+
         if (navigator.share) {
             try {
                 await navigator.share({
                     title: `Vem pro ${location.name}!`,
-                    text: `Olha esse lugar que achei no Dirole: ${location.name} - ${location.address}`,
-                    url: window.location.href
+                    text: shareText,
+                    url: shareUrl
                 });
             } catch (error) {
                 console.log('Error sharing:', error);
@@ -151,8 +218,12 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
         } else {
             // Fallback for desktop or non-supported browsers
             try {
-                await navigator.clipboard.writeText(`${location.name} - ${location.address}`);
-                alert("Link copiado para a área de transferência!");
+                await navigator.clipboard.writeText(shareUrl);
+                if (onShowToast) {
+                    onShowToast("Link Copiado! 🔗", "Compartilhe com seus amigos.", 'success');
+                } else {
+                    alert("Link copiado para a área de transferência!");
+                }
             } catch (err) {
                 console.error('Failed to copy', err);
             }
@@ -172,29 +243,29 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
                     <div className="flex gap-2">
                         <button
                             onClick={() => handleQuickVote(3, 3)}
-                            disabled={isVoting}
-                            className="flex-1 bg-red-500/20 border border-red-500/50 hover:bg-red-500/40 text-white py-3 rounded-lg flex flex-col items-center gap-1 transition-all active:scale-95"
+                            disabled={isVoting || isTooFar}
+                            className={`flex-1 ${isTooFar ? 'bg-slate-800 border-white/5 text-slate-500 opacity-50 grayscale' : 'bg-red-500/20 border-red-500/50 hover:bg-red-500/40 text-white'} border py-3 rounded-lg flex flex-col items-center gap-1 transition-all active:scale-95`}
                         >
                             <span className="text-xl">🔥</span>
-                            <span className="text-[10px] font-bold uppercase">Bombando</span>
+                            <span className="text-[10px] font-bold uppercase">{isTooFar ? 'Bloqueado' : 'Bombando'}</span>
                         </button>
 
                         <button
                             onClick={() => handleQuickVote(2, 2)}
-                            disabled={isVoting}
-                            className="flex-1 bg-yellow-500/20 border border-yellow-500/50 hover:bg-yellow-500/40 text-white py-3 rounded-lg flex flex-col items-center gap-1 transition-all active:scale-95"
+                            disabled={isVoting || isTooFar}
+                            className={`flex-1 ${isTooFar ? 'bg-slate-800 border-white/5 text-slate-500 opacity-50 grayscale' : 'bg-yellow-500/20 border-yellow-500/50 hover:bg-yellow-500/40 text-white'} border py-3 rounded-lg flex flex-col items-center gap-1 transition-all active:scale-95`}
                         >
                             <span className="text-xl">🙂</span>
-                            <span className="text-[10px] font-bold uppercase">Legal</span>
+                            <span className="text-[10px] font-bold uppercase">{isTooFar ? 'Bloqueado' : 'Legal'}</span>
                         </button>
 
                         <button
                             onClick={() => handleQuickVote(1, 1)}
-                            disabled={isVoting}
-                            className="flex-1 bg-blue-500/20 border border-blue-500/50 hover:bg-blue-500/40 text-white py-3 rounded-lg flex flex-col items-center gap-1 transition-all active:scale-95"
+                            disabled={isVoting || isTooFar}
+                            className={`flex-1 ${isTooFar ? 'bg-slate-800 border-white/5 text-slate-500 opacity-50 grayscale' : 'bg-blue-500/20 border-blue-500/50 hover:bg-blue-500/40 text-white'} border py-3 rounded-lg flex flex-col items-center gap-1 transition-all active:scale-95`}
                         >
                             <span className="text-xl">🧊</span>
-                            <span className="text-[10px] font-bold uppercase">Vazio</span>
+                            <span className="text-[10px] font-bold uppercase">{isTooFar ? 'Bloqueado' : 'Vazio'}</span>
                         </button>
                     </div>
                 </div>
@@ -259,7 +330,11 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
                         <p className="text-[10px] text-slate-400">Este local foi criado recentemente pela comunidade.</p>
                     </div>
                     {!hasVoted ? (
-                        <button onClick={handleVerify} className="px-3 py-1.5 bg-yellow-600 text-white text-xs font-bold rounded-lg hover:bg-yellow-500 transition-colors whitespace-nowrap">
+                        <button
+                            onClick={handleVerify}
+                            disabled={isTooFar}
+                            className={`px-3 py-1.5 ${isTooFar ? 'bg-slate-800 text-slate-500 border border-white/10 cursor-not-allowed' : 'bg-yellow-600 text-white hover:bg-yellow-500 transition-colors'} text-xs font-bold rounded-lg whitespace-nowrap`}
+                        >
                             Validar Local
                         </button>
                     ) : (
@@ -443,6 +518,40 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
         </div>
     );
 
+    const renderStories = () => (
+        <div className="space-y-4 animate-fade-in">
+            {stories.length === 0 ? (
+                <div className="text-center py-12">
+                    <i className="fas fa-camera text-slate-600 text-4xl mb-3"></i>
+                    <p className="text-slate-400 text-sm">Nenhum story ativo neste local</p>
+                    <p className="text-slate-500 text-xs mt-1">Stories expiram em 6 horas</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-3 gap-3">
+                    {stories.map((story) => (
+                        <button
+                            key={story.id}
+                            onClick={() => {
+                                triggerHaptic();
+                                setIsStoryViewerOpen(true);
+                            }}
+                            className="relative aspect-[9/16] rounded-2xl overflow-hidden border-2 border-purple-500 hover:scale-105 transition-transform"
+                        >
+                            <img
+                                src={story.photoUrl}
+                                alt="Story"
+                                className="w-full h-full object-cover"
+                            />
+                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                                <p className="text-white text-xs font-bold truncate">{story.userNickname || story.userName}</p>
+                            </div>
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+
     return (
         <div className="fixed inset-0 z-[500] flex items-end sm:items-center justify-center pointer-events-none sm:p-4">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] pointer-events-auto transition-opacity duration-500" onClick={onClose}></div>
@@ -466,6 +575,9 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
                                 <div className="flex items-center gap-2 mb-2">
                                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${location.verified ? 'text-dirole-primary bg-dirole-primary/10 border-dirole-primary/20' : 'text-slate-400 bg-slate-800/50 border-white/10'}`}>
                                         {location.type}
+                                    </span>
+                                    <span className="text-xs font-black text-slate-500 tracking-[0.2em] ml-2">
+                                        {'$'.repeat(Math.max(1, Math.min(3, Math.round(location.stats.avgPrice || 1))))}
                                     </span>
                                     {location.verified && <span className="text-[10px] text-green-400 font-bold flex items-center gap-1"><i className="fas fa-check-circle"></i> Oficial</span>}
                                 </div>
@@ -502,12 +614,20 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
                         FOTOS
                         {activeTab === 'gallery' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-dirole-primary to-dirole-secondary shadow-[0_0_15px_#8b5cf6]"></div>}
                     </button>
+                    <button
+                        onClick={() => { triggerHaptic(); setActiveTab('stories'); }}
+                        className={`py-4 relative transition-colors tracking-wide ${activeTab === 'stories' ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                    >
+                        STORIES {stories.length > 0 && `(${stories.length})`}
+                        {activeTab === 'stories' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-purple-500 to-pink-500 shadow-[0_0_15px_#a855f7]"></div>}
+                    </button>
                 </div>
 
                 <div className="flex-1 overflow-y-auto px-6 pb-32 pt-6 custom-scrollbar">
                     {activeTab === 'overview' && renderOverview()}
                     {activeTab === 'agenda' && renderAgenda()}
                     {activeTab === 'gallery' && renderGallery()}
+                    {activeTab === 'stories' && renderStories()}
                 </div>
 
                 {/* Floating Bottom Bar */}
@@ -539,13 +659,46 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
                         </button>
                     </div>
 
+                    {/* Story Button - Second Row */}
+                    {onPostStory && (
+                        <div className="mb-3">
+                            <button
+                                onClick={() => { triggerHaptic(); onPostStory(location); }}
+                                disabled={isTooFar}
+                                className={`w-full ${isTooFar ? 'bg-slate-800 text-slate-500 border-white/5 cursor-not-allowed grayscale' : 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-[0_5px_20px_rgba(168,85,247,0.3)] hover:shadow-[0_5px_30px_rgba(168,85,247,0.5)]'} font-black py-4 rounded-2xl active:scale-95 transition-all flex items-center justify-center gap-2 border border-white/10`}
+                            >
+                                <i className="fas fa-camera"></i> {isTooFar ? 'LONGE DEMAIS' : 'POSTAR STORY'}
+                            </button>
+                        </div>
+                    )}
+
                     <button
                         onClick={() => { triggerHaptic(); onClose(); onCheckIn(location); }}
-                        className="w-full bg-gradient-to-r from-dirole-primary to-dirole-secondary text-white font-black py-4 rounded-2xl shadow-[0_5px_20px_rgba(139,92,246,0.3)] hover:shadow-[0_5px_30px_rgba(139,92,246,0.5)] active:scale-95 transition-all flex items-center justify-center gap-2 border border-white/10"
+                        disabled={isTooFar}
+                        className={`w-full ${isTooFar ? 'bg-slate-800 text-slate-500 border-white/5 cursor-not-allowed grayscale shadow-none' : 'bg-gradient-to-r from-dirole-primary to-dirole-secondary text-white shadow-[0_5px_20px_rgba(139,92,246,0.3)] hover:shadow-[0_5px_30px_rgba(139,92,246,0.5)]'} font-black py-4 rounded-2xl active:scale-95 transition-all flex items-center justify-center gap-2 border border-white/10`}
                     >
-                        <i className="fas fa-edit"></i> CHECK-IN DETALHADO
+                        <i className="fas fa-edit"></i> {isTooFar ? 'LONGE DEMAIS' : 'CHECK-IN DETALHADO'}
                     </button>
+                    {isTooFar && (
+                        <p className="text-center text-[10px] font-black text-red-500/80 uppercase tracking-[0.2em] mt-3 animate-pulse">
+                            📍 Fora de alcance ({Math.round(distance || 0)}m / Limite 300m)
+                        </p>
+                    )}
                 </div>
+
+                {/* Story Viewer */}
+                {isStoryViewerOpen && stories.length > 0 && (
+                    <StoryViewer
+                        isOpen={isStoryViewerOpen}
+                        stories={stories}
+                        currentUserId={getUserProfile()?.id || ''}
+                        onClose={() => setIsStoryViewerOpen(false)}
+                        onStoryViewed={(storyId) => {
+                            const user = getUserProfile();
+                            if (user) markStoryAsViewed(storyId, user.id);
+                        }}
+                    />
+                )}
 
             </div>
         </div >

@@ -149,21 +149,26 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
 
             // 3. Atualizar no Appwrite
             if (!updatedUser.id.startsWith('guest_')) {
-                try {
-                    await updateUserProfile(updatedUser.id, {
-                        name: trimmedName,
-                        nickname: trimmedNickname,
-                        avatar: finalAvatar
-                    });
-                } catch (sErr: any) {
-                    console.warn("[Profile] Appwrite update failed:", sErr.message);
+                const result = await updateUserProfile(updatedUser.id, {
+                    name: trimmedName,
+                    nickname: trimmedNickname,
+                    avatar: finalAvatar
+                });
+
+                if (!result.success) {
+                    if (onShowToast) onShowToast(result.error || "Erro ao atualizar perfil", 'error');
+                    setIsSaving(false);
+                    return;
                 }
             }
 
             // 4. Fechar e Atualizar App
             console.log("[Profile] Finalizando...");
             onSave(updatedUser);
+            if (onClose) onClose(); // Close modal on success
             if (onShowToast) onShowToast("Perfil atualizado! 🚀", 'success');
+            // Force reload removed. Updating via state callbacks.
+            // window.location.reload();
 
         } catch (err: any) {
             console.error("[Profile] Erro crítico:", err);
@@ -224,7 +229,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                             )}
                         </div>
                         <div>
-                            <h2 className="text-2xl font-black text-white leading-tight tracking-tight">{nickname || name || 'Paparazzo'}</h2>
+                            <h2 className="text-2xl font-black text-white leading-tight tracking-tighter italic uppercase pr-4 truncate">{nickname || name || 'Paparazzo'}</h2>
                             <p className="text-dirole-secondary font-black text-[10px] tracking-[0.2em] uppercase mt-1">
                                 {isGuest ? 'CONVIDADO' : currentLevel.label.toUpperCase()}
                             </p>
@@ -356,6 +361,28 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                                                 </div>
                                             </button>
                                         </div>
+
+                                        {/* Troféus Section */}
+                                        {!isGuest && currentUser?.badges && currentUser.badges.length > 0 && (
+                                            <div className="bg-white/5 p-6 rounded-[2rem] border border-white/5">
+                                                <div className="flex items-center gap-2 mb-4">
+                                                    <i className="fas fa-trophy text-yellow-500 text-lg"></i>
+                                                    <h3 className="text-sm font-black text-white uppercase tracking-widest">Troféus Desbloqueados</h3>
+                                                </div>
+                                                <div className="grid grid-cols-4 gap-3">
+                                                    {currentUser.badges.map((badge) => (
+                                                        <div
+                                                            key={badge.id}
+                                                            className="group relative bg-white/5 border border-white/10 rounded-2xl p-3 flex flex-col items-center justify-center hover:bg-white/10 hover:border-yellow-500/30 transition-all cursor-pointer"
+                                                            title={`${badge.name}: ${badge.description}`}
+                                                        >
+                                                            <span className="text-3xl mb-1">{badge.icon}</span>
+                                                            <span className="text-[8px] font-black text-slate-400 uppercase text-center leading-tight group-hover:text-yellow-500 transition-colors">{badge.name}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
 

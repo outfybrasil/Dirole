@@ -48,7 +48,8 @@ const COLLECTIONS = [
             { key: 'favorites', type: 'string', size: 2000, required: false, default: '[]' }
         ],
         indexes: [
-            { key: 'idx_userId', type: 'unique', attributes: ['userId'] }
+            { key: 'idx_userId', type: 'unique', attributes: ['userId'] },
+            { key: 'idx_nickname', type: 'unique', attributes: ['nickname'] }
         ]
     },
     {
@@ -116,6 +117,26 @@ const COLLECTIONS = [
             { key: 'reporterId', type: 'string', size: 255, required: true },
             { key: 'reason', type: 'string', size: 500, required: true },
             { key: 'status', type: 'string', size: 50, required: false, default: 'open' }
+        ]
+    },
+    {
+        id: 'stories',
+        name: 'Dirole Stories',
+        attributes: [
+            { key: 'user_id', type: 'string', size: 255, required: true },
+            { key: 'user_name', type: 'string', size: 255, required: true },
+            { key: 'user_nickname', type: 'string', size: 255, required: false },
+            { key: 'user_avatar', type: 'string', size: 500, required: true },
+            { key: 'location_id', type: 'string', size: 255, required: true },
+            { key: 'location_name', type: 'string', size: 255, required: true },
+            { key: 'photo_url', type: 'string', size: 1000, required: true },
+            { key: 'created_at', type: 'string', size: 50, required: true },
+            { key: 'expires_at', type: 'string', size: 50, required: true },
+            { key: 'viewed_by', type: 'string', size: 10000, required: true }
+        ],
+        indexes: [
+            { key: 'idx_location_id', type: 'key', attributes: ['location_id'] },
+            { key: 'idx_expires_at', type: 'key', attributes: ['expires_at'] }
         ]
     }
 ];
