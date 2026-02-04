@@ -304,23 +304,42 @@ export const syncUserProfile = async (authId: string, meta: any): Promise<User |
 
         if (response.documents.length === 0) {
             console.log("[Appwrite Sync] Profile not found. Creating emergency profile...");
-            profileDoc = await databases.createDocument(
-                APPWRITE_DATABASE_ID,
-                'profiles',
-                ID.unique(),
-                {
-                    userId: authId,
-                    name: meta.full_name || meta.name || 'Novo Usuário',
-                    nickname: meta.nickname || '',
-                    email: meta.email || '',
-                    avatar: meta.avatar || meta.avatar_url || '😎',
-                    points: 0,
-                    xp: 0,
-                    level: 1,
-                    gender: meta.gender || 'Outro',
-                    badges: JSON.stringify([])
+            try {
+                profileDoc = await databases.createDocument(
+                    APPWRITE_DATABASE_ID,
+                    'profiles',
+                    ID.unique(),
+                    {
+                        userId: authId,
+                        name: meta.full_name || meta.name || 'Novo Usuário',
+                        nickname: meta.nickname || '',
+                        email: meta.email || '',
+                        avatar: meta.avatar || meta.avatar_url || '😎',
+                        points: 0,
+                        xp: 0,
+                        level: 1,
+                        gender: meta.gender || 'Outro',
+                        badges: JSON.stringify([])
+                    }
+                );
+            } catch (createError: any) {
+                // Handle race condition: another process already created the profile
+                if (createError.code === 409 || createError.message?.includes('already exists')) {
+                    console.log("[Appwrite Sync] Profile was created by another process. Fetching it...");
+                    const retryResponse = await databases.listDocuments(
+                        APPWRITE_DATABASE_ID,
+                        'profiles',
+                        [Query.equal('userId', authId), Query.limit(1)]
+                    );
+                    if (retryResponse.documents.length > 0) {
+                        profileDoc = retryResponse.documents[0];
+                    } else {
+                        throw new Error("Profile creation failed and retry fetch returned no results");
+                    }
+                } else {
+                    throw createError;
                 }
-            );
+            }
         } else {
             profileDoc = response.documents[0];
             console.log("[Appwrite Sync] Profile found. Updating with new data...");
@@ -1781,8 +1800,6 @@ export const createStory = async (
             {
                 user_id: userId,
                 user_name: userName,
-                user_nickname: userNickname,
-
                 user_avatar: userAvatar,
                 location_id: locationId,
                 location_name: locationName,
@@ -1818,7 +1835,6 @@ export const getStoriesByLocation = async (locationId: string): Promise<any[]> =
             id: doc.$id,
             userId: doc.user_id,
             userName: doc.user_name,
-            userNickname: doc.user_nickname,
             userAvatar: doc.user_avatar,
             locationId: doc.location_id,
             locationName: doc.location_name,

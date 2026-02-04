@@ -36,6 +36,13 @@ export const signInWithGoogle = async () => {
             redirectUrl = 'dirole://auth/callback';
         }
 
+        // Tenta deletar qualquer sessão existente (ex: convidado) antes do OAuth
+        try {
+            await account.deleteSession('current');
+        } catch (e) {
+            // Ignora se não houver sessão
+        }
+
         // Redireciona para o Google OAuth do Appwrite
         // successUrl = redirectUrl, failureUrl = redirectUrl
         return account.createOAuth2Session('google' as any, redirectUrl, redirectUrl);

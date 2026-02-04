@@ -26,6 +26,7 @@ async function createStoriesCollection() {
         // Create attributes
         await databases.createStringAttribute(DATABASE_ID, 'stories', 'user_id', 255, true);
         await databases.createStringAttribute(DATABASE_ID, 'stories', 'user_name', 255, true);
+        await databases.createStringAttribute(DATABASE_ID, 'stories', 'user_nickname', 255, false); // Optional
         await databases.createStringAttribute(DATABASE_ID, 'stories', 'user_avatar', 500, true);
         await databases.createStringAttribute(DATABASE_ID, 'stories', 'location_id', 255, true);
         await databases.createStringAttribute(DATABASE_ID, 'stories', 'location_name', 255, true);

@@ -35,13 +35,66 @@ import { PWAInstallBanner } from './components/PWAInstallBanner';
 
 function App() {
   const [showSplash, setShowSplash] = useState(true);
-  // ... (existing code) ...
   const [isDataModalOpen, setIsDataModalOpen] = useState(false);
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [isEmailUnverified, setIsEmailUnverified] = useState(false);
   const [verificationEmail, setVerificationEmail] = useState('');
+  const [isAuthChecking, setIsAuthChecking] = useState(true);
+
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  // App State (Only rendered if currentUser exists)
+  const [activeTab, setActiveTab] = useState<'map' | 'list' | 'rank'>('map');
+  const [locations, setLocations] = useState<Location[]>([]);
+
+  // LOCATION STATES
+  const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
+  const [userAccuracy, setUserAccuracy] = useState<number>(0);
+  const [mapTarget, setMapTarget] = useState<{ lat: number, lng: number } | null>(null);
+  const [currentMapCenter, setCurrentMapCenter] = useState<{ lat: number, lng: number } | null>(null);
+  const [searchOrigin, setSearchOrigin] = useState<{ lat: number, lng: number } | null>(null);
+
+  const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasInitialLoad, setHasInitialLoad] = useState(false);
+
+  // Modals
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+  const [isStoryCameraOpen, setIsStoryCameraOpen] = useState(false);
+  const [storyLocation, setStoryLocation] = useState<Location | null>(null);
+  const [storyCounts, setStoryCounts] = useState<Record<string, number>>({});
+
+  const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
+  const [friendsModalTab, setFriendsModalTab] = useState<'my_friends' | 'requests' | 'search'>('my_friends');
+  const [friendsModalView, setFriendsModalView] = useState<'default' | 'qr'>('default');
+
+  const [reportTarget, setReportTarget] = useState<{ id: string, type: 'location' | 'review' | 'photo' | 'user', name?: string } | null>(null);
+
+  // UI State
+  const [showFilters, setShowFilters] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [toasts, setToasts] = useState<ToastData[]>([]);
+  const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
+  const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
+  const [notificationCount, setNotificationCount] = useState(0);
+
+  // PULL TO REFRESH STATE
+  const [pullY, setPullY] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const startY = useRef(0);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // PWA Install Prompt State
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
 
   // User State  // --- 0. DEV SANITY: CLEAR SERVICE WORKERS ---
   useEffect(() => {
@@ -71,80 +124,48 @@ function App() {
         .then(() => {
           // Remove params from URL
           window.history.replaceState({}, '', window.location.pathname);
-          // Show success toast (deferred until component mount logic handles it, or just generic alert for now)
-          alert("E-mail verificado com sucesso! 🎉 Você pode usar o app agora.");
-          // Force reload to update session state if logged in
-          window.location.reload();
+          addToast({
+            title: "Sucesso! 🎉",
+            message: "E-mail verificado com sucesso! Você pode usar o app agora.",
+            type: 'success'
+          });
+          // Small delay before reload to let toast show? Or skip reload if we can
+          setTimeout(() => window.location.reload(), 2000);
         })
         .catch((err) => {
-          console.error("[Auth] Verification failed", err);
-          alert("Falha ao verificar e-mail. O link pode ter expirado.");
+          addToast({
+            title: "Erro",
+            message: "Falha ao verificar e-mail. O link pode ter expirado.",
+            type: 'error'
+          });
         });
     }
 
-    return () => window.removeEventListener('open-add-location', handleOpenAdd);
+    // CHECK FOR AUTH ERRORS IN URL (e.g. from Appwrite OAuth)
+    const errorParam = urlParams.get('error');
+    if (errorParam) {
+      try {
+        const errorObj = JSON.parse(errorParam);
+        addToast({
+          title: "Erro de Autenticação",
+          message: errorObj.message || "Ocorreu um problema ao entrar.",
+          type: 'error'
+        });
+      } catch (e) {
+        addToast({
+          title: "Erro",
+          message: errorParam,
+          type: 'error'
+        });
+      }
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+
+    return () => {
+      window.removeEventListener('open-add-location', handleOpenAdd);
+    };
   }, []);
-
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-
-  // App State (Only rendered if currentUser exists)
-  const [activeTab, setActiveTab] = useState<'map' | 'list' | 'rank'>('map');
-  const [locations, setLocations] = useState<Location[]>([]);
-
-  // LOCATION STATES
-  // 1. Onde o usuário REALMENTE está (GPS / Ponto Azul)
-  const [userLocation, setUserLocation] = useState<{ lat: number, lng: number } | null>(null);
-  const [userAccuracy, setUserAccuracy] = useState<number>(0); // Raio de precisão em metros
-
-  // 2. Onde a câmera do mapa deve focar (Centro do Mapa)
-  const [mapTarget, setMapTarget] = useState<{ lat: number, lng: number } | null>(null);
-
-  // 3. Onde o usuário está olhando manualmente (ao arrastar o mapa)
-  const [currentMapCenter, setCurrentMapCenter] = useState<{ lat: number, lng: number } | null>(null);
-
-  // 4. Origem da busca (para a API)
-  const [searchOrigin, setSearchOrigin] = useState<{ lat: number, lng: number } | null>(null);
-
-  const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasInitialLoad, setHasInitialLoad] = useState(false);
-
-  // Modals
-  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
-  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const [isClaimModalOpen, setIsClaimModalOpen] = useState(false);
-  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
-  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
-  const [isStoryCameraOpen, setIsStoryCameraOpen] = useState(false);
-  const [storyLocation, setStoryLocation] = useState<Location | null>(null);
-  const [storyCounts, setStoryCounts] = useState<Record<string, number>>({});
-
-
-  const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
-  const [friendsModalTab, setFriendsModalTab] = useState<'my_friends' | 'requests' | 'search'>('my_friends');
-  const [friendsModalView, setFriendsModalView] = useState<'default' | 'qr'>('default');
-
-  const [reportTarget, setReportTarget] = useState<{ id: string, type: 'location' | 'review' | 'photo' | 'user', name?: string } | null>(null);
-
-  // UI State
-  const [showFilters, setShowFilters] = useState(false);
-  const [showConfetti, setShowConfetti] = useState(false);
-  const [toasts, setToasts] = useState<ToastData[]>([]);
-  const [isNotificationsModalOpen, setIsNotificationsModalOpen] = useState(false);
-  const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
-  const [notificationCount, setNotificationCount] = useState(0);
-
-  // PULL TO REFRESH STATE
-  const [pullY, setPullY] = useState(0);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const startY = useRef(0);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-
-  // PWA Install Prompt State
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
-  const [showInstallBanner, setShowInstallBanner] = useState(false);
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (e: any) => {
@@ -154,7 +175,6 @@ function App() {
       setDeferredPrompt(e);
       // Update UI notify the user they can install the PWA
       setShowInstallBanner(true);
-      console.log('beforeinstallprompt event was fired');
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
@@ -172,7 +192,6 @@ function App() {
     deferredPrompt.prompt();
     // Wait for the user to respond to the prompt
     const { outcome } = await deferredPrompt.userChoice;
-    console.log(`User response to the install prompt: ${outcome}`);
     // We've used the prompt, and can't use it again, throw it away
     setDeferredPrompt(null);
     setShowInstallBanner(false);
@@ -209,7 +228,7 @@ function App() {
     lowCost: false,
     types: [],
     maxDistance: 3,
-    onlyOpen: false // Initialize new filter
+    onlyOpen: false
   });
 
   // Map Theme State
@@ -219,7 +238,7 @@ function App() {
   useEffect(() => {
     const handleOnline = () => {
       setIsOffline(false);
-      addToast({ title: "Conectado!", message: "Você está online novamente.", type: "system", actionLabel: "OK", action: () => { } });
+      addToast({ title: "Conectado!", message: "Você está online novamente.", type: "system" });
     };
     const handleOffline = () => setIsOffline(true);
 
@@ -239,18 +258,14 @@ function App() {
   // Calculate if we should show the "Search Here" button
   const shouldShowSearchHere = useMemo(() => {
     if (!currentMapCenter || !searchOrigin) return false;
-    // Calculate distance between current center and last search origin
-    // Approx calc for UI toggle
     const latDiff = Math.abs(currentMapCenter.lat - searchOrigin.lat);
     const lngDiff = Math.abs(currentMapCenter.lng - searchOrigin.lng);
-    // Rough estimate: > 0.02 degrees is approx > 2km
     return latDiff > 0.02 || lngDiff > 0.02;
   }, [currentMapCenter, searchOrigin]);
 
   // Splash Screen Timer
   useEffect(() => {
     const timer = setTimeout(() => {
-      console.log("[App] Splash Timeout Reached - Unmounting Splash");
       setShowSplash(false);
       requestNotificationPermission();
 
@@ -263,56 +278,6 @@ function App() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Check Appwrite Session & Load Local Profile
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        // 1. Check Local Storage first for fast UI
-        const localProfile = getUserProfile();
-        if (localProfile) {
-          setCurrentUser(localProfile);
-        }
-
-        // 2. Verify with Appwrite Session
-        const session = await getCurrentSession();
-
-        if (session) {
-
-          // CHECK EMAIL VERIFICATION
-          if (session.emailVerification === false) {
-            console.log("[Auth] Email not verified. Blocking access.");
-            setIsEmailUnverified(true);
-            setVerificationEmail(session.email);
-            // We still assume user is "logged in" for session purposes, but UI is blocked
-            // return; // Optional: stop profile sync if unverified
-          }
-
-          // Sync profile
-          const syncedUser = await syncUserProfile(session.userId, {
-            email: session.email,
-            name: session.name,
-            // Add other meta if needed
-          });
-
-          if (syncedUser) {
-            setCurrentUser(syncedUser);
-          }
-        } else {
-          console.log("[Auth] No active session.");
-          if (localProfile) {
-            // Optional: clear local profile if no session exists
-            // setCurrentUser(null);
-            // localStorage.removeItem('dirole_user_profile');
-          }
-        }
-      } catch (err) {
-        console.error("[Auth] Session check failed:", err);
-      }
-    };
-
-    initAuth();
-  }, []);
-
   // --- NOTIFICATION HANDLERS ---
   const addToast = useCallback((toast: Omit<ToastData, 'id'>) => {
     const id = Math.random().toString(36).substr(2, 9);
@@ -321,6 +286,47 @@ function App() {
 
   const removeToast = useCallback((id: string) => {
     setToasts(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  // Check Appwrite Session & Load Local Profile
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        const localProfile = getUserProfile();
+        if (localProfile) {
+          setCurrentUser(localProfile);
+        }
+
+        const session = await getCurrentSession();
+
+        if (session) {
+          if (session.emailVerification === false) {
+            setIsEmailUnverified(true);
+            setVerificationEmail(session.email);
+          } else {
+            setIsEmailUnverified(false);
+          }
+
+          const syncedUser = await syncUserProfile(session.userId, {
+            email: session.email,
+            name: session.name,
+          });
+
+          if (syncedUser) {
+            setCurrentUser(syncedUser);
+          }
+        } else {
+          setCurrentUser(null);
+          localStorage.removeItem('dirole_user_profile');
+        }
+      } catch (err) {
+        // Silently fail auth check if needed
+      } finally {
+        setIsAuthChecking(false);
+      }
+    };
+
+    initAuth();
   }, []);
 
   const previousCountRef = useRef(0);
@@ -933,7 +939,11 @@ function App() {
       console.log("Friend ID extracted:", friendId);
 
       if (friendId === currentUser?.id) {
-        alert("Você escaneou seu próprio código!");
+        addToast({
+          title: "Código Próprio",
+          message: "Você escaneou seu próprio código!",
+          type: 'info'
+        });
         return;
       }
 
@@ -963,9 +973,15 @@ function App() {
     }
 
     if (decodedText.startsWith('http')) {
-      const confirm = window.confirm(`Abrir link detectado?\n${decodedText}`);
-      if (confirm) window.open(decodedText, '_blank');
-    } else {
+      addToast({
+        title: "Link Detectado",
+        message: "Clique para abrir o link externo.",
+        type: 'info',
+        actionLabel: "ABRIR",
+        action: () => window.open(decodedText, '_blank')
+      });
+    }
+    else {
       addToast({
         title: "QR Code Lido",
         message: decodedText,
@@ -979,48 +995,62 @@ function App() {
     setActiveTab(tab);
   }
 
-  // --- 1. SPLASH SCREEN ---
-  if (showSplash) {
-    return (
-      <div className="fixed inset-0 h-[100dvh] w-full bg-[#0f0518] flex flex-col items-center justify-center relative overflow-hidden z-[9999]">
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-black to-blue-900/20"></div>
-        <div className="z-10 text-center animate-fade-in flex flex-col items-center">
-          <div className="w-32 h-32 mb-6 relative">
-            <div className="absolute inset-0 bg-dirole-primary/30 blur-3xl animate-pulse"></div>
-            <img
-              src="/og-image.png"
-              alt="Dirole Logo"
-              className="w-full h-full object-contain relative z-10 drop-shadow-[0_0_20px_rgba(139,92,246,0.3)]"
-            />
-          </div>
-          <h1 className="text-6xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-dirole-primary via-dirole-secondary to-orange-400 mb-2 animate-pulse-slow drop-shadow-[0_0_15px_rgba(139,92,246,0.5)] px-4 no-clip">
-            DIROLE
-          </h1>
-          <p className="text-slate-400 font-bold tracking-widest text-xs uppercase opacity-80">O Termômetro do Rolê</p>
-          <div className="mt-10 flex justify-center">
-            <div className="w-6 h-6 border-2 border-dirole-primary/30 border-t-dirole-primary rounded-full animate-spin"></div>
+  // --- 1. RENDER LOGIC ---
+  const renderAuthFlow = () => {
+    if (showSplash || isAuthChecking) {
+      return (
+        <div className="fixed inset-0 h-[100dvh] w-full bg-[#0f0518] flex flex-col items-center justify-center relative overflow-hidden z-[9999]">
+          <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-black to-blue-900/20"></div>
+          <div className="z-10 text-center animate-fade-in flex flex-col items-center">
+            <div className="w-32 h-32 mb-6 relative">
+              <div className="absolute inset-0 bg-dirole-primary/30 blur-3xl animate-pulse"></div>
+              <img
+                src="/og-image.png"
+                alt="Dirole Logo"
+                className="w-full h-full object-contain relative z-10 drop-shadow-[0_0_20px_rgba(139,92,246,0.3)]"
+              />
+            </div>
+            <h1 className="text-6xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-dirole-primary via-dirole-secondary to-orange-400 mb-2 animate-pulse-slow drop-shadow-[0_0_15px_rgba(139,92,246,0.5)] px-4 no-clip">
+              DIROLE
+            </h1>
+            <p className="text-slate-400 font-bold tracking-widest text-xs uppercase opacity-80">O Termômetro do Rolê</p>
+            <div className="mt-10 flex justify-center">
+              <div className="w-10 h-10 border-4 border-dirole-primary/30 border-t-dirole-primary rounded-full animate-spin"></div>
+            </div>
           </div>
         </div>
-      </div>
-    );
-  }
-
-  // --- 2. LANDING PAGE & LOGIN FLOW (If not authenticated) ---
-  if (!currentUser) {
-    if (showLogin) {
-      return <LoginScreen onLoginSuccess={setCurrentUser} />;
+      );
     }
-    return <LandingPage onEnter={() => setShowLogin(true)} />;
-  }
 
-  // --- 2.5 VERIFICATION BARRIER ---
-  // If user is logged in (currentUser exists) BUT email is unverified, show pending screen
-  if (isEmailUnverified) {
+    if (!currentUser) {
+      if (showLogin) {
+        return <LoginScreen onLoginSuccess={setCurrentUser} />;
+      }
+      return <LandingPage onEnter={() => setShowLogin(true)} />;
+    }
+
+    if (isEmailUnverified) {
+      return (
+        <VerificationPendingScreen
+          email={verificationEmail}
+          onVerified={() => window.location.reload()}
+        />
+      );
+    }
+
+    return null;
+  };
+
+  const authFlowContent = renderAuthFlow();
+
+  if (authFlowContent) {
     return (
-      <VerificationPendingScreen
-        email={verificationEmail}
-        onVerified={() => window.location.reload()}
-      />
+      <div className="fixed inset-0 h-[100dvh] w-full bg-[#0f0518] overflow-hidden">
+        {authFlowContent}
+        {toasts.map(toast => (
+          <InAppToast key={toast.id} toast={toast} onClose={removeToast} />
+        ))}
+      </div>
     );
   }
 

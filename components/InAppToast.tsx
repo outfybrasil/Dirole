@@ -4,7 +4,7 @@ export interface ToastData {
     id: string;
     title: string;
     message: string;
-    type: 'invite' | 'friend_request' | 'success' | 'info';
+    type: 'invite' | 'friend_request' | 'success' | 'info' | 'error' | 'system';
     action?: () => void;
     actionLabel?: string;
 }
@@ -27,6 +27,8 @@ export const InAppToast: React.FC<InAppToastProps> = ({ toast, onClose }) => {
             case 'invite': return '📩';
             case 'friend_request': return '👥';
             case 'success': return '✅';
+            case 'error': return '❌';
+            case 'system': return '⚙️';
             default: return '🔔';
         }
     };
