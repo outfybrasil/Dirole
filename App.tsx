@@ -459,21 +459,11 @@ function App() {
         const unsubscribeInvites = client.subscribe(
           `databases.${APPWRITE_DATABASE_ID}.collections.invites.documents`,
           (response: any) => {
-            console.warn('[Realtime DEBUG] RAW EVENT RECV:', response); // WARN level to see in noisy console
             const payload = response.payload;
             const events = response.events || [];
 
             const isCreate = events.some((e: string) => e.includes('.create'));
             const isUpdate = events.some((e: string) => e.includes('.update'));
-
-            console.log('[Realtime DEBUG] Checks:', {
-              isCreate,
-              isUpdate,
-              toUser: payload.to_user_id,
-              fromUser: payload.from_user_id,
-              myId: currentUser.id,
-              status: payload.status
-            });
 
             // 1. New Invite Receive (Someone invited ME to a location)
             if (isCreate && payload.to_user_id === currentUser.id) {
@@ -613,7 +603,11 @@ function App() {
           onlyOpen: false
         }));
       } else {
-        alert("Nenhum local encontrado com esse nome.");
+        addToast({
+          title: "Não encontrado",
+          message: "Nenhum local encontrado com esse nome.",
+          type: 'error'
+        });
       }
     } catch (e) {
       console.error(e);
@@ -702,7 +696,11 @@ function App() {
 
     const handleWebFallback = () => {
       if (!navigator.geolocation) {
-        alert("Geolocalização não suportada.");
+        addToast({
+          title: "GPS",
+          message: "Geolocalização não suportada.",
+          type: 'error'
+        });
         setIsLoading(false);
         setIsRefreshing(false);
         setPullY(0);
@@ -939,37 +937,40 @@ function App() {
         return;
       }
 
-      // Fetch user info
-      // NOTE: We do NOT set global isLoading here to avoid "refreshing map" visual
       try {
-        console.log("Fetching user...");
         const friend = await getUserById(friendId);
-        console.log("Friend data fetched:", friend);
 
         if (friend) {
           setScannedUser(friend);
-          // Brief delay to allow state changes to settle before opening modal
           setTimeout(() => {
-            console.log("Opening FriendsModal now");
             setIsFriendsModalOpen(true);
           }, 200);
         } else {
-          console.warn("User not found for ID:", friendId);
-          alert("Usuário não encontrado.");
+          addToast({
+            title: "Ops!",
+            message: "Usuário não encontrado.",
+            type: 'error'
+          });
         }
       } catch (error) {
-        console.error("Error fetching friend:", error);
-        alert("Erro ao buscar usuário.");
+        addToast({
+          title: "Erro",
+          message: "Não foi possível buscar o usuário.",
+          type: 'error'
+        });
       }
       return;
     }
 
-    // Logic for handling other QR codes
     if (decodedText.startsWith('http')) {
       const confirm = window.confirm(`Abrir link detectado?\n${decodedText}`);
       if (confirm) window.open(decodedText, '_blank');
     } else {
-      alert(`QR Code lido:\n${decodedText}`);
+      addToast({
+        title: "QR Code Lido",
+        message: decodedText,
+        type: 'info'
+      });
     }
   };
 

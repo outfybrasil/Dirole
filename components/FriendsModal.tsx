@@ -51,32 +51,18 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
                 const isNative = window.Capacitor?.isNativePlatform?.();
 
                 if (isNative) {
-                    // Native app (iOS/Android)
                     try {
                         const { status } = await CapacitorNfc.getStatus();
-                        console.log('[NFC] Capacitor NFC Status:', status);
 
-                        // NFC_OK means NFC is available and enabled
-                        // NFC_DISABLED means NFC hardware exists but is turned off
-                        // Both cases mean the device HAS NFC capability
                         if (status === 'NFC_OK' || status === 'NFC_DISABLED') {
                             setHasNfc(true);
-                            console.log('[NFC] ✅ NFC hardware detected via Capacitor');
-                        } else {
-                            console.log('[NFC] ❌ NFC not available:', status);
                         }
                     } catch (e: any) {
-                        console.warn('[NFC] Capacitor check failed:', e.message);
-                        // Do not force hasNfc(true) if it failed, as it might lead to a broken UI
                         setHasNfc(false);
                     }
                 } else {
-                    // Web browser - check for Web NFC API
                     if ('NDEFReader' in window) {
-                        console.log('[NFC] ✅ Web NFC API detected');
                         setHasNfc(true);
-                    } else {
-                        console.log('[NFC] ❌ Web NFC API not available');
                     }
                 }
             } catch (e) {
@@ -215,7 +201,9 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
                         await CapacitorNfc.write({ records: [record] });
                         triggerHaptic([50, 50, 50]);
                         if (onShowToast) onShowToast("Sucesso! 🎉", "Perfil compartilhado via NFC.", 'success');
-                        else alert("Perfil compartilhado via NFC com sucesso!");
+                        else {
+                            onShowToast("Sucesso", "Perfil compartilhado via NFC com sucesso!", 'success');
+                        }
                         await CapacitorNfc.stopScanning();
                         setIsNfcWriting(false);
                         listener.remove();
@@ -243,7 +231,9 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
 
                     triggerHaptic([50, 50, 50]);
                     if (onShowToast) onShowToast("Sucesso! 🎉", "Link gravado na tag NFC.", 'success');
-                    else alert("Link gravado na tag NFC!");
+                    else {
+                        onShowToast("Sucesso", "Link gravado na tag NFC!", 'success');
+                    }
                     setIsNfcWriting(false);
                 } catch (error: any) {
                     console.error("Web NFC failed:", error);
@@ -388,7 +378,9 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
                                 e.stopPropagation();
                                 if (confirm(`Deseja denunciar ${user.name}? Nossa equipe analisará o perfil.`)) {
                                     if (onShowToast) onShowToast("Denúncia Enviada", "Obrigado por sua colaboração.", 'info');
-                                    else alert("Denúncia enviada.");
+                                    else {
+                                        onShowToast("Denúncia", "Denúncia enviada.", 'success');
+                                    }
                                 }
                             }}
                             className="w-8 h-8 rounded-lg flex items-center justify-center text-slate-600 hover:text-red-500 hover:bg-red-500/10 transition-all sm:opacity-0 group-hover:opacity-100"
@@ -512,7 +504,9 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
                                                         ? "NFC não disponível neste dispositivo. Verifique se o NFC está ativado nas configurações."
                                                         : "NFC não suportado neste navegador. Use o QR Code ou abra no app.";
                                                     if (onShowToast) onShowToast("NFC Indisponível", message, "error");
-                                                    else alert(message);
+                                                    else {
+                                                        onShowToast("Convite", message, 'success');
+                                                    }
                                                 }
                                             }}
                                             className={`flex-1 font-black py-3.5 rounded-xl flex flex-col items-center justify-center gap-1 transition-all shadow-lg active:scale-95 border ${hasNfc ? 'bg-dirole-primary text-white border-dirole-primary hover:bg-dirole-primary/80' : 'bg-white/5 text-slate-500 border-white/10 hover:bg-white/10 cursor-not-allowed'}`}

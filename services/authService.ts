@@ -6,10 +6,8 @@ export const signUpWithEmail = async (email: string, pass: string, name: string)
         // Delete any existing session (e.g., guest session) before creating new account
         try {
             await account.deleteSession('current');
-            console.log('[Auth] Deleted existing session before signup');
         } catch (e) {
             // No session to delete, continue
-            console.log('[Auth] No existing session to delete');
         }
 
         const user = await account.create(ID.unique(), email, pass, name);
@@ -30,22 +28,13 @@ export const signInWithEmail = async (email: string, pass: string) => {
 
 export const signInWithGoogle = async () => {
     try {
-        console.log("[Auth] Initiating Google login...");
-        console.log("[Auth] Current Project ID:", APPWRITE_PROJECT_ID);
-
         const { Capacitor } = await import('@capacitor/core');
         const isNative = Capacitor.isNativePlatform();
-
-        console.log("[Auth] Is Native Platform:", isNative);
 
         let redirectUrl = window.location.origin;
         if (isNative) {
             redirectUrl = 'dirole://auth/callback';
-            console.log("[Auth] Native detected, using Deep Link:", redirectUrl);
         }
-
-        // DEBUG: Remover em produção
-        alert(`Debug Auth:\nÉ Nativo? ${isNative}\nURL: ${redirectUrl}`);
 
         // Redireciona para o Google OAuth do Appwrite
         // successUrl = redirectUrl, failureUrl = redirectUrl

@@ -1792,7 +1792,6 @@ export const createStory = async (
                 viewed_by: JSON.stringify([])
             }
         );
-        console.log('[createStory] Story created successfully!');
 
         return true;
     } catch (e: any) {
@@ -1912,7 +1911,6 @@ export const cleanupExpiredStories = async (): Promise<number> => {
             deleted++;
         }
 
-        console.log(`[cleanupExpiredStories] Deleted ${deleted} expired stories`);
         return deleted;
     } catch (e: any) {
         console.error("[cleanupExpiredStories] Failed:", e.message);
