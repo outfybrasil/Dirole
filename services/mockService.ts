@@ -1781,6 +1781,8 @@ export const createStory = async (
             {
                 user_id: userId,
                 user_name: userName,
+                user_nickname: userNickname,
+
                 user_avatar: userAvatar,
                 location_id: locationId,
                 location_name: locationName,
@@ -1791,6 +1793,7 @@ export const createStory = async (
             }
         );
         console.log('[createStory] Story created successfully!');
+
         return true;
     } catch (e: any) {
         console.error("[createStory] Failed:", e.message);

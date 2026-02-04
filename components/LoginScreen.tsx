@@ -396,6 +396,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                                             // Reload page to trigger App.tsx verification check
                                             window.location.reload();
 
+
                                         } catch (error: any) {
                                             console.error(error);
                                             if (error.message?.includes("already registered") || error.code === 409) {

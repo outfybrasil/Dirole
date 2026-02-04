@@ -14,6 +14,7 @@ declare global {
     }
 }
 
+
 interface FriendsModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -81,6 +82,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
             } catch (e) {
                 console.error('[NFC] Unexpected error during NFC check:', e);
                 setHasNfc(false);
+
             }
         };
         checkNfc();
@@ -251,6 +253,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
             } else {
                 setIsNfcWriting(false);
             }
+
         } catch (error) {
             console.error("NFC shared failed:", error);
             setIsNfcWriting(false);
@@ -518,6 +521,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
                                             <i className="fas fa-wifi rotate-90 text-base"></i>
                                             <span className="text-[10px] uppercase tracking-wider">NFC</span>
                                             {!hasNfc && <span className="text-[8px] opacity-60">N/D</span>}
+
                                         </button>
                                     </div>
 

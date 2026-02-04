@@ -34,6 +34,7 @@ export const StepIdentity: React.FC<StepIdentityProps> = ({
                 return;
             }
 
+
             const url = URL.createObjectURL(file);
             setPreviewUrl(url);
             setAvatarFile(file);
