@@ -1,0 +1,97 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - heading " Privacidade & LGPD" [level=3] [ref=e6]:
+        - generic [ref=e7]: 
+        - text: Privacidade & LGPD
+      - paragraph [ref=e8]: UTILIZAMOS COOKIES E SUA LOCALIZAÇÃO PARA O "TERMÔMETRO DO ROLÊ". AO CONTINUAR, VOCÊ CONCORDA COM NOSSA POLÍTICA DE PRIVACIDADE.
+    - button "Aceitar" [ref=e10] [cursor=pointer]
+  - banner [ref=e11]:
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - img "Logo" [ref=e15]
+        - generic [ref=e16]:
+          - heading "DIROLE" [level=1] [ref=e17]
+          - paragraph [ref=e20]: Social Thermometer
+      - generic [ref=e21]:
+        - generic [ref=e22] [cursor=pointer]:
+          - img "Avatar" [ref=e26]
+          - generic [ref=e27]:
+            - generic [ref=e28]: TestBot
+            - generic [ref=e29]: Nível 2
+        - button "" [ref=e30] [cursor=pointer]:
+          - generic [ref=e31]: 
+  - generic [ref=e32]:
+    - generic:
+      - generic:
+        - generic: 
+    - generic [ref=e33]:
+      - generic [ref=e35]:
+        - generic [ref=e37]: 
+        - textbox "Buscando o próximo rolê?" [ref=e38]
+      - generic [ref=e42]:
+        - heading "Filtros de Vibe" [level=2] [ref=e44]: Filtros de Vibe
+        - generic [ref=e47]:
+          - button "Aberto Agora" [ref=e48] [cursor=pointer]:
+            - generic [ref=e50]: Aberto Agora
+          - button "🔥 Agito" [ref=e51] [cursor=pointer]:
+            - generic [ref=e52]: 🔥 Agito
+          - button "🍽️ Gastronomia" [ref=e53] [cursor=pointer]:
+            - generic [ref=e54]: 🍽️ Gastronomia
+          - button "💘 Date" [ref=e55] [cursor=pointer]:
+            - generic [ref=e56]: 💘 Date
+          - button "💸 Fim de Mês" [ref=e57] [cursor=pointer]:
+            - generic [ref=e58]: 💸 Fim de Mês
+          - button "💬 Resenha" [ref=e59] [cursor=pointer]:
+            - generic [ref=e60]: 💬 Resenha
+        - generic [ref=e61]:
+          - generic [ref=e62]:
+            - generic [ref=e65]: Raio de Exploração
+            - generic [ref=e66]:
+              - generic [ref=e67]: "3"
+              - generic [ref=e68]: km
+          - slider [ref=e70] [cursor=pointer]: "3"
+      - text:            
+      - generic [ref=e71]:
+        - generic [ref=e73]:
+          - generic:
+            - generic:
+              - button [ref=e75] [cursor=pointer]
+              - button " ?" [ref=e77] [cursor=pointer]:
+                - generic [ref=e80]:
+                  - generic [ref=e81]: 
+                  - generic [ref=e83]: "?"
+              - button " ?" [ref=e84] [cursor=pointer]:
+                - generic [ref=e87]:
+                  - generic [ref=e88]: 
+                  - generic [ref=e90]: "?"
+          - generic [ref=e91]:
+            - link "Leaflet" [ref=e92] [cursor=pointer]:
+              - /url: https://leafletjs.com
+              - img [ref=e93]
+              - text: Leaflet
+            - text: "| © OSM"
+        - button "" [ref=e97] [cursor=pointer]:
+          - generic [ref=e98]: 
+  - generic:
+    - button "+" [ref=e99] [cursor=pointer]:
+      - generic [ref=e100]: +
+    - button "" [active] [ref=e101] [cursor=pointer]:
+      - generic [ref=e102]: 
+    - button "" [ref=e103] [cursor=pointer]:
+      - generic [ref=e104]: 
+  - navigation [ref=e105]:
+    - generic [ref=e106]:
+      - button " MAPA" [ref=e107] [cursor=pointer]:
+        - generic [ref=e109]: 
+        - generic [ref=e110]: MAPA
+      - button " LISTA" [ref=e111] [cursor=pointer]:
+        - generic [ref=e113]: 
+        - generic [ref=e114]: LISTA
+      - button " RANK" [ref=e115] [cursor=pointer]:
+        - generic [ref=e117]: 
+        - generic [ref=e118]: RANK
+```

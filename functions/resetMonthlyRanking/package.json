@@ -1,0 +1,15 @@
+{
+    "name": "reset-monthly-ranking",
+    "version": "1.0.0",
+    "description": "Resets the points field in the profiles collection every month.",
+    "main": "src/main.js",
+    "dependencies": {
+        "node-appwrite": "^11.0.0"
+    },
+    "devDependencies": {},
+    "scripts": {
+        "start": "node src/main.js"
+    },
+    "author": "Dirole Team",
+    "license": "ISC"
+}

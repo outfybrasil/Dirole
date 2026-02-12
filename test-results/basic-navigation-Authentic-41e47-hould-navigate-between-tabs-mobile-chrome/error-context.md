@@ -1,0 +1,122 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - heading " Privacidade & LGPD" [level=3] [ref=e6]:
+        - generic [ref=e7]: 
+        - text: Privacidade & LGPD
+      - paragraph [ref=e8]: UTILIZAMOS COOKIES E SUA LOCALIZAÇÃO PARA O "TERMÔMETRO DO ROLÊ". AO CONTINUAR, VOCÊ CONCORDA COM NOSSA POLÍTICA DE PRIVACIDADE.
+    - button "Aceitar" [ref=e10] [cursor=pointer]
+  - banner [ref=e11]:
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - img "Logo" [ref=e15]
+        - generic [ref=e16]:
+          - heading "DIROLE" [level=1] [ref=e17]
+          - paragraph [ref=e20]: Social Thermometer
+      - generic [ref=e21]:
+        - generic [ref=e22] [cursor=pointer]:
+          - img "Avatar" [ref=e26]
+          - generic [ref=e27]:
+            - generic [ref=e28]: TestBot
+            - generic [ref=e29]: Nível 2
+        - button "" [ref=e30] [cursor=pointer]:
+          - generic [ref=e31]: 
+  - generic [ref=e32]:
+    - generic:
+      - generic:
+        - generic: 
+    - text:                
+    - generic [ref=e33]:
+      - generic [ref=e35]:
+        - generic [ref=e37]: 
+        - textbox "Buscando o próximo rolê?" [ref=e38]
+      - generic [ref=e40]:
+        - generic [ref=e41] [cursor=pointer]:
+          - generic [ref=e42]:
+            - img "Teste" [ref=e43]
+            - generic [ref=e45]:
+              - generic [ref=e48]: "ON"
+              - generic [ref=e49]:
+                - generic [ref=e50]: 
+                - text: Bar
+            - button "" [ref=e51]:
+              - generic [ref=e52]: 
+          - generic [ref=e53]:
+            - generic [ref=e54]:
+              - generic [ref=e55]:
+                - heading "Teste" [level=3] [ref=e56]
+                - generic [ref=e57]:
+                  - paragraph [ref=e58]:
+                    - generic [ref=e59]: 
+                    - text: Teste
+                  - paragraph [ref=e61]: 1.5 km
+              - generic [ref=e63]:
+                - generic "Lotação" [ref=e64]:
+                  - generic [ref=e65]: 🟡
+                - generic "Vibe" [ref=e67]:
+                  - generic [ref=e68]: ⭐⭐
+            - generic [ref=e70]:
+              - generic [ref=e71]:
+                - generic [ref=e72]: 
+                - text: Movimento
+              - generic [ref=e73]: Movimentado
+            - generic [ref=e78]:
+              - button " CHECK-IN" [ref=e79]:
+                - generic [ref=e80]: 
+                - generic [ref=e81]: CHECK-IN
+              - generic [ref=e82]:
+                - generic [ref=e83]: $
+                - generic [ref=e84]: Preço
+        - generic [ref=e85] [cursor=pointer]:
+          - generic [ref=e86]:
+            - img "Sociedade Água Verde" [ref=e87]
+            - generic [ref=e89]:
+              - generic [ref=e92]: "ON"
+              - generic [ref=e93]:
+                - generic [ref=e94]: 
+                - text: Balada
+            - button "" [ref=e95]:
+              - generic [ref=e96]: 
+          - generic [ref=e97]:
+            - generic [ref=e98]:
+              - generic [ref=e99]:
+                - heading "Sociedade Água Verde" [level=3] [ref=e100]
+                - generic [ref=e101]:
+                  - paragraph [ref=e102]:
+                    - generic [ref=e103]: 
+                    - text: Avenida Iguaçu
+                  - paragraph [ref=e105]: 2.7 km
+              - generic [ref=e107]:
+                - generic "Lotação" [ref=e108]:
+                  - generic [ref=e109]: 🔴
+                - generic "Vibe" [ref=e111]:
+                  - generic [ref=e112]: ⭐⭐
+            - generic [ref=e114]:
+              - generic [ref=e115]:
+                - generic [ref=e116]: 
+                - text: Movimento
+              - generic [ref=e117]: Lotado
+            - generic [ref=e122]:
+              - button " CHECK-IN" [ref=e123]:
+                - generic [ref=e124]: 
+                - generic [ref=e125]: CHECK-IN
+              - generic [ref=e126]:
+                - generic [ref=e127]: $$
+                - generic [ref=e128]: Preço
+  - button "" [ref=e129] [cursor=pointer]:
+    - generic [ref=e130]: 
+  - navigation [ref=e131]:
+    - generic [ref=e132]:
+      - button " MAPA" [ref=e133] [cursor=pointer]:
+        - generic [ref=e135]: 
+        - generic [ref=e136]: MAPA
+      - button " LISTA" [active] [ref=e137] [cursor=pointer]:
+        - generic [ref=e139]: 
+        - generic [ref=e140]: LISTA
+      - button " RANK" [ref=e141] [cursor=pointer]:
+        - generic [ref=e143]: 
+        - generic [ref=e144]: RANK
+```

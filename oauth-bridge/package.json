@@ -1,0 +1,9 @@
+{
+    "name": "dirole-oauth-bridge",
+    "version": "1.0.0",
+    "description": "OAuth callback bridge for Dirole app",
+    "scripts": {
+        "dev": "npx serve public",
+        "build": "echo 'No build needed'"
+    }
+}

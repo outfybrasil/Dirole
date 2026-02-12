@@ -1,0 +1,493 @@
+{
+    "projectId": "697cfdd300371de0272e",
+    "projectName": "Dirole",
+    "settings": {
+        "services": {
+            "account": true,
+            "avatars": true,
+            "databases": true,
+            "functions": true,
+            "health": true,
+            "locale": true,
+            "storage": true,
+            "teams": true,
+            "users": true,
+            "webhook": true
+        }
+    },
+    "databases": [
+        {
+            "$id": "dirole_main",
+            "name": "Dirole Main",
+            "enabled": true,
+            "collections": [
+                {
+                    "$id": "profiles",
+                    "$permissions": [
+                        "read(\"any\")",
+                        "create(\"any\")",
+                        "update(\"any\")"
+                    ],
+                    "name": "Perfis de Usuário",
+                    "enabled": true,
+                    "attributes": [
+                        {
+                            "key": "userId",
+                            "type": "string",
+                            "size": 255,
+                            "required": true,
+                            "array": false
+                        },
+                        {
+                            "key": "name",
+                            "type": "string",
+                            "size": 255,
+                            "required": true,
+                            "array": false
+                        },
+                        {
+                            "key": "nickname",
+                            "type": "string",
+                            "size": 255,
+                            "required": false,
+                            "array": false
+                        },
+                        {
+                            "key": "email",
+                            "type": "string",
+                            "size": 255,
+                            "required": false,
+                            "array": false
+                        },
+                        {
+                            "key": "avatar",
+                            "type": "string",
+                            "size": 255,
+                            "required": false,
+                            "array": false,
+                            "default": "😎"
+                        },
+                        {
+                            "key": "points",
+                            "type": "integer",
+                            "required": false,
+                            "array": false,
+                            "default": 0
+                        },
+                        {
+                            "key": "xp",
+                            "type": "integer",
+                            "required": false,
+                            "array": false,
+                            "default": 0
+                        },
+                        {
+                            "key": "level",
+                            "type": "integer",
+                            "required": false,
+                            "array": false,
+                            "default": 1
+                        },
+                        {
+                            "key": "gender",
+                            "type": "string",
+                            "size": 50,
+                            "required": false,
+                            "array": false,
+                            "default": "Outro"
+                        },
+                        {
+                            "key": "badges",
+                            "type": "string",
+                            "size": 2000,
+                            "required": false,
+                            "array": false,
+                            "default": "[]"
+                        },
+                        {
+                            "key": "favorites",
+                            "type": "string",
+                            "size": 2000,
+                            "required": false,
+                            "array": false,
+                            "default": "[]"
+                        }
+                    ],
+                    "indexes": [
+                        {
+                            "key": "idx_userId",
+                            "type": "unique",
+                            "status": "available",
+                            "attributes": [
+                                "userId"
+                            ],
+                            "orders": [
+                                "ASC"
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "$id": "locations",
+                    "$permissions": [
+                        "read(\"any\")"
+                    ],
+                    "name": "Locais/Roles",
+                    "enabled": true,
+                    "attributes": [
+                        {
+                            "key": "name",
+                            "type": "string",
+                            "size": 255,
+                            "required": true,
+                            "array": false
+                        },
+                        {
+                            "key": "address",
+                            "type": "string",
+                            "size": 500,
+                            "required": false,
+                            "array": false
+                        },
+                        {
+                            "key": "type",
+                            "type": "string",
+                            "size": 100,
+                            "required": true,
+                            "array": false
+                        },
+                        {
+                            "key": "lat",
+                            "type": "float",
+                            "required": true,
+                            "array": false
+                        },
+                        {
+                            "key": "lng",
+                            "type": "float",
+                            "required": true,
+                            "array": false
+                        },
+                        {
+                            "key": "image_url",
+                            "type": "string",
+                            "size": 500,
+                            "required": false,
+                            "array": false
+                        },
+                        {
+                            "key": "verified",
+                            "type": "boolean",
+                            "required": false,
+                            "array": false,
+                            "default": false
+                        },
+                        {
+                            "key": "votes_for_verification",
+                            "type": "integer",
+                            "required": false,
+                            "array": false,
+                            "default": 0
+                        },
+                        {
+                            "key": "is_official",
+                            "type": "boolean",
+                            "required": false,
+                            "array": false,
+                            "default": false
+                        },
+                        {
+                            "key": "owner_id",
+                            "type": "string",
+                            "size": 255,
+                            "required": false,
+                            "array": false
+                        },
+                        {
+                            "key": "official_description",
+                            "type": "string",
+                            "size": 1000,
+                            "required": false,
+                            "array": false
+                        },
+                        {
+                            "key": "instagram",
+                            "type": "string",
+                            "size": 255,
+                            "required": false,
+                            "array": false
+                        },
+                        {
+                            "key": "whatsapp",
+                            "type": "string",
+                            "size": 255,
+                            "required": false,
+                            "array": false
+                        },
+                        {
+                            "key": "stats",
+                            "type": "string",
+                            "size": 2000,
+                            "required": false,
+                            "array": false,
+                            "default": "{}"
+                        }
+                    ],
+                    "indexes": []
+                },
+                {
+                    "$id": "reviews",
+                    "$permissions": [
+                        "read(\"any\")",
+                        "create(\"any\")"
+                    ],
+                    "name": "Avaliações",
+                    "enabled": true,
+                    "attributes": [
+                        {
+                            "key": "locationId",
+                            "type": "string",
+                            "size": 255,
+                            "required": true,
+                            "array": false
+                        },
+                        {
+                            "key": "userId",
+                            "type": "string",
+                            "size": 255,
+                            "required": true,
+                            "array": false
+                        },
+                        {
+                            "key": "userName",
+                            "type": "string",
+                            "size": 255,
+                            "required": false,
+                            "array": false
+                        },
+                        {
+                            "key": "userAvatar",
+                            "type": "string",
+                            "size": 255,
+                            "required": false,
+                            "array": false
+                        },
+                        {
+                            "key": "price",
+                            "type": "integer",
+                            "required": false,
+                            "array": false,
+                            "default": 0
+                        },
+                        {
+                            "key": "crowd",
+                            "type": "integer",
+                            "required": false,
+                            "array": false,
+                            "default": 0
+                        },
+                        {
+                            "key": "vibe",
+                            "type": "integer",
+                            "required": false,
+                            "array": false,
+                            "default": 0
+                        },
+                        {
+                            "key": "gender",
+                            "type": "integer",
+                            "required": false,
+                            "array": false,
+                            "default": 0
+                        },
+                        {
+                            "key": "comment",
+                            "type": "string",
+                            "size": 1000,
+                            "required": false,
+                            "array": false
+                        }
+                    ],
+                    "indexes": []
+                },
+                {
+                    "$id": "friendships",
+                    "$permissions": [
+                        "read(\"any\")",
+                        "create(\"any\")",
+                        "update(\"any\")",
+                        "delete(\"any\")"
+                    ],
+                    "name": "Relacionamentos/Amigos",
+                    "enabled": true,
+                    "attributes": [
+                        {
+                            "key": "requester_id",
+                            "type": "string",
+                            "size": 255,
+                            "required": true,
+                            "array": false
+                        },
+                        {
+                            "key": "receiver_id",
+                            "type": "string",
+                            "size": 255,
+                            "required": true,
+                            "array": false
+                        },
+                        {
+                            "key": "status",
+                            "type": "string",
+                            "size": 50,
+                            "required": true,
+                            "array": false,
+                            "default": "pending"
+                        }
+                    ],
+                    "indexes": []
+                },
+                {
+                    "$id": "invites",
+                    "$permissions": [
+                        "read(\"any\")",
+                        "create(\"any\")",
+                        "update(\"any\")"
+                    ],
+                    "name": "Convites para Rolê",
+                    "enabled": true,
+                    "attributes": [
+                        {
+                            "key": "from_user_id",
+                            "type": "string",
+                            "size": 255,
+                            "required": true,
+                            "array": false
+                        },
+                        {
+                            "key": "to_user_id",
+                            "type": "string",
+                            "size": 255,
+                            "required": true,
+                            "array": false
+                        },
+                        {
+                            "key": "location_id",
+                            "type": "string",
+                            "size": 255,
+                            "required": true,
+                            "array": false
+                        },
+                        {
+                            "key": "location_name",
+                            "type": "string",
+                            "size": 255,
+                            "required": true,
+                            "array": false
+                        },
+                        {
+                            "key": "message",
+                            "type": "string",
+                            "size": 500,
+                            "required": false,
+                            "array": false,
+                            "default": "Bora?"
+                        },
+                        {
+                            "key": "status",
+                            "type": "string",
+                            "size": 50,
+                            "required": false,
+                            "array": false,
+                            "default": "pending"
+                        }
+                    ],
+                    "indexes": []
+                },
+                {
+                    "$id": "reports",
+                    "$permissions": [
+                        "create(\"any\")"
+                    ],
+                    "name": "Denúncias",
+                    "enabled": true,
+                    "attributes": [
+                        {
+                            "key": "targetId",
+                            "type": "string",
+                            "size": 255,
+                            "required": true,
+                            "array": false
+                        },
+                        {
+                            "key": "targetType",
+                            "type": "string",
+                            "size": 50,
+                            "required": true,
+                            "array": false
+                        },
+                        {
+                            "key": "reporterId",
+                            "type": "string",
+                            "size": 255,
+                            "required": true,
+                            "array": false
+                        },
+                        {
+                            "key": "reason",
+                            "type": "string",
+                            "size": 500,
+                            "required": true,
+                            "array": false
+                        },
+                        {
+                            "key": "status",
+                            "type": "string",
+                            "size": 50,
+                            "required": false,
+                            "array": false,
+                            "default": "open"
+                        }
+                    ],
+                    "indexes": []
+                }
+            ]
+        }
+    ],
+    "buckets": [
+        {
+            "$id": "avatars",
+            "$permissions": [
+                "read(\"any\")",
+                "create(\"any\")",
+                "update(\"any\")"
+            ],
+            "name": "Avatares",
+            "enabled": true,
+            "maximumFileSize": 10000000,
+            "allowedFileExtensions": [
+                "jpg",
+                "png",
+                "jpeg",
+                "gif",
+                "webp"
+            ],
+            "encryption": true,
+            "antivirus": true
+        }
+    ],
+    "functions": [
+        {
+            "$id": "resetMonthlyRanking",
+            "name": "Reset Monthly Ranking",
+            "runtime": "node-18.0",
+            "path": "functions/resetMonthlyRanking",
+            "entrypoint": "src/main.js",
+            "execute": [],
+            "events": [],
+            "schedule": "0 0 1 * *",
+            "timeout": 30,
+            "enabled": true,
+            "logging": true
+        }
+    ]
+}

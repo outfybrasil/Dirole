@@ -1,0 +1,136 @@
+# Page snapshot
+
+```yaml
+- generic [ref=e1]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - heading " Privacidade & LGPD" [level=3] [ref=e6]:
+        - generic [ref=e7]: 
+        - text: Privacidade & LGPD
+      - paragraph [ref=e8]: UTILIZAMOS COOKIES E SUA LOCALIZAÇÃO PARA O "TERMÔMETRO DO ROLÊ". AO CONTINUAR, VOCÊ CONCORDA COM NOSSA POLÍTICA DE PRIVACIDADE.
+    - button "Aceitar" [ref=e10] [cursor=pointer]
+  - banner [ref=e11]:
+    - generic [ref=e12]:
+      - generic [ref=e13]:
+        - img "Logo" [ref=e15]
+        - generic [ref=e16]:
+          - heading "DIROLE" [level=1] [ref=e17]
+          - paragraph [ref=e20]: Social Thermometer
+      - generic [ref=e21]:
+        - generic [ref=e22] [cursor=pointer]:
+          - img "Avatar" [ref=e26]
+          - generic [ref=e27]:
+            - generic [ref=e28]: TestBot
+            - generic [ref=e29]: Nível 2
+        - button "" [ref=e30] [cursor=pointer]:
+          - generic [ref=e31]: 
+  - generic [ref=e32]:
+    - generic:
+      - generic:
+        - generic: 
+    - generic [ref=e33]:
+      - generic [ref=e34]:
+        - generic [ref=e36]: 
+        - textbox "Buscando o próximo rolê?" [ref=e37]
+      - generic [ref=e41]:
+        - heading "Filtros de Vibe" [level=2] [ref=e43]: Filtros de Vibe
+        - generic [ref=e46]:
+          - button "Aberto Agora" [ref=e47] [cursor=pointer]:
+            - generic [ref=e49]: Aberto Agora
+          - button "🔥 Agito" [ref=e50] [cursor=pointer]:
+            - generic [ref=e51]: 🔥 Agito
+          - button "🍽️ Gastronomia" [ref=e52] [cursor=pointer]:
+            - generic [ref=e53]: 🍽️ Gastronomia
+          - button "💘 Date" [ref=e54] [cursor=pointer]:
+            - generic [ref=e55]: 💘 Date
+          - button "💸 Fim de Mês" [ref=e56] [cursor=pointer]:
+            - generic [ref=e57]: 💸 Fim de Mês
+          - button "💬 Resenha" [ref=e58] [cursor=pointer]:
+            - generic [ref=e59]: 💬 Resenha
+        - generic [ref=e60]:
+          - generic [ref=e61]:
+            - generic [ref=e64]: Raio de Exploração
+            - generic [ref=e65]:
+              - generic [ref=e66]: "3"
+              - generic [ref=e67]: km
+          - slider [ref=e69] [cursor=pointer]: "3"
+      - text:            
+      - generic [ref=e70]:
+        - generic [ref=e72]:
+          - generic:
+            - generic:
+              - button [ref=e74] [cursor=pointer]
+              - button " ?" [ref=e76] [cursor=pointer]:
+                - generic [ref=e79]:
+                  - generic [ref=e80]: 
+                  - generic [ref=e82]: "?"
+              - button " ?" [ref=e83] [cursor=pointer]:
+                - generic [ref=e86]:
+                  - generic [ref=e87]: 
+                  - generic [ref=e89]: "?"
+          - generic [ref=e90]:
+            - link "Leaflet" [ref=e91] [cursor=pointer]:
+              - /url: https://leafletjs.com
+              - img [ref=e92]
+              - text: Leaflet
+            - text: "| © OSM"
+        - button "" [ref=e96] [cursor=pointer]:
+          - generic [ref=e97]: 
+  - generic:
+    - button "+" [ref=e98] [cursor=pointer]:
+      - generic [ref=e99]: +
+    - button "" [ref=e100] [cursor=pointer]:
+      - generic [ref=e101]: 
+    - button "" [ref=e102] [cursor=pointer]:
+      - generic [ref=e103]: 
+  - navigation [ref=e104]:
+    - generic [ref=e105]:
+      - button " MAPA" [ref=e106] [cursor=pointer]:
+        - generic [ref=e108]: 
+        - generic [ref=e109]: MAPA
+      - button " LISTA" [ref=e110] [cursor=pointer]:
+        - generic [ref=e112]: 
+        - generic [ref=e113]: LISTA
+      - button " RANK" [ref=e114] [cursor=pointer]:
+        - generic [ref=e116]: 
+        - generic [ref=e117]: RANK
+  - generic [ref=e119]:
+    - generic [ref=e121]:
+      - generic [ref=e122]:
+        - generic [ref=e123]:
+          - img "Avatar" [ref=e126]
+          - generic [ref=e127]: LVL 2
+        - generic [ref=e128]:
+          - heading "TestBot" [level=2] [ref=e129]
+          - paragraph [ref=e130]: EXPLORADOR
+      - button "" [ref=e131] [cursor=pointer]:
+        - generic [ref=e132]: 
+    - generic [ref=e133]:
+      - generic [ref=e135]:
+        - button " Status" [ref=e137] [cursor=pointer]:
+          - generic [ref=e138]: 
+          - text: Status
+        - button " Perfil" [ref=e139] [cursor=pointer]:
+          - generic [ref=e140]: 
+          - text: Perfil
+        - button " Ajustes" [ref=e141] [cursor=pointer]:
+          - generic [ref=e142]: 
+          - text: Ajustes
+      - generic [ref=e145]:
+        - generic [ref=e147]:
+          - generic [ref=e148]:
+            - paragraph [ref=e149]: Seu Progresso
+            - generic [ref=e150]: Nível 2
+          - generic [ref=e151]: 150 / 300 XP
+        - generic [ref=e154]:
+          - button " Social Meus Amigos" [ref=e155] [cursor=pointer]:
+            - generic [ref=e158]: 
+            - generic [ref=e159]:
+              - paragraph [ref=e160]: Social
+              - text: Meus Amigos
+          - button " Global Explorar" [ref=e161] [cursor=pointer]:
+            - generic [ref=e164]: 
+            - generic [ref=e165]:
+              - paragraph [ref=e166]: Global
+              - text: Explorar
+```

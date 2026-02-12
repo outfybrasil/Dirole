@@ -1,0 +1,27 @@
+{
+    "name": "Dirole - O Termômetro do Rolê",
+    "short_name": "Dirole",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#0f0518",
+    "theme_color": "#0f0518",
+    "orientation": "portrait-primary",
+    "icons": [
+        {
+            "src": "/icon-192.png",
+            "type": "image/png",
+            "sizes": "192x192"
+        },
+        {
+            "src": "/icon-512.png",
+            "type": "image/png",
+            "sizes": "512x512"
+        },
+        {
+            "src": "/icon-512.png",
+            "type": "image/png",
+            "sizes": "512x512",
+            "purpose": "maskable"
+        }
+    ]
+}
