@@ -1,5 +1,6 @@
 import React from 'react';
 import { Sparkles, MapPin, Users, Star, ArrowRight, Smartphone, Music, Search } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 
 interface LandingPageProps {
     onEnter: () => void;
@@ -117,6 +118,28 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onEnter }) => {
                             Saber mais
                         </button>
                     </div>
+
+
+
+                    {/* App Store Buttons */}
+                    {Capacitor.getPlatform() === 'web' && (
+                        <div className="pt-6 flex flex-col sm:flex-row items-center gap-4 justify-center md:justify-start">
+                            <button disabled className="group relative px-5 py-2.5 bg-white/5 border border-white/10 rounded-xl flex items-center gap-3 hover:bg-white/10 transition-all opacity-70 cursor-not-allowed">
+                                <div className="w-8 h-8 flex items-center justify-center bg-white/10 rounded-lg">
+                                    <svg viewBox="0 0 24 24" className="w-5 h-5 fill-white" xmlns="http://www.w3.org/2000/svg">
+                                        <path d="M3.609 1.814L13.792 12 3.61 22.186a.996.996 0 0 1-.61-.92V2.734a1 1 0 0 1 .609-.92zm11.516 11.516l3.481 3.481L5.91 22.56a1.002 1.002 0 0 1-1.354-.347l10.569-8.883zm3.483-3.483l-3.482 3.482-10.57-8.882a1.002 1.002 0 0 1 1.354-.347l12.698 5.747zM15.42 12l4.803 4.803c.567.567.893.427.72-.207l-4.22-11.595c-.173-.634-.5-1.1-1.303.8z" />
+                                    </svg>
+                                </div>
+                                <div className="text-left">
+                                    <p className="text-[10px] uppercase font-bold text-gray-400 leading-tight">Disponível em breve no</p>
+                                    <p className="text-sm font-black italic text-white leading-tight">Google Play</p>
+                                </div>
+                                <div className="absolute -top-3 -right-2 bg-gradient-to-r from-purple-500 to-pink-500 text-white text-[9px] font-black italic px-2 py-0.5 rounded-full shadow-lg border border-[#0f0518] animate-pulse">
+                                    EM BREVE
+                                </div>
+                            </button>
+                        </div>
+                    )}
 
                     {/* Social Proof */}
                     <div className="pt-8 flex items-center justify-center md:justify-start gap-4 text-sm text-gray-500 font-medium">

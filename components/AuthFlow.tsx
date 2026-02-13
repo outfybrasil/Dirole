@@ -61,7 +61,7 @@ export const AuthFlow: React.FC<AuthFlowProps> = ({
 
     if (!currentUser) {
         return (
-            <div className="fixed inset-0 h-[100dvh] w-full bg-[#0f0518] overflow-hidden">
+            <div className="fixed inset-0 h-[100dvh] w-full bg-[#0f0518] overflow-y-auto safe-scroll">
                 {showLogin ? (
                     <LoginScreen onLoginSuccess={setCurrentUser} />
                 ) : (
