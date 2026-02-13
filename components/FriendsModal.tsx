@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { User, FriendUser, FriendshipStatus } from '../types';
 import { getFriends, searchUsers, sendFriendRequest, respondToFriendRequest, triggerHaptic, getSuggestedUsers, blockUser } from '../services/mockService';
 import UserAvatar from './UserAvatar';
-import { CapacitorNfc } from '@capgo/capacitor-nfc';
 
 // Type declaration for Capacitor
 declare global {
@@ -41,38 +40,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
     const [isScanning, setIsScanning] = useState(false);
     const [scanResult, setScanResult] = useState<FriendUser | null>(null);
     const [scanError, setScanError] = useState<string | null>(null);
-    const [hasNfc, setHasNfc] = useState(false);
-    const [isNfcWriting, setIsNfcWriting] = useState(false);
 
-    useEffect(() => {
-        const checkNfc = async () => {
-            try {
-                // Check if running in Capacitor native environment
-                const isNative = window.Capacitor?.isNativePlatform?.();
-
-                if (isNative) {
-                    try {
-                        const { status } = await CapacitorNfc.getStatus();
-
-                        if (status === 'NFC_OK' || status === 'NFC_DISABLED') {
-                            setHasNfc(true);
-                        }
-                    } catch (e: any) {
-                        setHasNfc(false);
-                    }
-                } else {
-                    if ('NDEFReader' in window) {
-                        setHasNfc(true);
-                    }
-                }
-            } catch (e) {
-                console.error('[NFC] Unexpected error during NFC check:', e);
-                setHasNfc(false);
-
-            }
-        };
-        checkNfc();
-    }, []);
 
     const isGuest = currentUser?.id.startsWith('guest_');
 
@@ -82,7 +50,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
 
             if (scannedUser) {
                 setShowQrCode(true);
-                setScanResult(scannedUser);
+                setScanResult(scannedUser as FriendUser);
                 setIsScanning(false);
             } else if (initialView === 'qr') {
                 setShowQrCode(true);
@@ -162,93 +130,8 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
         setIsScanning(false);
         setScanResult(null);
         setScanError(null);
-        setIsNfcWriting(false);
     };
 
-    const shareViaNFC = async () => {
-        if (!hasNfc || !currentUser) return;
-        triggerHaptic();
-        setIsNfcWriting(true);
-
-        const profileUrl = `https://dirole.appwrite.network/u/${currentUser.id}`;
-
-        try {
-            const isNative = window.Capacitor?.isNativePlatform?.();
-
-            if (isNative) {
-                // --- NATIVE FLOW (Capacitor) ---
-                // Helper to encode NDEF URL record
-                const createUrlRecord = (url: string) => {
-                    const urlBytes = new TextEncoder().encode(url.replace('https://', ''));
-                    return {
-                        tnf: 1, // Well Known
-                        type: [85], // 'U'
-                        id: [],
-                        payload: [4, ...Array.from(urlBytes)] // 4 = https:// prefix
-                    };
-                };
-
-                const record = createUrlRecord(profileUrl);
-
-                // On iOS, we MUST call startScanning before write
-                await CapacitorNfc.startScanning({
-                    alertMessage: "Aproxime um dispositivo ou tag NFC para compartilhar seu perfil."
-                });
-
-                // Listen for tag discovery to write
-                const listener = await CapacitorNfc.addListener('nfcEvent', async () => {
-                    try {
-                        await CapacitorNfc.write({ records: [record] });
-                        triggerHaptic([50, 50, 50]);
-                        if (onShowToast) onShowToast("Sucesso! 🎉", "Perfil compartilhado via NFC.", 'success');
-                        else {
-                            onShowToast("Sucesso", "Perfil compartilhado via NFC com sucesso!", 'success');
-                        }
-                        await CapacitorNfc.stopScanning();
-                        setIsNfcWriting(false);
-                        listener.remove();
-                    } catch (e) {
-                        console.error("Write failed:", e);
-                    }
-                });
-
-                // Timeout after 30 seconds
-                setTimeout(async () => {
-                    if (isNfcWriting) {
-                        try {
-                            await CapacitorNfc.stopScanning();
-                        } catch (e) { }
-                        setIsNfcWriting(false);
-                        listener.remove();
-                    }
-                }, 30000);
-            } else if ('NDEFReader' in window) {
-                // --- WEB FLOW (Chrome Android) ---
-                try {
-                    // @ts-ignore - NDEFReader is not in standard TS types yet
-                    const ndef = new window.NDEFReader();
-                    await ndef.write(profileUrl);
-
-                    triggerHaptic([50, 50, 50]);
-                    if (onShowToast) onShowToast("Sucesso! 🎉", "Link gravado na tag NFC.", 'success');
-                    else {
-                        onShowToast("Sucesso", "Link gravado na tag NFC!", 'success');
-                    }
-                    setIsNfcWriting(false);
-                } catch (error: any) {
-                    console.error("Web NFC failed:", error);
-                    if (onShowToast) onShowToast("Erro NFC", "Não foi possível gravar na tag. Verifique se o NFC está ativo.", 'error');
-                    setIsNfcWriting(false);
-                }
-            } else {
-                setIsNfcWriting(false);
-            }
-
-        } catch (error) {
-            console.error("NFC shared failed:", error);
-            setIsNfcWriting(false);
-        }
-    };
 
     const startScan = () => {
         triggerHaptic();
@@ -264,7 +147,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
     if (isGuest) {
         return (
             <div className="fixed inset-0 z-[150] flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-md pointer-events-auto">
-                <div className="bg-dirole-bg w-full sm:w-[450px] h-[350px] rounded-t-3xl sm:rounded-3xl border border-white/10 flex flex-col animate-slide-up shadow-2xl overflow-hidden p-6 text-center">
+                <div className="bg-dirole-bg w-full max-w-md h-auto min-h-[350px] rounded-t-3xl sm:rounded-3xl border border-white/10 flex flex-col animate-slide-up shadow-2xl overflow-hidden p-6 text-center">
                     <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-slate-400 hover:text-white transition-colors">
                         <i className="fas fa-times"></i>
                     </button>
@@ -274,7 +157,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
                             <i className="fas fa-user-lock text-3xl text-slate-500"></i>
                         </div>
                         <h2 className="text-xl font-bold text-white mb-2">Recurso Bloqueado</h2>
-                        <p className="text-sm text-slate-400 mb-6 max-w-[250px]">
+                        <p className="text-sm text-slate-400 mb-6 max-w-[16rem] mx-auto">
                             Visitantes não podem adicionar amigos. Crie uma conta gratuita para conectar com a galera!
                         </p>
                         <button
@@ -299,8 +182,8 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
 
         return (
             <div key={user.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between mb-2 group relative overflow-hidden active:bg-white/10 transition-colors">
-                <div className="flex items-center gap-3">
-                    <div className="relative">
+                <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
+                    <div className="relative shrink-0">
                         <UserAvatar avatar={user.avatar} size="md" />
                         {user.level && (
                             <div className="absolute -bottom-1 -right-1 bg-yellow-500 text-black text-[8px] font-black px-1.5 py-0.5 rounded-full border border-[#0f0518]">
@@ -308,9 +191,9 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
                             </div>
                         )}
                     </div>
-                    <div>
-                        <h4 className="font-bold text-white text-sm">{user.name}</h4>
-                        <p className="text-xs text-slate-500 font-medium">@{user.nickname}</p>
+                    <div className="min-w-0 overflow-hidden">
+                        <h4 className="font-bold text-white text-sm truncate">{user.name}</h4>
+                        <p className="text-xs text-slate-500 font-medium truncate">@{user.nickname}</p>
                     </div>
                 </div>
 
@@ -397,7 +280,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
     return (
         <div className="fixed inset-0 z-[500] flex items-end sm:items-center justify-center pointer-events-none">
             <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] pointer-events-auto transition-opacity" onClick={onClose}></div>
-            <div className={`bg-[#0f0518] w-full max-w-lg ${showQrCode ? 'h-[96vh] sm:h-[750px]' : 'h-[85vh] sm:h-[650px]'} rounded-t-[2rem] border-t border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.8)] pointer-events-auto animate-slide-up flex flex-col overflow-hidden relative isolate transition-all duration-300`}>
+            <div className={`bg-[#0f0518] w-full max-w-lg ${showQrCode ? 'h-[96dvh] sm:h-[45rem]' : 'h-[85dvh] sm:h-[40rem]'} rounded-t-[2rem] border-t border-white/10 shadow-[0_-10px_40px_rgba(0,0,0,0.8)] pointer-events-auto animate-slide-up flex flex-col overflow-hidden relative isolate transition-all duration-300 min-h-[500px]`}>
 
                 {/* Grabber Handle */}
                 <div className="absolute top-3 left-1/2 -translate-x-1/2 w-12 h-1 bg-white/20 rounded-full z-50"></div>
@@ -495,28 +378,7 @@ export const FriendsModal: React.FC<FriendsModalProps> = ({ isOpen, onClose, cur
                                             <span className="text-[10px] uppercase tracking-wider">Escanear</span>
                                         </button>
 
-                                        <button
-                                            onClick={() => {
-                                                if (hasNfc) {
-                                                    shareViaNFC();
-                                                } else {
-                                                    const message = window.Capacitor?.isNativePlatform?.()
-                                                        ? "NFC não disponível neste dispositivo. Verifique se o NFC está ativado nas configurações."
-                                                        : "NFC não suportado neste navegador. Use o QR Code ou abra no app.";
-                                                    if (onShowToast) onShowToast("NFC Indisponível", message, "error");
-                                                    else {
-                                                        onShowToast("Convite", message, 'success');
-                                                    }
-                                                }
-                                            }}
-                                            className={`flex-1 font-black py-3.5 rounded-xl flex flex-col items-center justify-center gap-1 transition-all shadow-lg active:scale-95 border ${hasNfc ? 'bg-dirole-primary text-white border-dirole-primary hover:bg-dirole-primary/80' : 'bg-white/5 text-slate-500 border-white/10 hover:bg-white/10 cursor-not-allowed'}`}
-                                            disabled={!hasNfc}
-                                        >
-                                            <i className="fas fa-wifi rotate-90 text-base"></i>
-                                            <span className="text-[10px] uppercase tracking-wider">NFC</span>
-                                            {!hasNfc && <span className="text-[8px] opacity-60">N/D</span>}
 
-                                        </button>
                                     </div>
 
                                     {/* ID Label */}

@@ -50,9 +50,11 @@ export const AuthFlow: React.FC<AuthFlowProps> = ({
                         <div className="w-10 h-10 border-4 border-dirole-primary/30 border-t-dirole-primary rounded-full animate-spin"></div>
                     </div>
                 </div>
-                {toasts.map(toast => (
-                    <InAppToast key={toast.id} toast={toast} onClose={removeToast} />
-                ))}
+                <div className="fixed top-[max(1rem,env(safe-area-inset-top))] left-4 right-4 z-[9999] pointer-events-none flex flex-col items-center">
+                    {toasts.map(toast => (
+                        <InAppToast key={toast.id} toast={toast} onClose={removeToast} />
+                    ))}
+                </div>
             </div>
         );
     }
@@ -65,9 +67,11 @@ export const AuthFlow: React.FC<AuthFlowProps> = ({
                 ) : (
                     <LandingPage onEnter={() => setShowLogin(true)} />
                 )}
-                {toasts.map(toast => (
-                    <InAppToast key={toast.id} toast={toast} onClose={removeToast} />
-                ))}
+                <div className="fixed top-[max(1rem,env(safe-area-inset-top))] left-4 right-4 z-[9999] pointer-events-none flex flex-col items-center">
+                    {toasts.map(toast => (
+                        <InAppToast key={toast.id} toast={toast} onClose={removeToast} />
+                    ))}
+                </div>
             </div>
         );
     }
@@ -79,9 +83,11 @@ export const AuthFlow: React.FC<AuthFlowProps> = ({
                     email={verificationEmail}
                     onVerified={() => window.location.reload()}
                 />
-                {toasts.map(toast => (
-                    <InAppToast key={toast.id} toast={toast} onClose={removeToast} />
-                ))}
+                <div className="fixed top-[max(1rem,env(safe-area-inset-top))] left-4 right-4 z-[9999] pointer-events-none flex flex-col items-center">
+                    {toasts.map(toast => (
+                        <InAppToast key={toast.id} toast={toast} onClose={removeToast} />
+                    ))}
+                </div>
             </div>
         );
     }

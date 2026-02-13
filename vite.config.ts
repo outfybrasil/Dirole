@@ -21,7 +21,17 @@ export default defineConfig(({ mode }) => {
       }
     },
     build: {
-      target: 'es2020'
+      target: 'es2020',
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'react-vendor': ['react', 'react-dom'],
+            'appwrite-vendor': ['appwrite'],
+            'maps-vendor': ['leaflet', 'react-leaflet'],
+            'ui-vendor': ['lucide-react', 'framer-motion'] // Add any other large UI libs here
+          }
+        }
+      }
     },
     optimizeDeps: {
       include: ['appwrite']

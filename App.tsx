@@ -1,27 +1,33 @@
-import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
-import { MapView } from './components/MapView';
-import { ListView } from './components/ListView';
-import { FilterBar } from './components/FilterBar';
-import { Leaderboard } from './components/Leaderboard';
-import { ReviewModal } from './components/ReviewModal';
-import { AddLocationModal } from './components/AddLocationModal';
-import { ProfileModal } from './components/ProfileModal';
+import React, { useEffect, useState, useCallback, useMemo, useRef, Suspense } from 'react';
+
+// Lazy Load Heavy Components
+const MapView = React.lazy(() => import('./components/MapView').then(module => ({ default: module.MapView })));
+const ListView = React.lazy(() => import('./components/ListView').then(module => ({ default: module.ListView })));
+const FilterBar = React.lazy(() => import('./components/FilterBar').then(module => ({ default: module.FilterBar })));
+const Leaderboard = React.lazy(() => import('./components/Leaderboard').then(module => ({ default: module.Leaderboard })));
+
+// Lazy Load Modals
+const ReviewModal = React.lazy(() => import('./components/ReviewModal').then(module => ({ default: module.ReviewModal })));
+const AddLocationModal = React.lazy(() => import('./components/AddLocationModal').then(module => ({ default: module.AddLocationModal })));
+const ProfileModal = React.lazy(() => import('./components/ProfileModal').then(module => ({ default: module.ProfileModal })));
+const LocationDetailsModal = React.lazy(() => import('./components/LocationDetailsModal').then(module => ({ default: module.LocationDetailsModal })));
+const ClaimBusinessModal = React.lazy(() => import('./components/ClaimBusinessModal').then(module => ({ default: module.ClaimBusinessModal })));
+const ReportModal = React.lazy(() => import('./components/ReportModal').then(module => ({ default: module.ReportModal })));
+const InviteFriendsModal = React.lazy(() => import('./components/InviteFriendsModal').then(module => ({ default: module.InviteFriendsModal })));
+const FriendsModal = React.lazy(() => import('./components/FriendsModal').then(module => ({ default: module.FriendsModal })));
+const NotificationsModal = React.lazy(() => import('./components/NotificationsModal').then(module => ({ default: module.NotificationsModal })));
+const QRScannerModal = React.lazy(() => import('./components/QRScannerModal').then(module => ({ default: module.QRScannerModal })));
+const PrivacyPolicyModal = React.lazy(() => import('./components/PrivacyPolicyModal').then(module => ({ default: module.PrivacyPolicyModal })));
+const DataPrivacyModal = React.lazy(() => import('./components/DataPrivacyModal').then(module => ({ default: module.DataPrivacyModal })));
+const StoryCamera = React.lazy(() => import('./components/StoryCamera').then(module => ({ default: module.StoryCamera })));
+const OnboardingModal = React.lazy(() => import('./components/OnboardingModal').then(module => ({ default: module.OnboardingModal })));
+
+// Keep lightweight/critical components eager
 import { ActivityTicker } from './components/ActivityTicker';
-import { LocationDetailsModal } from './components/LocationDetailsModal';
-import { ClaimBusinessModal } from './components/ClaimBusinessModal';
-import { ReportModal } from './components/ReportModal';
-import { InviteFriendsModal } from './components/InviteFriendsModal';
-import { FriendsModal } from './components/FriendsModal';
 import { Confetti } from './components/Confetti';
 import { CookieConsent } from './components/CookieConsent';
 import { InAppToast, ToastData } from './components/InAppToast';
-import { NotificationsModal } from './components/NotificationsModal';
-import { QRScannerModal } from './components/QRScannerModal';
-import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
-import { DataPrivacyModal } from './components/DataPrivacyModal';
-import { StoryCamera } from './components/StoryCamera';
 import { PWAInstallBanner } from './components/PWAInstallBanner';
-import { OnboardingModal } from './components/OnboardingModal';
 import { AuthFlow } from './components/AuthFlow';
 import UserAvatar from './components/UserAvatar';
 import { SearchBar } from './components/SearchBar';
@@ -116,8 +122,11 @@ function App() {
     setToasts(prev => prev.filter(t => t.id !== id));
   }, []);
 
+  const isRefreshingRef = useRef(isRefreshing);
+  useEffect(() => { isRefreshingRef.current = isRefreshing; }, [isRefreshing]);
+
   const fetchData = useCallback(async (lat: number, lng: number, bounds?: MapBounds) => {
-    if (!isRefreshing) setIsLoading(true);
+    if (!isRefreshingRef.current) setIsLoading(true);
     setSearchOrigin({ lat, lng });
 
     try {
@@ -131,7 +140,7 @@ function App() {
       setIsRefreshing(false);
       setPullY(0);
     }
-  }, [isRefreshing]);
+  }, []);
 
   const fetchNotificationCount = useCallback(async (userId: string) => {
     try {
@@ -383,7 +392,9 @@ function App() {
       <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-[#1a0b2e] to-slate-900 z-[-1]"></div>
       {showConfetti && <Confetti />}
       <CookieConsent />
-      {toasts.map(toast => <InAppToast key={toast.id} toast={toast} onClose={removeToast} />)}
+      <div className="fixed top-[max(1rem,env(safe-area-inset-top))] left-4 right-4 z-[9999] pointer-events-none flex flex-col items-center">
+        {toasts.map(toast => <InAppToast key={toast.id} toast={toast} onClose={removeToast} />)}
+      </div>
 
       <header className="bg-[#0f0518]/80 backdrop-blur-xl z-[60] px-6 py-4 pt-[max(1rem,env(safe-area-inset-top))] border-b border-white/5 flex justify-center sticky top-0 shrink-0">
         <div className="w-full max-w-7xl flex justify-between items-center">
@@ -466,7 +477,9 @@ function App() {
                 <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mt-4 mb-2 md:hidden"></div>
 
                 <div className="flex-1 overflow-y-auto sidebar-scroll">
-                  <FilterBar filters={filters} onChange={setFilters} onSearch={handleTextSearch} onClose={() => setShowFilters(false)} />
+                  <Suspense fallback={<div className="p-4 text-center text-slate-500">Loading Filters...</div>}>
+                    <FilterBar filters={filters} onChange={setFilters} onSearch={handleTextSearch} onClose={() => setShowFilters(false)} />
+                  </Suspense>
                 </div>
               </div>
             )}
@@ -495,15 +508,17 @@ function App() {
                     onClose={() => setShowFilters(false)}
                   />
                   <div className="h-px bg-white/5 mx-6 my-4"></div>
-                  <ListView
-                    locations={filteredLocations}
-                    onCheckIn={(loc) => { triggerHaptic(); setSelectedLocation(loc); setIsReviewModalOpen(true); }}
-                    favorites={currentUser?.favorites || []}
-                    onToggleFavorite={id => toggleFavorite(id).then(user => user && setCurrentUser(user))}
-                    onOpenDetails={(loc) => { triggerHaptic(); setSelectedLocation(loc); setIsDetailsModalOpen(true); }}
-                    isLoading={locations.length === 0 && isLoading}
-                    isSidebar={true}
-                  />
+                  <Suspense fallback={<div className="p-4 text-center"><i className="fas fa-spinner animate-spin"></i></div>}>
+                    <ListView
+                      locations={filteredLocations}
+                      onCheckIn={(loc) => { triggerHaptic(); setSelectedLocation(loc); setIsReviewModalOpen(true); }}
+                      favorites={currentUser?.favorites || []}
+                      onToggleFavorite={id => toggleFavorite(id).then(user => user && setCurrentUser(user))}
+                      onOpenDetails={(loc) => { triggerHaptic(); setSelectedLocation(loc); setIsDetailsModalOpen(true); }}
+                      isLoading={locations.length === 0 && isLoading}
+                      isSidebar={true}
+                    />
+                  </Suspense>
                 </div>
               </div>
             </div>
@@ -520,17 +535,19 @@ function App() {
 
             {/* MAIN CONTENT AREA (MAP BY DEFAULT OR LIST ON MOBILE) */}
             <div className={`flex-1 relative h-full min-h-0 ${activeTab === 'list' ? 'md:block hidden' : 'block'}`}>
-              <MapView
-                locations={filteredLocations}
-                userLocation={userLocation}
-                userAccuracy={userAccuracy}
-                mapCenter={mapTarget}
-                onOpenDetails={(loc) => { triggerHaptic(); setSelectedLocation(loc); setIsDetailsModalOpen(true); }}
-                onRegionChange={handleRegionChange}
-                searchRadius={filters.maxDistance}
-                searchOrigin={searchOrigin}
-                theme={mapTheme}
-              />
+              <Suspense fallback={<div className="flex items-center justify-center h-full"><i className="fas fa-circle-notch animate-spin text-dirole-primary text-2xl"></i></div>}>
+                <MapView
+                  locations={filteredLocations}
+                  userLocation={userLocation}
+                  userAccuracy={userAccuracy}
+                  mapCenter={mapTarget}
+                  onOpenDetails={(loc) => { triggerHaptic(); setSelectedLocation(loc); setIsDetailsModalOpen(true); }}
+                  onRegionChange={handleRegionChange}
+                  searchRadius={filters.maxDistance}
+                  searchOrigin={searchOrigin}
+                  theme={mapTheme}
+                />
+              </Suspense>
               <button onClick={() => setMapTheme(mapTheme === 'dark' ? 'light' : 'dark')} className={`w-10 h-10 rounded-full shadow-lg flex items-center justify-center transition-all transform active:scale-95 border border-white/20 ${mapTheme === 'dark' ? 'bg-black/80 text-white backdrop-blur-md' : 'bg-white/90 text-slate-900 backdrop-blur-md'}`}>
                 <i className={`fas ${mapTheme === 'dark' ? 'fa-sun' : 'fa-moon'} text-xs`}></i>
               </button>
@@ -545,19 +562,27 @@ function App() {
               <SearchBar onSearch={handleTextSearch} />
             </div>
             <div className="flex-1 overflow-y-auto pb-safe">
-              <ListView
-                locations={filteredLocations}
-                onCheckIn={(loc) => { triggerHaptic(); setSelectedLocation(loc); setIsReviewModalOpen(true); }}
-                favorites={currentUser.favorites || []}
-                onToggleFavorite={id => toggleFavorite(id).then(user => user && setCurrentUser(user))}
-                onOpenDetails={(loc) => { triggerHaptic(); setSelectedLocation(loc); setIsDetailsModalOpen(true); }}
-                isLoading={locations.length === 0 && isLoading}
-              />
+              <Suspense fallback={<div className="p-4 text-center"><i className="fas fa-spinner animate-spin"></i></div>}>
+                <ListView
+                  locations={filteredLocations}
+                  onCheckIn={(loc) => { triggerHaptic(); setSelectedLocation(loc); setIsReviewModalOpen(true); }}
+                  favorites={currentUser.favorites || []}
+                  onToggleFavorite={id => toggleFavorite(id).then(user => user && setCurrentUser(user))}
+                  onOpenDetails={(loc) => { triggerHaptic(); setSelectedLocation(loc); setIsDetailsModalOpen(true); }}
+                  isLoading={locations.length === 0 && isLoading}
+                />
+              </Suspense>
             </div>
           </div>
         )}
 
-        {activeTab === 'rank' && <div className="w-full min-h-full max-w-3xl mx-auto"><Leaderboard /></div>}
+        {activeTab === 'rank' && (
+          <div className="w-full min-h-full max-w-3xl mx-auto">
+            <Suspense fallback={<div className="p-10 text-center text-white"><i className="fas fa-trophy animate-bounce text-yellow-500 text-3xl mb-4"></i><p>Carregando ranking...</p></div>}>
+              <Leaderboard />
+            </Suspense>
+          </div>
+        )}
       </div>
 
       {activeTab === 'map' && shouldShowSearchHere && !isRefreshing && (
@@ -591,32 +616,34 @@ function App() {
       </nav>
 
       {/* MODALS */}
-      {
-        selectedLocation && (
-          <>
-            <ReviewModal location={selectedLocation} currentUser={currentUser} isOpen={isReviewModalOpen} onClose={() => setIsReviewModalOpen(false)} onSuccess={() => { setShowConfetti(true); setTimeout(() => setShowConfetti(false), 4000); const up = getUserProfile(); if (up) setCurrentUser(up); if (searchOrigin) fetchData(searchOrigin.lat, searchOrigin.lng); }} onLogout={handleLogout} userLocation={userLocation} />
-            <LocationDetailsModal location={selectedLocation} isOpen={isDetailsModalOpen} onClose={() => setIsDetailsModalOpen(false)} onCheckIn={(loc) => { triggerHaptic(); setSelectedLocation(loc); setIsReviewModalOpen(true); }} onClaim={(loc) => { setSelectedLocation(loc); setIsClaimModalOpen(true); }} onReport={(id, type, name) => { setReportTarget({ id, type, name }); setIsReportModalOpen(true); }} onInvite={(loc) => { setSelectedLocation(loc); setIsInviteModalOpen(true); setIsDetailsModalOpen(false); }} onPostStory={(loc) => { triggerHaptic(); setStoryLocation(loc); setIsStoryCameraOpen(true); }} onShowToast={(title, message, type) => addToast({ title, message, type: type as any })} userLocation={userLocation} />
-            <ClaimBusinessModal location={selectedLocation} currentUser={currentUser} isOpen={isClaimModalOpen} onClose={() => setIsClaimModalOpen(false)} onSuccess={() => { setShowConfetti(true); setTimeout(() => setShowConfetti(false), 3000); const center = currentMapCenter || userLocation || INITIAL_CENTER; fetchData(center.lat, center.lng); }} />
-            <InviteFriendsModal isOpen={isInviteModalOpen} onClose={() => setIsInviteModalOpen(false)} currentUser={currentUser} location={selectedLocation} onSuccess={() => { setShowConfetti(true); setTimeout(() => setShowConfetti(false), 3000); }} />
-          </>
-        )
-      }
+      {/* MODALS WRAPPED IN SUSPENSE */}
+      <Suspense fallback={<div className="fixed inset-0 z-[999] pointer-events-none"></div>}>
+        {
+          selectedLocation && (
+            <>
+              {isReviewModalOpen && <ReviewModal location={selectedLocation} currentUser={currentUser} isOpen={isReviewModalOpen} onClose={() => setIsReviewModalOpen(false)} onSuccess={() => { setShowConfetti(true); setTimeout(() => setShowConfetti(false), 4000); const up = getUserProfile(); if (up) setCurrentUser(up); if (searchOrigin) fetchData(searchOrigin.lat, searchOrigin.lng); }} onLogout={handleLogout} userLocation={userLocation} />}
+              {isDetailsModalOpen && <LocationDetailsModal location={selectedLocation} isOpen={isDetailsModalOpen} onClose={() => setIsDetailsModalOpen(false)} onCheckIn={(loc) => { triggerHaptic(); setSelectedLocation(loc); setIsReviewModalOpen(true); }} onClaim={(loc) => { setSelectedLocation(loc); setIsClaimModalOpen(true); }} onReport={(id, type, name) => { setReportTarget({ id, type, name }); setIsReportModalOpen(true); }} onInvite={(loc) => { setSelectedLocation(loc); setIsInviteModalOpen(true); setIsDetailsModalOpen(false); }} onPostStory={(loc) => { triggerHaptic(); setStoryLocation(loc); setIsStoryCameraOpen(true); }} onShowToast={(title, message, type) => addToast({ title, message, type: type as any })} userLocation={userLocation} />}
+              {isClaimModalOpen && <ClaimBusinessModal location={selectedLocation} currentUser={currentUser} isOpen={isClaimModalOpen} onClose={() => setIsClaimModalOpen(false)} onSuccess={() => { setShowConfetti(true); setTimeout(() => setShowConfetti(false), 3000); const center = currentMapCenter || userLocation || INITIAL_CENTER; fetchData(center.lat, center.lng); }} />}
+              {isInviteModalOpen && <InviteFriendsModal isOpen={isInviteModalOpen} onClose={() => setIsInviteModalOpen(false)} currentUser={currentUser} location={selectedLocation} onSuccess={() => { setShowConfetti(true); setTimeout(() => setShowConfetti(false), 3000); }} />}
+            </>
+          )
+        }
 
-      {isReportModalOpen && reportTarget && <ReportModal isOpen={isReportModalOpen} onClose={() => setIsReportModalOpen(false)} targetId={reportTarget.id} targetType={reportTarget.type} targetName={reportTarget.name} currentUser={currentUser} />}
-      {isPrivacyModalOpen && <PrivacyPolicyModal isOpen={isPrivacyModalOpen} onClose={() => setIsPrivacyModalOpen(false)} />}
-      {isDataModalOpen && <DataPrivacyModal isOpen={isDataModalOpen} onClose={() => setIsDataModalOpen(false)} currentUser={currentUser} />}
-      {isNotificationsModalOpen && <NotificationsModal isOpen={isNotificationsModalOpen} onClose={() => setIsNotificationsModalOpen(false)} />}
-      <QRScannerModal isOpen={isQRScannerOpen} onClose={() => setIsQRScannerOpen(false)} onScan={handleQRScan} />
-      <OnboardingModal isOpen={showOnboarding} onClose={() => setShowOnboarding(false)} />
-      {showInstallBanner && <PWAInstallBanner onInstall={async () => { if (!deferredPrompt) return; triggerHaptic(); deferredPrompt.prompt(); await deferredPrompt.userChoice; setDeferredPrompt(null); setShowInstallBanner(false); }} onDismiss={() => { triggerHaptic(); setShowInstallBanner(false); }} />}
+        {isReportModalOpen && reportTarget && <ReportModal isOpen={isReportModalOpen} onClose={() => setIsReportModalOpen(false)} targetId={reportTarget.id} targetType={reportTarget.type} targetName={reportTarget.name} currentUser={currentUser} />}
+        {isPrivacyModalOpen && <PrivacyPolicyModal isOpen={isPrivacyModalOpen} onClose={() => setIsPrivacyModalOpen(false)} />}
+        {isDataModalOpen && <DataPrivacyModal isOpen={isDataModalOpen} onClose={() => setIsDataModalOpen(false)} currentUser={currentUser} />}
+        {isNotificationsModalOpen && <NotificationsModal isOpen={isNotificationsModalOpen} onClose={() => setIsNotificationsModalOpen(false)} currentUser={currentUser} />}
+        {isQRScannerOpen && <QRScannerModal isOpen={isQRScannerOpen} onClose={() => setIsQRScannerOpen(false)} onScan={handleQRScan} />}
+        {showOnboarding && <OnboardingModal isOpen={showOnboarding} onClose={() => setShowOnboarding(false)} />}
 
-      <AddLocationModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onSuccess={() => { if (searchOrigin) fetchData(searchOrigin.lat, searchOrigin.lng); }} userLat={userLocation?.lat || INITIAL_CENTER.lat} userLng={userLocation?.lng || INITIAL_CENTER.lng} currentUser={currentUser} />
+        {isAddModalOpen && <AddLocationModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onSuccess={() => { if (searchOrigin) fetchData(searchOrigin.lat, searchOrigin.lng); }} userLat={userLocation?.lat || INITIAL_CENTER.lat} userLng={userLocation?.lng || INITIAL_CENTER.lng} currentUser={currentUser} />}
 
-      <ProfileModal isOpen={isProfileModalOpen} currentUser={currentUser} onSave={(u) => { setCurrentUser(u); setIsProfileModalOpen(false); }} onClose={() => setIsProfileModalOpen(false)} onOpenPrivacy={() => setIsPrivacyModalOpen(true)} onOpenData={() => setIsDataModalOpen(true)} onOpenFriends={(tab) => { triggerHaptic(); setFriendsModalTab(tab); setIsProfileModalOpen(false); setIsFriendsModalOpen(true); }} onLogout={handleLogout} onShowToast={(message, type) => addToast({ title: type === 'error' ? 'Erro' : 'Sucesso', message, type: type as any })} />
+        {isProfileModalOpen && <ProfileModal isOpen={isProfileModalOpen} currentUser={currentUser} onSave={(u) => { setCurrentUser(u); setIsProfileModalOpen(false); }} onClose={() => setIsProfileModalOpen(false)} onOpenPrivacy={() => setIsPrivacyModalOpen(true)} onOpenData={() => setIsDataModalOpen(true)} onOpenFriends={(tab) => { triggerHaptic(); setFriendsModalTab(tab); setIsProfileModalOpen(false); setIsFriendsModalOpen(true); }} onLogout={handleLogout} onShowToast={(message, type) => addToast({ title: type === 'error' ? 'Erro' : 'Sucesso', message, type: type as any })} />}
 
-      {isFriendsModalOpen && <FriendsModal isOpen={isFriendsModalOpen} onClose={() => { setIsFriendsModalOpen(false); setScannedUser(null); setFriendsModalView('default'); }} currentUser={currentUser} initialTab={friendsModalTab} initialView={friendsModalView} scannedUser={scannedUser} onLogout={handleLogout} onOpenScanner={() => { setIsFriendsModalOpen(false); setTimeout(() => setIsQRScannerOpen(true), 300); }} onShowToast={(title, message, type) => addToast({ title, message, type: type as any })} />}
+        {isFriendsModalOpen && <FriendsModal isOpen={isFriendsModalOpen} onClose={() => { setIsFriendsModalOpen(false); setScannedUser(null); setFriendsModalView('default'); }} currentUser={currentUser} initialTab={friendsModalTab} initialView={friendsModalView} scannedUser={scannedUser} onLogout={handleLogout} onOpenScanner={() => { setIsFriendsModalOpen(false); setTimeout(() => setIsQRScannerOpen(true), 300); }} onShowToast={(title, message, type) => addToast({ title, message, type: type as any })} />}
 
-      {isStoryCameraOpen && storyLocation && <StoryCamera isOpen={isStoryCameraOpen} locationId={storyLocation.id} locationName={storyLocation.name} onClose={() => setIsStoryCameraOpen(false)} onStoryPosted={() => { setIsStoryCameraOpen(false); setStoryLocation(null); addToast({ title: "Story Postado! 📸", message: "Seu story ficará visível por 6 horas.", type: 'success' }); }} />}
+        {isStoryCameraOpen && storyLocation && <StoryCamera isOpen={isStoryCameraOpen} locationId={storyLocation.id} locationName={storyLocation.name} onClose={() => setIsStoryCameraOpen(false)} onStoryPosted={() => { setIsStoryCameraOpen(false); setStoryLocation(null); addToast({ title: "Story Postado! 📸", message: "Seu story ficará visível por 6 horas.", type: 'success' }); }} />}
+      </Suspense>
     </div >
   );
 }

@@ -1,9 +1,9 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Transaction, Budget, Goal, Insight } from '../types';
 
 // Initialize Gemini client
 // Note: process.env.API_KEY is assumed to be available as per instructions.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+const ai = new GoogleGenerativeAI(process.env.API_KEY || '');
 
 export const generateFinancialInsights = async (
   transactions: Transaction[],
@@ -11,6 +11,12 @@ export const generateFinancialInsights = async (
   goals: Goal[]
 ): Promise<Insight[]> => {
   const modelId = 'gemini-2.5-flash';
+  const model = ai.getGenerativeModel({
+    model: modelId,
+    generationConfig: {
+      responseMimeType: "application/json",
+    },
+  });
 
   // Prepare data context for the AI
   const recentTransactions = transactions.slice(0, 20); // Last 20 for context
@@ -46,15 +52,8 @@ export const generateFinancialInsights = async (
   `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: modelId,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-      }
-    });
-
-    const text = response.text;
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
     if (!text) return [];
 
     const insights = JSON.parse(text) as Insight[];
@@ -76,63 +75,69 @@ export const generateFinancialInsights = async (
 };
 
 export interface GoalStrategy {
-    monthlyRequired: number;
-    monthsRemaining: number;
-    suggestion: string;
-    alternativeScenario: string;
+  monthlyRequired: number;
+  monthsRemaining: number;
+  suggestion: string;
+  alternativeScenario: string;
 }
 
 export const analyzeGoalStrategy = async (
-    targetAmount: number,
-    currentAmount: number,
-    deadline: string,
-    transactions: Transaction[] // Novo parâmetro
+  targetAmount: number,
+  currentAmount: number,
+  deadline: string,
+  transactions: Transaction[] // Novo parâmetro
 ): Promise<GoalStrategy | null> => {
-    const modelId = 'gemini-2.5-flash';
-    
-    // 1. Cálculos matemáticos básicos da meta
-    const today = new Date();
-    const deadlineDate = new Date(deadline);
-    const monthsRemaining = Math.max(
-        (deadlineDate.getFullYear() - today.getFullYear()) * 12 + (deadlineDate.getMonth() - today.getMonth()),
-        1
-    );
-    const amountNeeded = targetAmount - currentAmount;
-    const mathMonthly = amountNeeded / monthsRemaining;
+  const modelId = 'gemini-1.5-flash';
+  const model = ai.getGenerativeModel({
+    model: modelId,
+    generationConfig: {
+      responseMimeType: "application/json",
+    },
+  });
 
-    // 2. Análise do Histórico Financeiro (Últimos 3 meses para média)
-    const cutoffDate = new Date();
-    cutoffDate.setMonth(cutoffDate.getMonth() - 3);
+  // 1. Cálculos matemáticos básicos da meta
+  const today = new Date();
+  const deadlineDate = new Date(deadline);
+  const monthsRemaining = Math.max(
+    (deadlineDate.getFullYear() - today.getFullYear()) * 12 + (deadlineDate.getMonth() - today.getMonth()),
+    1
+  );
+  const amountNeeded = targetAmount - currentAmount;
+  const mathMonthly = amountNeeded / monthsRemaining;
 
-    const recentTx = transactions.filter(t => new Date(t.date) >= cutoffDate);
-    
-    let totalIncome = 0;
-    let totalExpense = 0;
-    const expensesByCategory: Record<string, number> = {};
+  // 2. Análise do Histórico Financeiro (Últimos 3 meses para média)
+  const cutoffDate = new Date();
+  cutoffDate.setMonth(cutoffDate.getMonth() - 3);
 
-    recentTx.forEach(t => {
-        if (t.type === 'income') {
-            totalIncome += t.amount;
-        } else {
-            totalExpense += t.amount;
-            expensesByCategory[t.category] = (expensesByCategory[t.category] || 0) + t.amount;
-        }
-    });
+  const recentTx = transactions.filter(t => new Date(t.date) >= cutoffDate);
 
-    // Médias mensais (dividindo por 3 ou 1 se for novo usuário)
-    const monthsData = recentTx.length > 0 ? 3 : 1;
-    const avgIncome = totalIncome / monthsData;
-    const avgExpense = totalExpense / monthsData;
-    const avgDisposable = avgIncome - avgExpense;
+  let totalIncome = 0;
+  let totalExpense = 0;
+  const expensesByCategory: Record<string, number> = {};
 
-    // Formatar categorias principais para o prompt
-    const topCategories = Object.entries(expensesByCategory)
-        .sort(([,a], [,b]) => b - a)
-        .slice(0, 3)
-        .map(([cat, val]) => `${cat}: R$ ${(val/monthsData).toFixed(0)}/mês`)
-        .join(', ');
+  recentTx.forEach(t => {
+    if (t.type === 'income') {
+      totalIncome += t.amount;
+    } else {
+      totalExpense += t.amount;
+      expensesByCategory[t.category] = (expensesByCategory[t.category] || 0) + t.amount;
+    }
+  });
 
-    const prompt = `
+  // Médias mensais (dividindo por 3 ou 1 se for novo usuário)
+  const monthsData = recentTx.length > 0 ? 3 : 1;
+  const avgIncome = totalIncome / monthsData;
+  const avgExpense = totalExpense / monthsData;
+  const avgDisposable = avgIncome - avgExpense;
+
+  // Formatar categorias principais para o prompt
+  const topCategories = Object.entries(expensesByCategory)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 3)
+    .map(([cat, val]) => `${cat}: R$ ${(val / monthsData).toFixed(0)}/mês`)
+    .join(', ');
+
+  const prompt = `
       Atue como um planejador financeiro especialista e realista para o Gustavo.
       
       DADOS DA META:
@@ -162,23 +167,16 @@ export const analyzeGoalStrategy = async (
       }
     `;
 
-    try {
-        const response = await ai.models.generateContent({
-            model: modelId,
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-            }
-        });
+  try {
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    if (!text) return null;
+    return JSON.parse(text) as GoalStrategy;
 
-        const text = response.text;
-        if (!text) return null;
-        return JSON.parse(text) as GoalStrategy;
-
-    } catch (error) {
-        console.error("Erro ao calcular estratégia de meta", error);
-        return null;
-    }
+  } catch (error) {
+    console.error("Erro ao calcular estratégia de meta", error);
+    return null;
+  }
 };
 
 export interface AuditAdvice {
@@ -192,8 +190,14 @@ export const generateAuditAdvice = async (
   wants: number,
   savings: number
 ): Promise<AuditAdvice | null> => {
-  const modelId = 'gemini-2.5-flash';
-  
+  const modelId = 'gemini-1.5-flash';
+  const model = ai.getGenerativeModel({
+    model: modelId,
+    generationConfig: {
+      responseMimeType: "application/json",
+    },
+  });
+
   const needsPct = ((needs / income) * 100).toFixed(1);
   const wantsPct = ((wants / income) * 100).toFixed(1);
   const savingsPct = ((savings / income) * 100).toFixed(1);
@@ -219,16 +223,12 @@ export const generateAuditAdvice = async (
   `;
 
   try {
-      const response = await ai.models.generateContent({
-          model: modelId,
-          contents: prompt,
-          config: { responseMimeType: "application/json" }
-      });
-      const text = response.text;
-      if(!text) return null;
-      return JSON.parse(text) as AuditAdvice;
+    const result = await model.generateContent(prompt);
+    const text = result.response.text();
+    if (!text) return null;
+    return JSON.parse(text) as AuditAdvice;
   } catch (e) {
-      console.error("Erro no audit", e);
-      return null;
+    console.error("Erro no audit", e);
+    return null;
   }
 }

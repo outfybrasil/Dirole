@@ -23,7 +23,14 @@ export const signUpWithEmail = async (email: string, pass: string, name: string)
 
 export const signInWithEmail = async (email: string, pass: string) => {
     try {
-        const session = await account.createEmailPasswordSession(email, pass);
+        // Clear any stuck sessions before attempting login
+        try {
+            await account.deleteSession('current');
+        } catch (e) {
+            // Ignore if no session
+        }
+
+        const session = await account.createEmailPasswordSession(email.trim(), pass);
         console.log('[Auth] Sign in successful');
         return session;
     } catch (e: any) {

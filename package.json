@@ -21,15 +21,18 @@
     "@capacitor/core": "^8.0.2",
     "@capacitor/geolocation": "^7.1.6",
     "@capacitor/ios": "^8.0.2",
-    "@capgo/capacitor-nfc": "^8.0.8",
+    "@google/generative-ai": "^0.24.1",
     "@ionic/pwa-elements": "^3.3.0",
+    "@types/recharts": "^1.8.29",
     "appwrite": "^21.5.0",
+    "framer-motion": "^12.34.0",
     "html5-qrcode": "^2.3.8",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.563.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-leaflet": "^5.0.0"
+    "react-leaflet": "^5.0.0",
+    "recharts": "^3.7.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",

@@ -95,9 +95,13 @@ export const StepPersonal: React.FC<StepPersonalProps> = ({
                         onChange={(e) => setGender(e.target.value)}
                         className="w-full bg-black/30 border border-white/10 rounded-xl py-3.5 pl-12 pr-4 text-white focus:border-dirole-secondary focus:ring-1 focus:ring-dirole-secondary focus:outline-none appearance-none backdrop-blur-sm transition-all text-sm"
                     >
-                        <option value="Outro">Outro / Prefiro não dizer</option>
+                        <option value="Prefiro não dizer">Prefiro não dizer</option>
                         <option value="Masculino">Masculino</option>
                         <option value="Feminino">Feminino</option>
+                        <option value="Não-binário">Não-binário</option>
+                        <option value="Transgênero">Transgênero</option>
+                        <option value="Gênero Fluido">Gênero Fluido</option>
+                        <option value="Outro">Outro</option>
                     </select>
                     <i className="fas fa-chevron-down absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 text-xs pointer-events-none"></i>
                 </div>

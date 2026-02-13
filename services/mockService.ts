@@ -13,6 +13,16 @@ import {
 } from 'appwrite';
 
 // --- FILE UPLOAD ---
+// Caching for performance
+let locationCache: {
+    lat: number;
+    lng: number;
+    timestamp: number;
+    data: Location[];
+} | null = null;
+const CACHE_STALE_MS = 60000; // 1 minute
+const CACHE_DISTANCE_THRESHOLD = 0.05; // ~50m
+
 export const uploadFile = async (file: File): Promise<string> => {
     try {
         const result = await storage.createFile(
@@ -294,74 +304,98 @@ export const syncUserProfile = async (authId: string, meta: any): Promise<User |
     try {
         console.log(`[Appwrite Sync] Syncing user profile for ${authId}`);
 
-        const response = await databases.listDocuments(
-            APPWRITE_DATABASE_ID,
-            'profiles',
-            [Query.equal('userId', authId), Query.limit(1)]
-        );
-
         let profileDoc;
 
-        if (response.documents.length === 0) {
-            console.log("[Appwrite Sync] Profile not found. Creating emergency profile...");
+        try {
+            console.log(`[Appwrite Sync] Attempting to fetch profile by ID: ${authId}`);
+            profileDoc = await databases.getDocument(
+                APPWRITE_DATABASE_ID,
+                'profiles',
+                authId
+            );
+            console.log("[Appwrite Sync] Profile found by ID.");
+        } catch (getErr: any) {
+            console.log(`[Appwrite Sync] getDocument failed (${getErr.code}). Falling back to listDocuments...`);
+            const response = await databases.listDocuments(
+                APPWRITE_DATABASE_ID,
+                'profiles',
+                [Query.equal('userId', authId), Query.limit(1)]
+            );
+            if (response.documents.length > 0) {
+                profileDoc = response.documents[0];
+                console.log("[Appwrite Sync] Profile found by userId query.");
+            }
+        }
+
+        if (!profileDoc) {
+            console.log("[Appwrite Sync] Profile not found. Creating profile with ID:", authId);
             try {
+                // Gender normalization to avoid Appwrite validation errors
+                const getSafeGender = (g: string) => {
+                    const normalized = (g || '').toLowerCase();
+                    if (normalized.includes('masc')) return 'Masculino';
+                    if (normalized.includes('fem')) return 'Feminino';
+                    return 'Outro';
+                };
+
+                const profileData = {
+                    userId: authId,
+                    name: meta.full_name || meta.name || 'Novo Usuário',
+                    nickname: meta.nickname || '',
+                    email: meta.email || '',
+                    avatar: meta.avatar || meta.avatar_url || '😎',
+                    points: 0,
+                    xp: 0,
+                    level: 1,
+                    gender: getSafeGender(meta.gender),
+                    badges: JSON.stringify([]),
+                    favorites: JSON.stringify([])
+                };
+                console.log("[Appwrite Sync] Creating document with data:", JSON.stringify(profileData, null, 2));
+
                 profileDoc = await databases.createDocument(
                     APPWRITE_DATABASE_ID,
                     'profiles',
-                    ID.unique(),
-                    {
-                        userId: authId,
-                        name: meta.full_name || meta.name || 'Novo Usuário',
-                        nickname: meta.nickname || '',
-                        email: meta.email || '',
-                        avatar: meta.avatar || meta.avatar_url || '😎',
-                        points: 0,
-                        xp: 0,
-                        level: 1,
-                        gender: meta.gender || 'Outro',
-                        badges: JSON.stringify([])
-                    }
+                    authId,
+                    profileData,
+                    [
+                        Permission.read(Role.any()),
+                        Permission.update(Role.user(authId)),
+                        Permission.delete(Role.user(authId))
+                    ]
                 );
+                console.log("[Appwrite Sync] Profile created successfully:", profileDoc.$id);
             } catch (createError: any) {
-                // Handle race condition: another process already created the profile
+                console.error("[Appwrite Sync] Create profile error. Code:", createError.code, "Message:", createError.message);
+
                 if (createError.code === 409 || createError.message?.includes('already exists')) {
-                    console.log("[Appwrite Sync] Profile was created by another process. Fetching it...");
-                    const retryResponse = await databases.listDocuments(
-                        APPWRITE_DATABASE_ID,
-                        'profiles',
-                        [Query.equal('userId', authId), Query.limit(1)]
-                    );
-                    if (retryResponse.documents.length > 0) {
-                        profileDoc = retryResponse.documents[0];
-                    } else {
-                        throw new Error("Profile creation failed and retry fetch returned no results");
-                    }
+                    console.error("[Appwrite Sync] 404/409 Conflict Detected! O documento existe mas é invisível para o usuário.");
+                    throw new Error("CONFLITO DE PERMISSÃO: O seu perfil já existe no Appwrite mas o app não tem permissão para lê-lo. Verifique as 'Permissions' da coleção 'profiles' no Console do Appwrite.");
                 } else {
                     throw createError;
                 }
             }
         } else {
-            profileDoc = response.documents[0];
-            console.log("[Appwrite Sync] Profile found. Updating with new data...");
+            console.log("[Appwrite Sync] Profile found. ID:", profileDoc.$id);
+        }
 
-            // Update existing profile with new data if provided
-            const updateData: any = {};
-            if (meta.name || meta.full_name) updateData.name = meta.full_name || meta.name;
-            if (meta.nickname) updateData.nickname = meta.nickname;
-            if (meta.email) updateData.email = meta.email;
-            if (meta.avatar || meta.avatar_url) updateData.avatar = meta.avatar || meta.avatar_url;
-            if (meta.gender) updateData.gender = meta.gender;
+        // Update existing profile with new data if provided
+        const updateData: any = {};
+        if (meta.name || meta.full_name) updateData.name = meta.full_name || meta.name;
+        if (meta.nickname) updateData.nickname = meta.nickname;
+        if (meta.email) updateData.email = meta.email;
+        if (meta.avatar || meta.avatar_url) updateData.avatar = meta.avatar || meta.avatar_url;
+        if (meta.gender) updateData.gender = meta.gender;
 
-            // Only update if there's data to update
-            if (Object.keys(updateData).length > 0) {
-                profileDoc = await databases.updateDocument(
-                    APPWRITE_DATABASE_ID,
-                    'profiles',
-                    profileDoc.$id,
-                    updateData
-                );
-                console.log("[Appwrite Sync] Profile updated successfully");
-            }
+        // Only update if there's data to update
+        if (Object.keys(updateData).length > 0) {
+            profileDoc = await databases.updateDocument(
+                APPWRITE_DATABASE_ID,
+                'profiles',
+                profileDoc.$id,
+                updateData
+            );
+            console.log("[Appwrite Sync] Profile updated successfully");
         }
 
         const user: User = {
@@ -373,9 +407,17 @@ export const syncUserProfile = async (authId: string, meta: any): Promise<User |
             points: profileDoc.points || 0,
             xp: profileDoc.xp || 0,
             level: profileDoc.level || 1,
-            badges: profileDoc.badges ? JSON.parse(profileDoc.badges) : [],
+            badges: [],
             favorites: []
         };
+
+        try {
+            if (profileDoc.badges) user.badges = JSON.parse(profileDoc.badges);
+        } catch (e) { console.warn("[Appwrite Sync] Failed to parse badges:", profileDoc.badges); }
+
+        try {
+            if (profileDoc.favorites) user.favorites = JSON.parse(profileDoc.favorites);
+        } catch (e) { console.warn("[Appwrite Sync] Failed to parse favorites:", profileDoc.favorites); }
 
         localStorage.setItem(STORAGE_KEY, JSON.stringify(user));
         return user;
@@ -590,29 +632,35 @@ export const searchUsers = async (query: string, currentUserId: string): Promise
     try {
         const blockedIds = await getBlockedUsers(currentUserId);
 
-        // Search in Appwrite profiles
+        // Search in Appwrite profiles - Optimized with server-side filtering
         const response = await databases.listDocuments(
             APPWRITE_DATABASE_ID,
             'profiles',
             [
-                Query.limit(100)
+                Query.or([
+                    Query.contains('name', cleanQuery),
+                    Query.contains('nickname', cleanQuery)
+                ]),
+                Query.notEqual('userId', currentUserId),
+                Query.limit(50)
             ]
         );
 
-        const profiles = response.documents.filter((p: any) =>
-            (p.name?.toLowerCase().includes(cleanQuery.toLowerCase()) ||
-                p.nickname?.toLowerCase().includes(cleanQuery.toLowerCase())) &&
-            p.userId !== currentUserId &&
-            !blockedIds.includes(p.userId)
+        const profiles = response.documents.filter((p: any) => !blockedIds.includes(p.userId));
+
+        // Fetch friendships - Optimized with Or query
+        const fResponse = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'friendships',
+            [
+                Query.or([
+                    Query.equal('requester_id', currentUserId),
+                    Query.equal('receiver_id', currentUserId)
+                ])
+            ]
         );
 
-        // Fetch friendships
-        const fResponseRes = await Promise.all([
-            databases.listDocuments(APPWRITE_DATABASE_ID, 'friendships', [Query.equal('requester_id', currentUserId)]),
-            databases.listDocuments(APPWRITE_DATABASE_ID, 'friendships', [Query.equal('receiver_id', currentUserId)])
-        ]);
-
-        const myFriendships = [...fResponseRes[0].documents, ...fResponseRes[1].documents];
+        const myFriendships = fResponse.documents;
 
         return profiles.map((p: any) => {
             const friendship = myFriendships.find((f: any) =>
@@ -658,12 +706,18 @@ export const getFriends = async (currentUserId: string): Promise<FriendUser[]> =
     try {
         const blockedIds = await getBlockedUsers(currentUserId);
 
-        const fResponseRes = await Promise.all([
-            databases.listDocuments(APPWRITE_DATABASE_ID, 'friendships', [Query.equal('requester_id', currentUserId)]),
-            databases.listDocuments(APPWRITE_DATABASE_ID, 'friendships', [Query.equal('receiver_id', currentUserId)])
-        ]);
+        const fResponse = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'friendships',
+            [
+                Query.or([
+                    Query.equal('requester_id', currentUserId),
+                    Query.equal('receiver_id', currentUserId)
+                ])
+            ]
+        );
 
-        const friendships = [...fResponseRes[0].documents, ...fResponseRes[1].documents];
+        const friendships = fResponse.documents;
 
         if (friendships.length > 0) {
             const friendIds = friendships.map((f: any) => f.requester_id === currentUserId ? f.receiver_id : f.requester_id);
@@ -676,10 +730,10 @@ export const getFriends = async (currentUserId: string): Promise<FriendUser[]> =
                 const pResponse = await databases.listDocuments(
                     APPWRITE_DATABASE_ID,
                     'profiles',
-                    [Query.limit(100)]
+                    [Query.equal('userId', safeFriendIds)]
                 );
 
-                const profiles = pResponse.documents.filter((p: any) => safeFriendIds.includes(p.userId));
+                const profiles = pResponse.documents;
 
                 return profiles.map((p: any) => {
                     const f = friendships.find((fr: any) => fr.requester_id === p.userId || fr.receiver_id === p.userId);
@@ -905,14 +959,14 @@ export const getPendingFriendRequests = async (userId: string): Promise<FriendUs
 
         const requesterIds = response.documents.map((f: any) => f.requester_id);
 
-        // Fetch profiles. Similar to getFriends, we list and filter if under 100 for MVP
+        // Fetch profiles - Optimized to only fetch the requesters
         const pResponse = await databases.listDocuments(
             APPWRITE_DATABASE_ID,
             'profiles',
-            [Query.limit(100)]
+            [Query.equal('userId', requesterIds)]
         );
 
-        const profiles = pResponse.documents.filter((p: any) => requesterIds.includes(p.userId));
+        const profiles = pResponse.documents;
 
         return profiles.map((p: any) => {
             const f = response.documents.find((fr: any) => fr.requester_id === p.userId);
@@ -1322,6 +1376,19 @@ const generateFallbackLocations = (centerLat: number, centerLng: number, count: 
 };
 
 export const getNearbyRoles = async (lat: number, lng: number, bounds?: MapBounds): Promise<Location[]> => {
+    // Optimization: Return cache if within threshold and not stale
+    if (locationCache && !bounds) {
+        const dist = calculateDistance(lat, lng, locationCache.lat, locationCache.lng);
+        const isFresh = Date.now() - locationCache.timestamp < CACHE_STALE_MS;
+        if (dist < CACHE_DISTANCE_THRESHOLD && isFresh) {
+            console.log(`[Cache] Using cached locations (${Math.round(dist * 1000)}m shift)`);
+            return locationCache.data.map(loc => ({
+                ...loc,
+                distance: Math.round(calculateDistance(lat, lng, loc.latitude, loc.longitude))
+            })).sort((a, b) => (a.distance || 0) - (b.distance || 0));
+        }
+    }
+
     try {
         console.log(`[Appwrite] Fetching locations near [${lat}, ${lng}]`, bounds ? `within bounds` : '');
 
@@ -1355,10 +1422,23 @@ export const getNearbyRoles = async (lat: number, lng: number, bounds?: MapBound
                 reviews: []
             };
         });
-        return dbLocations.map(loc => ({
+
+        const finalLocations = dbLocations.map(loc => ({
             ...loc,
             distance: Math.round(calculateDistance(lat, lng, loc.latitude, loc.longitude))
         })).sort((a, b) => (a.distance || 0) - (b.distance || 0));
+
+        // Update Cache
+        if (!bounds) {
+            locationCache = {
+                lat,
+                lng,
+                timestamp: Date.now(),
+                data: dbLocations
+            };
+        }
+
+        return finalLocations;
     } catch (e: any) {
         console.error("[Appwrite] Error in getNearbyRoles:", e.message);
         return generateFallbackLocations(lat, lng, 10);

@@ -137,6 +137,7 @@ export const MapView = React.memo<MapViewProps>(({
       <Marker
         key={loc.id}
         position={[loc.latitude, loc.longitude]}
+        // @ts-ignore
         icon={createCustomIcon(loc, hasStories)}
         eventHandlers={{
           click: () => {
@@ -158,6 +159,7 @@ export const MapView = React.memo<MapViewProps>(({
   return (
     <div className="w-full h-full relative z-0">
       <MapContainer
+        // @ts-ignore
         center={[effectiveCenter.lat, effectiveCenter.lng]}
         zoom={14}
         scrollWheelZoom={true}
@@ -169,6 +171,7 @@ export const MapView = React.memo<MapViewProps>(({
         <MapEventHandler onRegionChange={onRegionChange} />
 
         <TileLayer
+          // @ts-ignore
           attribution='&copy; OSM'
           url={theme === 'dark'
             ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
@@ -179,7 +182,9 @@ export const MapView = React.memo<MapViewProps>(({
         {/* Search Radius Circle - Shows where we searched */}
         {searchOrigin && (
           <Circle
+            // @ts-ignore
             center={[circleCenter.lat, circleCenter.lng]}
+            // @ts-ignore
             radius={radiusInMeters}
             pathOptions={{
               color: '#8b5cf6',
@@ -199,6 +204,7 @@ export const MapView = React.memo<MapViewProps>(({
         {userLocation && (
           <Marker
             position={[userLocation.lat, userLocation.lng]}
+            // @ts-ignore
             icon={L.divIcon({
               className: 'user-pin',
               html: `<div class="w-4 h-4 rounded-full bg-blue-500 border-2 border-white shadow-lg pulse-ring"></div>`,

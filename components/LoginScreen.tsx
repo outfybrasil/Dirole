@@ -25,10 +25,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     const [name, setName] = useState('');
     const [nickname, setNickname] = useState('');
     const [age, setAge] = useState('');
-    const [gender, setGender] = useState('Outro');
+    const [gender, setGender] = useState('Prefiro não dizer');
     const [avatar, setAvatar] = useState('😎');
     const [guestName, setGuestName] = useState('');
     const [isGuestInputVisible, setIsGuestInputVisible] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
 
     // EULA
     const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -47,7 +48,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
         setIsLoading(true);
         setErrorMsg(null);
         try {
-            await signInWithEmail(email, password);
+            await signInWithEmail(email.trim(), password);
             const session = await getCurrentSession();
 
             // CHECK VERIFICATION
@@ -65,8 +66,14 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 }
             }
         } catch (error: any) {
-            console.error(error);
-            setErrorMsg("Email ou senha incorretos.");
+            console.error("[Login] Error:", error);
+            if (error.code === 401 || error.type === 'user_invalid_credentials') {
+                setErrorMsg("Senha incorreta ou usuário não encontrado.");
+            } else if (error.code === 429) {
+                setErrorMsg("Muitas tentativas. Tente novamente mais tarde.");
+            } else {
+                setErrorMsg(error.message || "Erro ao fazer login.");
+            }
         } finally {
             setIsLoading(false);
         }
@@ -287,15 +294,22 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                                             className="w-full bg-black/30 border border-white/10 rounded-xl p-4 text-white focus:border-dirole-primary focus:outline-none backdrop-blur-sm"
                                         />
                                     </div>
-                                    <div>
+                                    <div className="relative group">
                                         <input
-                                            type="password"
+                                            type={showPassword ? "text" : "password"}
                                             value={password}
                                             onChange={(e) => setPassword(e.target.value)}
                                             placeholder="Senha"
                                             required
-                                            className="w-full bg-black/30 border border-white/10 rounded-xl p-4 text-white focus:border-dirole-primary focus:outline-none backdrop-blur-sm"
+                                            className="w-full bg-black/30 border border-white/10 rounded-xl p-4 pr-12 text-white focus:border-dirole-primary focus:outline-none backdrop-blur-sm"
                                         />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white focus:outline-none"
+                                        >
+                                            <i className={`fas ${showPassword ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                                        </button>
                                     </div>
                                     <div className="flex justify-end">
                                         <button type="button" className="text-xs text-slate-400 hover:text-white transition-colors">

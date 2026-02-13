@@ -42,6 +42,9 @@ export enum FriendshipStatus {
   ACCEPTED = 'accepted'
 }
 
+export type TransactionType = 'income' | 'expense';
+
+
 export interface FriendUser extends User {
   friendshipStatus: FriendshipStatus;
   friendshipId?: string;
@@ -219,4 +222,54 @@ export interface Story {
   createdAt: Date;
   expiresAt: Date; // createdAt + 6h
   viewedBy: string[]; // Array of user IDs who viewed this story
+}
+
+export interface Transaction {
+  id: string;
+  amount: number;
+  date: string;
+  description: string;
+  category: string;
+  type: 'income' | 'expense';
+  userId: string;
+  isPaid?: boolean;
+  isRecurring?: boolean;
+  groupId?: string;
+}
+
+export interface Budget {
+  id: string;
+  userId: string;
+  category: string;
+  limit: number;
+  spent: number;
+  period: 'monthly' | 'weekly';
+  cumulative?: boolean;
+}
+
+export interface Goal {
+  id: string;
+  userId?: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  deadline: string;
+  icon?: string;
+  color?: string;
+}
+
+export interface Insight {
+  id: string;
+  title: string;
+  description: string;
+  type: 'opportunity' | 'warning' | 'debt' | 'info';
+  actionPlan: string[];
+}
+
+export interface ShoppingItem {
+  id: string;
+  name: string;
+  checked: boolean;
+  quantity: number;
+  estimatedPrice: number;
 }

@@ -34,7 +34,7 @@ export const InAppToast: React.FC<InAppToastProps> = ({ toast, onClose }) => {
     };
 
     return (
-        <div className="fixed top-[max(1.5rem,env(safe-area-inset-top))] left-4 right-4 z-[9999] animate-slide-down pointer-events-auto">
+        <div className="relative w-full max-w-md animate-slide-down pointer-events-auto mb-3 last:mb-0">
             <div
                 className="bg-[#1a0b2e]/90 backdrop-blur-2xl border border-white/10 rounded-3xl p-4 shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex items-center gap-4 transition-all active:scale-95"
                 onClick={() => onClose(toast.id)}

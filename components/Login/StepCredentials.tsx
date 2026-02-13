@@ -81,8 +81,15 @@ export const StepCredentials: React.FC<StepCredentialsProps> = ({
                         placeholder="Confirmar Senha"
                         required
                         minLength={8}
-                        className="w-full bg-black/30 border border-white/10 rounded-xl py-3.5 pl-12 pr-4 text-white focus:border-dirole-primary focus:ring-1 focus:ring-dirole-primary focus:outline-none backdrop-blur-sm transition-all text-sm placeholder:text-slate-600"
+                        className="w-full bg-black/30 border border-white/10 rounded-xl py-3.5 pl-12 pr-12 text-white focus:border-dirole-primary focus:ring-1 focus:ring-dirole-primary focus:outline-none backdrop-blur-sm transition-all text-sm placeholder:text-slate-600"
                     />
+                    <button
+                        type="button"
+                        onClick={() => setShowPass(!showPass)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white focus:outline-none"
+                    >
+                        <i className={`fas ${showPass ? 'fa-eye-slash' : 'fa-eye'}`}></i>
+                    </button>
                 </div>
             </div>
 
