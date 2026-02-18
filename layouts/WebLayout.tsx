@@ -91,7 +91,7 @@ export function WebLayout({ onLoginSuccess }: WebLayoutProps) {
 
                 {/* Features Section */}
                 <section id="features" className="py-32 sm:py-52 relative bg-black">
-                    <div className="max-w-7xl mx-auto px-6">
+                    <div className="max-w-7xl mx-auto px-8 sm:px-12">
                         <div className="text-center mb-20 sm:mb-32">
                             <h2 className="text-4xl sm:text-5xl md:text-7xl font-[1000] italic tracking-tighter mb-6 sm:mb-10 leading-tight py-2 sm:py-4">INTELIGÊNCIA <span className="text-purple-500">SOCIAL</span></h2>
                             <p className="text-slate-400 max-w-3xl mx-auto text-lg sm:text-2xl leading-relaxed font-light px-2">
@@ -99,7 +99,7 @@ export function WebLayout({ onLoginSuccess }: WebLayoutProps) {
                             </p>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 sm:gap-12">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-10 sm:gap-16">
                             <FeatureCard
                                 icon="fire"
                                 color="text-orange-500"
@@ -128,13 +128,13 @@ export function WebLayout({ onLoginSuccess }: WebLayoutProps) {
                 {/* CTO Section */}
                 <section className="py-32 sm:py-52 relative overflow-hidden bg-[#0a0a0a]">
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-stops))] from-purple-900/10 via-transparent to-transparent"></div>
-                    <div className="max-w-6xl mx-auto px-6 text-center relative z-10">
-                        <h2 className="text-5xl sm:text-6xl md:text-9xl font-[1000] italic tracking-tighter mb-10 sm:mb-16 leading-tight py-4">
-                            PRONTO PARA <br /> O <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-500">NEXT LEVEL?</span>
+                    <div className="max-w-6xl mx-auto px-8 sm:px-12 text-center relative z-10">
+                        <h2 className="text-5xl sm:text-6xl md:text-9xl font-[1000] italic tracking-tighter mb-14 sm:mb-24 leading-normal py-8 px-4">
+                            VIVA O ROLÊ <br /> <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-500 to-pink-500 inline-block pb-4 px-2">DO FUTURO</span>
                         </h2>
                         <button
                             onClick={() => setShowLogin(true)}
-                            className="px-10 sm:px-16 py-6 sm:py-8 bg-white text-black font-black rounded-full text-xl sm:text-2xl hover:scale-105 transition-all shadow-2xl hover:shadow-[0_0_50px_rgba(255,255,255,0.3)] w-full sm:w-auto"
+                            className="px-10 sm:px-16 py-6 sm:py-8 bg-white text-black font-black rounded-full text-xl sm:text-2xl hover:scale-105 transition-all shadow-2xl hover:shadow-[0_0_50px_rgba(255,255,255,0.3)] w-full sm:w-auto mb-24"
                         >
                             CRIAR CONTA GRÁTIS
                         </button>

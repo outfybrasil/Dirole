@@ -203,7 +203,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, isModa
     };
 
     return (
-        <div className={`${isModal ? 'w-full max-w-lg mx-auto bg-[#0f0518] rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10 relative' : 'fixed inset-0 z-[9999] bg-[#0f0518] overflow-y-auto safe-scroll'}`}>
+        <div className={`${isModal ? 'w-full max-w-lg mx-auto bg-[#0f0518] rounded-[2.5rem] shadow-2xl border border-white/10 relative max-h-[90vh] overflow-y-auto hide-scrollbar' : 'fixed inset-0 z-[9999] bg-[#0f0518] overflow-y-auto safe-scroll'}`}>
 
             {/* Close Button for Modal */}
             {isModal && onClose && (
@@ -218,10 +218,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, isModa
             <PrivacyPolicyModal isOpen={isPrivacyOpen} onClose={() => setIsPrivacyOpen(false)} />
 
             {/* Background Gradient */}
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-black to-blue-900 pointer-events-none"></div>
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-black to-blue-900 pointer-events-none h-full min-h-full"></div>
 
             {/* Wrapper de Conteúdo */}
-            <div className={`${isModal ? 'flex flex-col items-center justify-center p-6 sm:p-10 min-h-[500px]' : 'min-h-full w-full flex flex-col items-center justify-center p-6 sm:p-10'} relative z-10`}>
+            <div className={`${isModal ? 'flex flex-col items-center justify-center p-8 sm:p-12 pb-16 min-h-[500px]' : 'min-h-full w-full flex flex-col items-center justify-center p-6 sm:p-10'} relative z-10`}>
 
                 <div className="w-full max-w-sm flex flex-col items-center my-auto transition-all">
 
