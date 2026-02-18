@@ -84,7 +84,7 @@ export function WebDashboardLayout({ preloadedUser }: WebDashboardLayoutProps) {
     const [showConfetti, setShowConfetti] = useState(false);
     const [toasts, setToasts] = useState<ToastData[]>([]);
     const [notificationCount, setNotificationCount] = useState(0);
-    const [mapTheme, setMapTheme] = useState<'dark' | 'light'>('dark');
+    const [mapTheme] = useState<'dark' | 'light'>('light');
     const [filters, setFilters] = useState<Filters>({
         minVibe: false,
         lowCost: false,
@@ -364,11 +364,8 @@ export function WebDashboardLayout({ preloadedUser }: WebDashboardLayoutProps) {
 
                             {/* Floating Map Controls (Bottom Right) */}
                             <div className="absolute bottom-8 right-8 flex flex-col gap-3 z-[400] pointer-events-auto">
-                                <button onClick={() => setMapTheme(t => t === 'dark' ? 'light' : 'dark')} className="w-12 h-12 bg-black/60 backdrop-blur-xl border border-white/10 rounded-xl text-white hover:bg-white hover:text-black transition-all flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95">
-                                    <i className={`fas ${mapTheme === 'dark' ? 'fa-sun' : 'fa-moon'} text-lg`}></i>
-                                </button>
-                                <button onClick={handleForceLocationRefresh} className="w-12 h-12 bg-black/60 backdrop-blur-xl border border-white/10 rounded-xl text-white hover:bg-white hover:text-black transition-all flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95">
-                                    <i className="fas fa-location-arrow text-lg"></i>
+                                <button onClick={handleForceLocationRefresh} className="w-14 h-14 bg-slate-800 text-white rounded-xl hover:bg-white hover:text-black transition-all flex items-center justify-center shadow-2xl border border-white/20 hover:scale-105 active:scale-95">
+                                    <i className="fas fa-location-arrow text-xl"></i>
                                 </button>
                             </div>
 

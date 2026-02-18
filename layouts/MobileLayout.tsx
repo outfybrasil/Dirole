@@ -96,7 +96,7 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
     const [showConfetti, setShowConfetti] = useState(false);
     const [toasts, setToasts] = useState<ToastData[]>([]);
     const [notificationCount, setNotificationCount] = useState(0);
-    const [mapTheme, setMapTheme] = useState<'dark' | 'light'>('light');
+    const [mapTheme] = useState<'dark' | 'light'>('light');
     const [filters, setFilters] = useState<Filters>({
         minVibe: false,
         lowCost: false,
@@ -436,7 +436,7 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
                 </div>
             </header>
 
-            <div ref={scrollContainerRef} className="flex-1 relative w-full h-full min-h-0 overflow-y-auto overflow-x-hidden scroll-smooth" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+            <div ref={scrollContainerRef} className="flex-1 relative w-full h-full min-h-0 overflow-y-auto overflow-x-hidden scroll-smooth pb-32" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
                 <div className="absolute left-0 right-0 flex justify-center pointer-events-none z-[60]" style={{ top: -60, transform: `translateY(${pullY}px)`, transition: isRefreshing ? 'transform 0.2s ease-out' : 'transform 0s' }}>
                     <div className="bg-slate-800 rounded-full p-2 shadow-lg border border-white/10 flex items-center justify-center w-10 h-10"><i className={`fas fa-sync-alt text-dirole-primary ${isRefreshing || pullY > REFRESH_THRESHOLD ? 'animate-spin' : ''}`} style={{ transform: `rotate(${pullY * 2}deg)` }}></i></div>
                 </div>
@@ -450,43 +450,10 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
 
                 {(activeTab === 'map' || activeTab === 'list') && (
                     <div className={`flex-1 flex flex-col md:flex-row h-full overflow-hidden relative ${activeTab === 'list' ? 'hidden md:flex' : 'flex'}`}>
-                        {/* MOBILE DRAWER BACKDROP */}
-                        {activeTab === 'map' && showFilters && (
-                            <div
-                                className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[250] md:hidden animate-fade-in"
-                                onClick={() => setShowFilters(false)}
-                            ></div>
-                        )}
-
                         {/* SEARCH OVERLAY (MOBILE ONLY) */}
                         <div className="absolute top-4 left-0 right-0 z-[400] pointer-events-none px-4 md:hidden">
                             <SearchBar onSearch={handleTextSearch} className="pointer-events-auto" />
                         </div>
-
-                        {/* MOBILE BOTTOM DRAWER (Only on Map Tab) */}
-                        {activeTab === 'map' && (
-                            <div className={`
-                z-[300] transition-all duration-500 ease-in-out
-                md:hidden
-                ${showFilters
-                                    ? 'translate-y-0 opacity-100'
-                                    : 'translate-y-full opacity-0'
-                                }
-                fixed bottom-0 left-0 right-0
-                bg-[#0f0518]/95 backdrop-blur-2xl rounded-t-[2.5rem]
-                shadow-[0_-20px_60px_rgba(0,0,0,0.8)]
-                border-t border-white/10
-              `}>
-                                {/* Drawer Grabber */}
-                                <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mt-4 mb-2 md:hidden"></div>
-
-                                <div className="flex-1 overflow-y-auto sidebar-scroll">
-                                    <Suspense fallback={<div className="p-4 text-center text-slate-500">Loading Filters...</div>}>
-                                        <FilterBar filters={filters} onChange={setFilters} onSearch={handleTextSearch} onClose={() => setShowFilters(false)} />
-                                    </Suspense>
-                                </div>
-                            </div>
-                        )}
 
                         {/* DESKTOP SIDEBAR */}
                         <div className={`hidden md:flex flex-col border-r border-white/5 bg-[#0f0518]/90 backdrop-blur-3xl transition-all duration-500 ease-in-out relative ${isSidebarCollapsed ? 'w-0 opacity-0 -translate-x-full' : 'w-[450px] opacity-100 translate-x-0'}`}>
@@ -552,9 +519,6 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
                                     theme={mapTheme}
                                 />
                             </Suspense>
-                            <button onClick={() => setMapTheme(mapTheme === 'dark' ? 'light' : 'dark')} className={`absolute bottom-4 left-4 z-[50] w-10 h-10 rounded-full shadow-lg flex items-center justify-center transition-all transform active:scale-95 border border-white/20 ${mapTheme === 'dark' ? 'bg-black/80 text-white backdrop-blur-md' : 'bg-white/90 text-slate-900 backdrop-blur-md'}`}>
-                                <i className={`fas ${mapTheme === 'dark' ? 'fa-sun' : 'fa-moon'} text-xs`}></i>
-                            </button>
                         </div>
                     </div>
                 )}
@@ -589,24 +553,59 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
                 )}
             </div>
 
-            {activeTab === 'map' && shouldShowSearchHere && !isRefreshing && (
-                <div className="fixed bottom-24 left-6 z-[50] pointer-events-none animate-slide-up">
-                    <button onClick={() => { triggerHaptic(); if (currentMapCenter) fetchData(currentMapCenter.lat, currentMapCenter.lng, currentMapBounds.current || undefined); }} disabled={isLoading} className={`w-14 h-14 rounded-full bg-[#0f0518]/90 backdrop-blur-xl border border-white/10 text-white flex items-center justify-center shadow-[0_10px_30px_rgba(0,0,0,0.5)] active:scale-95 transition-all pointer-events-auto group ${isLoading ? 'opacity-50' : 'hover:bg-slate-900'}`}>
-                        <i className={`fas fa-redo text-base group-hover:rotate-180 transition-transform duration-500 ${isLoading ? 'animate-spin' : ''}`}></i>
-                    </button>
-                </div>
-            )}
+            {/* OVERLAYS AT ROOT LEVEL (Proper stacking and positioning) */}
+            {activeTab === 'map' && (
+                <>
+                    {/* MOBILE DRAWER BACKDROP */}
+                    {showFilters && (
+                        <div
+                            className="fixed inset-0 bg-black/70 z-[800] md:hidden animate-fade-in"
+                            onClick={() => setShowFilters(false)}
+                        ></div>
+                    )}
 
-            <div className="fixed bottom-24 right-4 z-[50] pointer-events-none flex flex-col gap-4 items-end">
-                {activeTab === 'map' && (
-                    <>
-                        <button onClick={() => { triggerHaptic(); setIsAddModalOpen(true); }} className="w-12 h-12 rounded-2xl bg-gradient-to-r from-dirole-primary to-dirole-secondary text-white shadow-xl shadow-purple-900/40 active:scale-90 transition-all border border-white/20 flex items-center justify-center pointer-events-auto"><i className="fas fa-plus text-xl"></i></button>
-                        <button onClick={() => { triggerHaptic(); setShowFilters(!showFilters); }} className={`w-12 h-12 rounded-2xl shadow-lg flex items-center justify-center transition-all border border-white/10 pointer-events-auto ${showFilters ? 'bg-white text-dirole-primary shadow-white/20' : 'bg-[#0f0518]/90 backdrop-blur-xl text-white hover:bg-slate-900'}`}><i className={`fas ${showFilters ? 'fa-times' : 'fa-sliders-h'}`}></i></button>
-                        <button onClick={handleForceLocationRefresh} className="w-12 h-12 rounded-2xl bg-[#0f0518]/90 backdrop-blur-xl text-white shadow-lg flex items-center justify-center border border-white/10 pointer-events-auto"><i className="fas fa-location-arrow text-sm"></i></button>
-                    </>
-                )}
-                {activeTab === 'list' && <button onClick={() => { triggerHaptic(); setShowFilters(!showFilters); }} className={`w-14 h-14 rounded-2xl shadow-xl active:scale-90 transition-all pointer-events-auto flex items-center justify-center ${showFilters ? 'bg-slate-800 text-white' : 'bg-gradient-to-r from-dirole-primary to-dirole-secondary text-white'}`}><i className={`fas ${showFilters ? 'fa-times' : 'fa-sliders-h'} text-xl`}></i></button>}
-            </div>
+                    {/* MOBILE BOTTOM DRAWER */}
+                    <div className={`
+                        z-[900] transition-all duration-500 ease-in-out md:hidden
+                        ${showFilters ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'}
+                        fixed bottom-0 left-0 right-0 h-[75vh]
+                        bg-[#1a0b2e] rounded-t-[2.5rem]
+                        shadow-[0_-20px_60px_rgba(0,0,0,1)] border-t border-white/20
+                    `}>
+                        <div className="w-12 h-1.5 bg-white/30 rounded-full mx-auto mt-4 mb-2"></div>
+                        <div className="flex-1 overflow-y-auto sidebar-scroll h-full pb-10">
+                            <Suspense fallback={<div className="p-4 text-center text-slate-500">Loading Filters...</div>}>
+                                <FilterBar filters={filters} onChange={setFilters} onSearch={handleTextSearch} onClose={() => setShowFilters(false)} />
+                            </Suspense>
+                        </div>
+                    </div>
+
+                    {/* MAP CONTROLS CLUSTER (Hidden when filtering) */}
+                    {!showFilters && (
+                        <div className="fixed bottom-28 right-4 z-[90] pointer-events-none flex flex-col gap-3 items-end mb-[env(safe-area-inset-bottom)]">
+                            <button onClick={() => { triggerHaptic(); setIsAddModalOpen(true); }} className="w-12 h-12 rounded-xl bg-gradient-to-r from-dirole-primary to-dirole-secondary text-white shadow-2xl active:scale-90 transition-all border border-white/30 flex items-center justify-center pointer-events-auto">
+                                <i className="fas fa-plus text-lg"></i>
+                            </button>
+                            <button onClick={() => { triggerHaptic(); setShowFilters(true); }} className={`w-12 h-12 rounded-xl bg-slate-800 text-white shadow-2xl flex items-center justify-center transition-all border border-white/20 active:scale-95 pointer-events-auto`}>
+                                <i className="fas fa-sliders-h text-lg"></i>
+                            </button>
+                            <button onClick={handleForceLocationRefresh} className="w-12 h-12 rounded-xl bg-slate-800 text-white shadow-2xl flex items-center justify-center border border-white/20 active:scale-95 pointer-events-auto">
+                                <i className="fas fa-location-arrow text-sm"></i>
+                            </button>
+                        </div>
+                    )}
+
+                    {/* RE-SEARCH AREA BUTTON (Hidden when filtering) */}
+                    {shouldShowSearchHere && !isRefreshing && !showFilters && (
+                        <div className="fixed bottom-28 left-1/2 -translate-x-1/2 z-[90] pointer-events-none animate-slide-up mb-[env(safe-area-inset-bottom)]">
+                            <button onClick={() => { triggerHaptic(); if (currentMapCenter) fetchData(currentMapCenter.lat, currentMapCenter.lng, currentMapBounds.current || undefined); }} disabled={isLoading} className="px-6 py-3 rounded-full bg-white text-black font-black text-[10px] shadow-2xl active:scale-95 transition-all pointer-events-auto flex items-center gap-2 uppercase tracking-widest leading-none">
+                                <i className={`fas fa-redo ${isLoading ? 'animate-spin' : ''}`}></i>
+                                Atualizar Mapa
+                            </button>
+                        </div>
+                    )}
+                </>
+            )}
 
             <nav className="bottom-nav fixed bottom-0 left-0 right-0 bg-[#0f0518]/80 backdrop-blur-xl border-t border-white/5 z-50 px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
                 <div className="max-w-md mx-auto grid grid-cols-3 gap-1">
