@@ -99,7 +99,7 @@ export function WebLayout({ onLoginSuccess }: WebLayoutProps) {
                             </p>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-10 sm:gap-16">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-24 lg:gap-32">
                             <FeatureCard
                                 icon="fire"
                                 color="text-orange-500"
@@ -183,7 +183,7 @@ export function WebLayout({ onLoginSuccess }: WebLayoutProps) {
 
 function FeatureCard({ icon, title, desc, color, bg }: { icon: string, title: string, desc: string, color: string, bg: string }) {
     return (
-        <div className="m-100 p-10 rounded-[2.5rem] bg-white/5 border border-white/5 hover:border-white/10 transition-all hover:-translate-y-2 group">
+        <div className="p-10 rounded-[2.5rem] bg-white/5 border border-white/5 hover:border-white/10 transition-all hover:-translate-y-2 group">
             <div className={`w-16 h-16 ${bg} ${color} rounded-2xl flex items-center justify-center text-3xl mb-8 group-hover:scale-110 transition-transform duration-500`}>
                 <i className={`fas fa-${icon}`}></i>
             </div>
