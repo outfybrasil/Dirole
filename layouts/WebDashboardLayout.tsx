@@ -244,14 +244,14 @@ export function WebDashboardLayout({ preloadedUser }: WebDashboardLayoutProps) {
     if (!currentUser) return null; // Should be handled by App.tsx
 
     return (
-        <div className="flex h-screen w-full bg-[#0f0518] text-white overflow-hidden font-sans p-4 gap-4 selection:bg-purple-500 selection:text-white">
+        <div className="flex h-screen w-full bg-[#0f0518] text-white overflow-hidden font-sans selection:bg-purple-500 selection:text-white">
             {showConfetti && <Confetti />}
             <div className="fixed top-4 right-4 z-[9999] pointer-events-none flex flex-col items-end gap-2">
                 {toasts.map(toast => <InAppToast key={toast.id} toast={toast} onClose={removeToast} />)}
             </div>
 
-            {/* SIDEBAR NAVIGATION - DESKTOP */}
-            <aside className="w-64 bg-[#12081f] rounded-[2rem] flex flex-col shrink-0 z-50 shadow-2xl overflow-hidden border border-white/5">
+            {/* SIDEBAR NAVIGATION - DESKTOP (No rounded corners, Full height) */}
+            <aside className="w-64 bg-[#12081f] flex flex-col shrink-0 z-50 shadow-2xl overflow-hidden border-r border-white/5 relative">
                 {/* Logo Area */}
                 <div className="p-8 flex items-center justify-center gap-3 border-b border-white/5 bg-gradient-to-b from-white/5 to-transparent">
                     <img src="/og-image.png" alt="Dirole" className="w-10 h-10 object-contain drop-shadow-[0_0_15px_rgba(168,85,247,0.5)]" />
@@ -260,19 +260,19 @@ export function WebDashboardLayout({ preloadedUser }: WebDashboardLayoutProps) {
 
                 {/* Navigation Links */}
                 <nav className="flex-1 px-4 space-y-2 py-6 overflow-y-auto custom-scrollbar">
-                    <button onClick={() => setActiveTab('map')} className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all group ${activeTab === 'map' ? 'bg-dirole-primary text-white font-bold shadow-lg shadow-purple-900/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
+                    <button onClick={() => setActiveTab('map')} className={`w-full flex items-center gap-4 px-6 py-4 rounded-xl transition-all group ${activeTab === 'map' ? 'bg-dirole-primary text-white font-bold shadow-lg shadow-purple-900/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${activeTab === 'map' ? 'bg-white/20' : 'bg-white/5 group-hover:bg-white/10'}`}>
                             <i className="fas fa-map-marked-alt text-sm"></i>
                         </div>
                         <span className="text-sm font-bold tracking-wide">MAPA</span>
                     </button>
-                    <button onClick={() => setActiveTab('list')} className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all group ${activeTab === 'list' ? 'bg-dirole-primary text-white font-bold shadow-lg shadow-purple-900/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
+                    <button onClick={() => setActiveTab('list')} className={`w-full flex items-center gap-4 px-6 py-4 rounded-xl transition-all group ${activeTab === 'list' ? 'bg-dirole-primary text-white font-bold shadow-lg shadow-purple-900/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${activeTab === 'list' ? 'bg-white/20' : 'bg-white/5 group-hover:bg-white/10'}`}>
                             <i className="fas fa-list text-sm"></i>
                         </div>
                         <span className="text-sm font-bold tracking-wide">LISTA</span>
                     </button>
-                    <button onClick={() => setActiveTab('rank')} className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl transition-all group ${activeTab === 'rank' ? 'bg-dirole-primary text-white font-bold shadow-lg shadow-purple-900/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
+                    <button onClick={() => setActiveTab('rank')} className={`w-full flex items-center gap-4 px-6 py-4 rounded-xl transition-all group ${activeTab === 'rank' ? 'bg-dirole-primary text-white font-bold shadow-lg shadow-purple-900/20' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}>
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${activeTab === 'rank' ? 'bg-white/20' : 'bg-white/5 group-hover:bg-white/10'}`}>
                             <i className="fas fa-trophy text-sm"></i>
                         </div>
@@ -282,7 +282,7 @@ export function WebDashboardLayout({ preloadedUser }: WebDashboardLayoutProps) {
 
                 {/* User Profile Mini */}
                 <div className="p-4 border-t border-white/5 bg-black/20">
-                    <button onClick={() => setIsProfileModalOpen(true)} className="w-full flex items-center gap-3 p-3 rounded-2xl bg-white/5 hover:bg-white/10 transition-all border border-white/5 group">
+                    <button onClick={() => setIsProfileModalOpen(true)} className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-all border border-white/5 group">
                         <div className="relative">
                             <UserAvatar avatar={currentUser.avatar} size="sm" />
                             <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-[#12081f]"></div>
@@ -296,10 +296,10 @@ export function WebDashboardLayout({ preloadedUser }: WebDashboardLayoutProps) {
                 </div>
             </aside>
 
-            {/* MAIN CONTENT AREA */}
-            <main className="flex-1 flex flex-col relative min-w-0 bg-[#12081f] rounded-[2rem] shadow-2xl border border-white/5 overflow-hidden">
+            {/* MAIN CONTENT AREA (No rounded corners, Full height) */}
+            <main className="flex-1 flex flex-col relative min-w-0 bg-[#0f0518] shadow-2xl overflow-hidden">
                 {/* HEADER / TOOLBAR */}
-                <header className="h-24 flex items-center justify-between px-8 bg-black/20 z-40 shrink-0">
+                <header className="h-20 flex items-center justify-between px-8 bg-[#12081f] border-b border-white/5 z-40 shrink-0">
                     {/* Search Bar */}
                     <div className="w-96">
                         <SearchBar onSearch={handleTextSearch} />
@@ -310,7 +310,7 @@ export function WebDashboardLayout({ preloadedUser }: WebDashboardLayoutProps) {
                         {/* Filter Toggle */}
                         <button
                             onClick={() => setShowFilters(!showFilters)}
-                            className={`h-12 px-6 rounded-2xl border flex items-center gap-2 font-bold text-sm transition-all ${showFilters ? 'bg-white text-black border-white shadow-[0_0_20px_rgba(255,255,255,0.3)]' : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10 hover:text-white'}`}
+                            className={`h-10 px-6 rounded-xl border flex items-center gap-2 font-bold text-sm transition-all ${showFilters ? 'bg-white text-black border-white shadow-[0_0_20px_rgba(255,255,255,0.3)]' : 'bg-white/5 text-slate-300 border-white/10 hover:bg-white/10 hover:text-white'}`}
                         >
                             <i className="fas fa-sliders-h"></i>
                             Filtros
@@ -319,18 +319,18 @@ export function WebDashboardLayout({ preloadedUser }: WebDashboardLayoutProps) {
                         {/* Add Location Button */}
                         <button
                             onClick={() => setIsAddModalOpen(true)}
-                            className="h-12 px-8 bg-gradient-to-r from-dirole-primary to-dirole-secondary rounded-2xl text-white font-bold text-sm shadow-lg shadow-purple-900/30 hover:brightness-110 active:scale-95 transition-all flex items-center gap-2"
+                            className="h-10 px-8 bg-gradient-to-r from-dirole-primary to-dirole-secondary rounded-xl text-white font-bold text-sm shadow-lg shadow-purple-900/30 hover:brightness-110 active:scale-95 transition-all flex items-center gap-2"
                         >
                             <i className="fas fa-plus"></i>
                             Adicionar Local
                         </button>
 
-                        <div className="h-8 w-px bg-white/10 mx-2"></div>
+                        <div className="h-6 w-px bg-white/10 mx-2"></div>
 
                         {/* Notifications */}
-                        <button onClick={() => setIsNotificationsModalOpen(true)} className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white hover:bg-white/10 relative transition-colors">
+                        <button onClick={() => setIsNotificationsModalOpen(true)} className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white hover:bg-white/10 relative transition-colors">
                             <i className="fas fa-bell"></i>
-                            {notificationCount > 0 && <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#12081f]"></span>}
+                            {notificationCount > 0 && <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#12081f]"></span>}
                         </button>
                     </div>
                 </header>
@@ -345,7 +345,7 @@ export function WebDashboardLayout({ preloadedUser }: WebDashboardLayoutProps) {
                 )}
 
                 {/* CONTENT CANVAS */}
-                <div className="flex-1 relative overflow-hidden bg-black/20">
+                <div className="flex-1 relative w-full h-full overflow-hidden bg-black/20">
                     {activeTab === 'map' && (
                         <>
                             <Suspense fallback={<div className="flex items-center justify-center h-full"><i className="fas fa-circle-notch animate-spin text-3xl text-dirole-primary"></i></div>}>
@@ -363,18 +363,18 @@ export function WebDashboardLayout({ preloadedUser }: WebDashboardLayoutProps) {
                             </Suspense>
 
                             {/* Floating Map Controls (Bottom Right) */}
-                            <div className="absolute bottom-8 right-8 flex flex-col gap-3">
-                                <button onClick={() => setMapTheme(t => t === 'dark' ? 'light' : 'dark')} className="w-14 h-14 bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl text-white hover:bg-white hover:text-black transition-all flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95">
+                            <div className="absolute bottom-8 right-8 flex flex-col gap-3 z-[400] pointer-events-auto">
+                                <button onClick={() => setMapTheme(t => t === 'dark' ? 'light' : 'dark')} className="w-12 h-12 bg-black/60 backdrop-blur-xl border border-white/10 rounded-xl text-white hover:bg-white hover:text-black transition-all flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95">
                                     <i className={`fas ${mapTheme === 'dark' ? 'fa-sun' : 'fa-moon'} text-lg`}></i>
                                 </button>
-                                <button onClick={handleForceLocationRefresh} className="w-14 h-14 bg-black/60 backdrop-blur-xl border border-white/10 rounded-2xl text-white hover:bg-white hover:text-black transition-all flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95">
+                                <button onClick={handleForceLocationRefresh} className="w-12 h-12 bg-black/60 backdrop-blur-xl border border-white/10 rounded-xl text-white hover:bg-white hover:text-black transition-all flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95">
                                     <i className="fas fa-location-arrow text-lg"></i>
                                 </button>
                             </div>
 
                             {/* Search Here Button (Floating Center Bottom) */}
-                            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-20">
-                                <button onClick={() => { if (currentMapCenter) fetchData(currentMapCenter.lat, currentMapCenter.lng, currentMapBounds.current || undefined); }} className="px-8 py-4 bg-white text-black font-black text-sm rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.5)] hover:scale-105 active:scale-95 transition-all flex items-center gap-3 uppercase tracking-wide">
+                            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[400] pointer-events-auto">
+                                <button onClick={() => { if (currentMapCenter) fetchData(currentMapCenter.lat, currentMapCenter.lng, currentMapBounds.current || undefined); }} className="px-6 py-3 bg-white text-black font-black text-xs rounded-full shadow-[0_10px_40px_rgba(0,0,0,0.5)] hover:scale-105 active:scale-95 transition-all flex items-center gap-2 uppercase tracking-wide">
                                     <i className={`fas fa-redo ${isLoading ? 'animate-spin' : ''}`}></i>
                                     Buscar nesta área
                                 </button>
@@ -383,9 +383,9 @@ export function WebDashboardLayout({ preloadedUser }: WebDashboardLayoutProps) {
                     )}
 
                     {activeTab === 'list' && (
-                        <div className="h-full overflow-y-auto p-8 custom-scrollbar">
+                        <div className="h-full w-full overflow-y-auto p-8 custom-scrollbar">
                             <Suspense fallback={<div>Loading...</div>}>
-                                <div className="max-w-5xl mx-auto">
+                                <div className="max-w-5xl mx-auto pb-20">
                                     <h2 className="text-3xl font-[1000] italic tracking-tight mb-8">LOCAIS PRÓXIMOS</h2>
                                     <ListView
                                         locations={filteredLocations}
@@ -401,7 +401,7 @@ export function WebDashboardLayout({ preloadedUser }: WebDashboardLayoutProps) {
                     )}
 
                     {activeTab === 'rank' && (
-                        <div className="h-full overflow-y-auto p-8 flex flex-col items-center custom-scrollbar">
+                        <div className="h-full w-full overflow-y-auto p-8 flex flex-col items-center custom-scrollbar">
                             <Suspense fallback={<div>Loading...</div>}>
                                 <Leaderboard />
                             </Suspense>
