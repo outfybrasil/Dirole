@@ -344,8 +344,7 @@ export const syncUserProfile = async (authId: string, meta: any): Promise<User |
                     nickname: meta.nickname || '',
                     email: meta.email || '',
                     avatar: meta.avatar || meta.avatar_url || '😎',
-                    // Adding age field - assuming it's required by the schema based on the error
-                    age: meta.age ? parseInt(meta.age.toString()) : 18,
+                    // age removed to fix schema mismatch
                     points: 0,
                     xp: 0,
                     level: 1,
@@ -388,7 +387,7 @@ export const syncUserProfile = async (authId: string, meta: any): Promise<User |
         if (meta.email) updateData.email = meta.email;
         if (meta.avatar || meta.avatar_url) updateData.avatar = meta.avatar || meta.avatar_url;
         if (meta.gender) updateData.gender = meta.gender;
-        if (meta.age) updateData.age = parseInt(meta.age.toString());
+        // if (meta.age) updateData.age = parseInt(meta.age.toString()); // Removed to fix schema error
 
         // Only update if there's data to update
         if (Object.keys(updateData).length > 0) {
@@ -407,7 +406,7 @@ export const syncUserProfile = async (authId: string, meta: any): Promise<User |
             nickname: profileDoc.nickname,
             email: profileDoc.email,
             avatar: profileDoc.avatar,
-            age: profileDoc.age, // Add to User type if needed, but mainly for sync
+            age: profileDoc.age || 18, // Default if missing
             points: profileDoc.points || 0,
             xp: profileDoc.xp || 0,
             level: profileDoc.level || 1,

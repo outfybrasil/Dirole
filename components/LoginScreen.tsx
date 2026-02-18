@@ -7,11 +7,12 @@ import { RegisterWizard } from './Login/RegisterWizard';
 
 interface LoginScreenProps {
     onLoginSuccess: (user: User) => void;
+    isModal?: boolean;
 }
 
 const AVATARS = ['😎', '👽', '👾', '🦊', '🐯', '🦁', '🐷', '🦄', '🐝', '🤠', '🥳', '💃', '🕺', '🍻', '🌮', '🔥'];
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
+export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, isModal = false }) => {
     const [isRegistering, setIsRegistering] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -160,9 +161,9 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
 
     if (isSuccess) {
         return (
-            <div className="fixed inset-0 z-[9999] bg-[#0f0518] overflow-y-auto">
-                {/* Background Fixo para cobrir toda a tela sem cortes */}
-                <div className="fixed inset-0 bg-gradient-to-br from-purple-900/20 via-black to-blue-900/20 pointer-events-none"></div>
+            <div className={`${isModal ? 'relative w-full h-full bg-[#0f0518] rounded-3xl overflow-hidden' : 'fixed inset-0 z-[9999] bg-[#0f0518] overflow-y-auto'}`}>
+                {/* Background Fixo/Absoluto */}
+                <div className={`absolute inset-0 bg-gradient-to-br from-purple-900/20 via-black to-blue-900/20 pointer-events-none`}></div>
 
                 <div className="min-h-full w-full flex flex-col items-center justify-center p-6 relative z-10">
                     <div className="w-full max-w-sm bg-white/5 border border-white/10 rounded-3xl p-8 text-center animate-slide-up shadow-2xl backdrop-blur-md">
@@ -193,7 +194,6 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             setIsLoading(true);
             triggerHaptic();
             await signInWithGoogle();
-            // The page will redirect
         } catch (error: any) {
             console.error("Google Login Error:", error);
             setErrorMsg("Erro ao conectar com Google. Tente novamente.");
@@ -202,48 +202,60 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     };
 
     return (
-        <div className="fixed inset-0 z-[9999] bg-[#0f0518] overflow-y-auto safe-scroll">
+        <div className={`${isModal ? 'w-full max-w-lg mx-auto bg-[#0f0518] rounded-3xl overflow-hidden shadow-2xl border border-white/10' : 'fixed inset-0 z-[9999] bg-[#0f0518] overflow-y-auto safe-scroll'}`}>
 
             <PrivacyPolicyModal isOpen={isPrivacyOpen} onClose={() => setIsPrivacyOpen(false)} />
 
-            {/* Background Fixo: Garante que o fundo nunca seja cortado em telas grandes ou ao rolar */}
-            <div className="fixed inset-0 bg-gradient-to-br from-purple-900/20 via-black to-blue-900/20 pointer-events-none"></div>
+            {/* Background Gradient */}
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-black to-blue-900 pointer-events-none"></div>
 
-            {/* Wrapper de Conteúdo: min-h-full garante que o flex center funcione em monitores grandes e scroll em pequenos */}
-            <div className="min-h-full w-full flex flex-col items-center justify-center p-8 sm:p-10 relative z-10 py-12">
+            {/* Wrapper de Conteúdo */}
+            <div className={`${isModal ? 'flex flex-col items-center justify-center p-6 sm:p-10 min-h-[500px]' : 'min-h-full w-full flex flex-col items-center justify-center p-6 sm:p-10'} relative z-10`}>
 
                 <div className="w-full max-w-sm flex flex-col items-center my-auto transition-all">
 
-                    <div className="mb-10 text-center flex flex-col items-center">
-                        <div className="w-32 h-32 mb-6 relative">
-                            <div className="absolute inset-0 bg-dirole-primary/30 blur-3xl animate-pulse"></div>
-                            <img src="/og-image.png" className="w-full h-full object-contain relative z-10 drop-shadow-[0_0_15px_rgba(139,92,246,0.3)]" alt="Logo" />
-                        </div>
-                        <h1 className="text-6xl font-black italic tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-dirole-primary via-dirole-secondary to-orange-400 mb-2 drop-shadow-[0_0_15px_rgba(139,92,246,0.5)] px-6 py-2 no-clip">
-                            DIROLE
+                    {/* Header */}
+                    <div className="mb-8 sm:mb-10 text-center animate-fade-in-up w-full">
+                        <img
+                            src="/og-image.png"
+                            alt="Logo"
+                            className="w-20 h-20 sm:w-24 sm:h-24 mx-auto mb-6 object-contain drop-shadow-[0_0_25px_rgba(124,58,237,0.5)] hover:scale-110 transition-transform duration-500"
+                        />
+                        <h1 className="text-3xl sm:text-4xl font-[900] italic tracking-tight text-white mb-2 sm:mb-3">
+                            {isRegistering ? 'CRIE SUA CONTA' : 'BEM-VINDO'}
                         </h1>
-                        <p className="text-slate-400 font-bold tracking-[0.3em] text-[10px] uppercase opacity-80">O Termômetro do Rolê</p>
+                        <p className="text-slate-400 text-base sm:text-lg font-medium">
+                            {isRegistering ? 'Entre para o rolê mais exclusivo.' : 'Faça login para continuar.'}
+                        </p>
                     </div>
 
-                    {!isGuestInputVisible && (
-                        <div className="flex bg-white/5 p-1 rounded-xl mb-6 w-full border border-white/10 backdrop-blur-sm">
-                            <button
-                                onClick={() => { setIsRegistering(false); resetForm(); }}
-                                className={`flex-1 py-3 text-sm font-bold rounded-lg transition-all ${!isRegistering ? 'bg-dirole-primary text-white shadow-lg' : 'text-slate-400'}`}
-                            >
-                                Entrar
-                            </button>
-                            <button
-                                onClick={() => { setIsRegistering(true); resetForm(); }}
-                                className={`flex-1 py-3 text-sm font-bold rounded-lg transition-all ${isRegistering ? 'bg-dirole-primary text-white shadow-lg' : 'text-slate-400'}`}
-                            >
-                                Criar Conta
-                            </button>
+                    {errorMsg && (
+                        <div className="w-full bg-red-500/10 border border-red-500/20 text-red-200 px-5 py-4 rounded-2xl mb-6 flex items-start gap-3 animate-shake">
+                            <i className="fas fa-exclamation-circle mt-1 text-red-400"></i>
+                            <span className="text-sm font-medium">{errorMsg}</span>
                         </div>
                     )}
 
+                    {/* Google Login Button */}
+                    <button
+                        onClick={handleGoogleLogin}
+                        disabled={isLoading}
+                        className="w-full bg-white text-black font-extrabold py-3.5 sm:py-4 px-6 rounded-2xl flex items-center justify-center gap-3 hover:bg-slate-100 active:scale-95 transition-all shadow-[0_0_30px_rgba(255,255,255,0.15)] mb-6 sm:mb-8 group relative overflow-hidden"
+                    >
+                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent translate-x-[-100%] group-hover:animate-shine"></div>
+                        <img src="https://www.google.com/favicon.ico" alt="G" className="w-5 h-5 sm:w-6 sm:h-6" />
+                        <span className="text-base sm:text-lg">Continuar com Google</span>
+                    </button>
+
+                    <div className="relative w-full text-center mb-6 sm:mb-8">
+                        <div className="absolute inset-0 flex items-center">
+                            <div className="w-full border-t border-white/10"></div>
+                        </div>
+                        <span className="relative bg-[#0f0518] px-4 text-xs sm:text-sm text-slate-500 font-bold uppercase tracking-widest">ou use seu e-mail</span>
+                    </div>
+
                     {isGuestInputVisible ? (
-                        <form onSubmit={handleGuestSubmit} className="w-full space-y-4 animate-slide-up">
+                        <form onSubmit={handleGuestSubmit} className="w-full space-y-6 animate-slide-up">
                             <div className="text-center mb-2">
                                 <p className="text-white font-bold text-lg">Como quer ser chamado?</p>
                             </div>
