@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://dirole.appwrite.network/sitemap.xml
+Sitemap: https://dirole-web.appwrite.network/sitemap.xml
