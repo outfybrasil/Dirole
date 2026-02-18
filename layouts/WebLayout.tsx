@@ -17,7 +17,7 @@ export function WebLayout({ onLoginSuccess }: WebLayoutProps) {
     };
 
     return (
-        <div className="min-h-screen bg-[#050505] text-white font-sans flex flex-col selection:bg-purple-500 selection:text-white overflow-x-hidden">
+        <div className="fixed inset-0 h-full w-full overflow-y-auto safe-scroll bg-[#050505] text-white font-sans flex flex-col selection:bg-purple-500 selection:text-white overflow-x-hidden">
 
             {/* Navbar */}
             <nav className="fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-black/50 backdrop-blur-xl border-b border-white/5">
