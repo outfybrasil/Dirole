@@ -8,11 +8,12 @@ import { RegisterWizard } from './Login/RegisterWizard';
 interface LoginScreenProps {
     onLoginSuccess: (user: User) => void;
     isModal?: boolean;
+    onClose?: () => void;
 }
 
 const AVATARS = ['😎', '👽', '👾', '🦊', '🐯', '🦁', '🐷', '🦄', '🐝', '🤠', '🥳', '💃', '🕺', '🍻', '🌮', '🔥'];
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, isModal = false }) => {
+export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, isModal = false, onClose }) => {
     const [isRegistering, setIsRegistering] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -161,7 +162,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, isModa
 
     if (isSuccess) {
         return (
-            <div className={`${isModal ? 'relative w-full h-full bg-[#0f0518] rounded-3xl overflow-hidden' : 'fixed inset-0 z-[9999] bg-[#0f0518] overflow-y-auto'}`}>
+            <div className={`${isModal ? 'relative w-full h-full bg-[#0f0518] rounded-[2.5rem] overflow-hidden' : 'fixed inset-0 z-[9999] bg-[#0f0518] overflow-y-auto'}`}>
                 {/* Background Fixo/Absoluto */}
                 <div className={`absolute inset-0 bg-gradient-to-br from-purple-900/20 via-black to-blue-900/20 pointer-events-none`}></div>
 
@@ -202,7 +203,17 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, isModa
     };
 
     return (
-        <div className={`${isModal ? 'w-full max-w-lg mx-auto bg-[#0f0518] rounded-3xl overflow-hidden shadow-2xl border border-white/10' : 'fixed inset-0 z-[9999] bg-[#0f0518] overflow-y-auto safe-scroll'}`}>
+        <div className={`${isModal ? 'w-full max-w-lg mx-auto bg-[#0f0518] rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/10 relative' : 'fixed inset-0 z-[9999] bg-[#0f0518] overflow-y-auto safe-scroll'}`}>
+
+            {/* Close Button for Modal */}
+            {isModal && onClose && (
+                <button
+                    onClick={onClose}
+                    className="absolute top-6 right-6 z-50 w-8 h-8 rounded-full bg-white/5 hover:bg-white/20 flex items-center justify-center transition-all text-slate-400 hover:text-white"
+                >
+                    <i className="fas fa-times"></i>
+                </button>
+            )}
 
             <PrivacyPolicyModal isOpen={isPrivacyOpen} onClose={() => setIsPrivacyOpen(false)} />
 

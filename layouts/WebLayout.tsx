@@ -161,17 +161,19 @@ export function WebLayout({ onLoginSuccess }: WebLayoutProps) {
             {/* LOGIN MODAL - Fixed Z-Index and Isolation */}
             {showLogin && (
                 <div
-                    className="fixed inset-0 bg-black/90 backdrop-blur-xl flex items-center justify-center p-4 animate-fade-in"
+                    className="fixed inset-0 bg-black/40 backdrop-blur-xl flex items-center justify-center p-4 animate-fade-in"
                     style={{ zIndex: 999999 }}
+                    onClick={() => setShowLogin(false)}
                 >
-                    <div className="relative w-full max-w-lg z-[1000000]">
-                        <button
-                            onClick={() => setShowLogin(false)}
-                            className="absolute -top-12 right-0 z-[1000001] text-slate-400 hover:text-white transition-all transform hover:scale-110 p-2"
-                        >
-                            <i className="fas fa-times text-2xl"></i>
-                        </button>
-                        <LoginScreen onLoginSuccess={(u) => { setShowLogin(false); onLoginSuccess(u); }} isModal={true} />
+                    <div
+                        className="relative w-full max-w-lg z-[1000000]"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <LoginScreen
+                            onLoginSuccess={(u) => { setShowLogin(false); onLoginSuccess(u); }}
+                            isModal={true}
+                            onClose={() => setShowLogin(false)}
+                        />
                     </div>
                 </div>
             )}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MobileLayout } from './layouts/MobileLayout';
 import { WebLayout } from './layouts/WebLayout';
+import { WebDashboardLayout } from './layouts/WebDashboardLayout';
 import { User } from './types';
 import { getCurrentSession } from './services/authService';
 import { getUserProfile, syncUserProfile } from './services/mockService';
@@ -17,6 +18,7 @@ function App() {
       const isDesktopWidth = window.innerWidth >= 1024;
       // Force Web Layout if on specific domain or if it looks like desktop
       setIsWeb(isWebDomain || isDesktopWidth);
+      // setIsWeb(true); // Uncomment for testing on dev
     };
     checkPlatform();
     window.addEventListener('resize', checkPlatform);
@@ -64,13 +66,13 @@ function App() {
   // LOGIC:
   // - If Mobile: Always show MobileLayout (it handles its own Login if !user)
   // - If Web:
-  //    - If Logged In: Show MobileLayout (The "Dashboard")
+  //    - If Logged In: Show WebDashboardLayout (The "Dashboard" for Desktop)
   //    - If Logged Out: Show WebLayout (The Landing Page)
 
   if (isWeb) {
     if (user) {
-      // Authenticated Web User -> Dashboard
-      return <MobileLayout preloadedUser={user} />;
+      // Authenticated Web User -> DESKTOP DASHBOARD
+      return <WebDashboardLayout preloadedUser={user} />;
     } else {
       // Visitor -> Landing Page
       return <WebLayout onLoginSuccess={(u) => setUser(u)} />;
