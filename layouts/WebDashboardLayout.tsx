@@ -244,7 +244,7 @@ export function WebDashboardLayout({ preloadedUser }: WebDashboardLayoutProps) {
     if (!currentUser) return null; // Should be handled by App.tsx
 
     return (
-        <div className="flex h-screen w-full bg-[#0f0518] text-white overflow-hidden font-sans selection:bg-purple-500 selection:text-white">
+        <div className="fixed inset-0 w-full h-full flex bg-[#0f0518] text-white overflow-hidden font-sans selection:bg-purple-500 selection:text-white">
             {showConfetti && <Confetti />}
             <div className="fixed top-4 right-4 z-[9999] pointer-events-none flex flex-col items-end gap-2">
                 {toasts.map(toast => <InAppToast key={toast.id} toast={toast} onClose={removeToast} />)}

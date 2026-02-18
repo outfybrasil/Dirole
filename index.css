@@ -3,11 +3,23 @@
 @tailwind utilities;
 
 /* Additional Custom Global Styles */
+html {
+    height: 100%;
+}
+
 body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden; /* Prevent body scroll, let layouts handle it */
     background-color: #0f0518;
     color: white;
     overscroll-behavior-y: none;
     -webkit-tap-highlight-color: transparent;
+}
+
+#root {
+    height: 100%;
+    isolation: isolate;
 }
 
 /* Safe Scroll Container for Mobiles */
