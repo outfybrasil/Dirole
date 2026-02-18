@@ -5,6 +5,8 @@ node_modules
 
 # Testing
 coverage
+playwright-report
+test-results
 
 # Production
 dist
@@ -14,6 +16,12 @@ www
 # Native folders (Capacitor/React Native)
 /android
 /ios
+
+# Build artifacts (APK / AAB / IPA)
+*.apk
+*.aab
+*.ipa
+*.tar.gz
 
 # Misc
 .DS_Store
@@ -46,3 +54,7 @@ yarn-error.log*
 
 # Local history
 .history/
+
+# AI / Agent kit
+.agent/
+.temp_ag_kit/

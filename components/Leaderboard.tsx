@@ -27,6 +27,11 @@ export const Leaderboard: React.FC = () => {
       const data = await getLeaderboard(scope as 'global' | 'friends', profile?.id);
       console.log(`[Leaderboard] Received ${data.length} users.`);
       setUsers(data);
+
+      // Write-back to cache
+      const userId = profile?.id || 'anon';
+      const CACHE_KEY = `dirole_leaderboard_${scope}_${userId}`;
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify(data)); } catch (e) { /* quota exceeded */ }
     } catch (error) {
       console.error("[Leaderboard] Error loading:", error);
       setUsers([]);

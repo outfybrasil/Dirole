@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react';
 import { client, APPWRITE_DATABASE_ID } from '../services/mockService';
 import { getUserProfile } from '../services/mockService';
+import { User } from '../types';
 
 interface UseAppwriteRealtimeProps {
-    currentUser: any;
-    setCurrentUser: (user: any) => void;
+    currentUser: User | null;
+    setCurrentUser: (user: User | null) => void;
     playNotificationSound: () => void;
     triggerHaptic: () => void;
     addToast: (toast: any) => void;

@@ -4,7 +4,7 @@
     "description": "Resets the points field in the profiles collection every month.",
     "main": "src/main.js",
     "dependencies": {
-        "node-appwrite": "^11.0.0"
+        "node-appwrite": "^14.0.0"
     },
     "devDependencies": {},
     "scripts": {

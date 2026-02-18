@@ -1,0 +1,9 @@
+{
+    "name": "delete-expired-stories",
+    "version": "1.0.5",
+    "description": "Deletes stories older than 6 hours",
+    "main": "src/main.js",
+    "dependencies": {
+        "node-appwrite": "^14.0.0"
+    }
+}

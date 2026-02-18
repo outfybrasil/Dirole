@@ -210,7 +210,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
             <div className="fixed inset-0 bg-gradient-to-br from-purple-900/20 via-black to-blue-900/20 pointer-events-none"></div>
 
             {/* Wrapper de Conteúdo: min-h-full garante que o flex center funcione em monitores grandes e scroll em pequenos */}
-            <div className="min-h-full w-full flex flex-col items-center justify-center p-4 sm:p-6 relative z-10 py-10">
+            <div className="min-h-full w-full flex flex-col items-center justify-center p-8 sm:p-10 relative z-10 py-12">
 
                 <div className="w-full max-w-sm flex flex-col items-center my-auto transition-all">
 

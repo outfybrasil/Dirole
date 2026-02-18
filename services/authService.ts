@@ -74,6 +74,7 @@ export const signInWithGoogle = async () => {
                 setTimeout(() => {
                     clearInterval(checkSession);
                     console.log('[Auth] Session polling timeout');
+                    reject(new Error('OAuth session polling timeout after 120s'));
                 }, 120000);
             });
         } else {

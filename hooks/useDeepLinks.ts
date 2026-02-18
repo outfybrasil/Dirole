@@ -68,7 +68,12 @@ export const useDeepLinks = ({ addToast }: UseDeepLinksProps) => {
 
                         // DIAGNOSTIC CHECK
                         if (!userId || !secret) {
-                            alert(`⛔ ERRO CRÍTICO: DADOS FALTANDO\n\nURL Recebida: ${url.href}\n\nVerifique:\n1. O Package Name no Appwrite Console.\n2. O SHA-1 no Google Cloud.`);
+                            console.error('[Deep Link] Missing OAuth params', { url: url.href, userId, secret });
+                            addToast({
+                                title: "Erro no Login",
+                                message: "Dados de autenticação incompletos. Tente novamente.",
+                                type: 'error'
+                            });
                             isProcessingDeepLink.current = false;
                             return;
                         }
@@ -83,6 +88,19 @@ export const useDeepLinks = ({ addToast }: UseDeepLinksProps) => {
                         if (userId && secret) {
                             console.log('[Deep Link] Creating session with params');
                             try {
+                                // Race Condition Fix: Check if we already have a session
+                                try {
+                                    const current = await account.get();
+                                    if (current) {
+                                        console.log('[Deep Link] Already logged in, skipping creation.');
+                                        addToast({ title: "Já conectado! 👍", message: "Sessão ativa encontrada.", type: "success" });
+                                        isProcessingDeepLink.current = false;
+                                        return;
+                                    }
+                                } catch (e) {
+                                    // No session, proceed
+                                }
+
                                 await account.createSession(userId, secret);
                                 addToast({
                                     title: "Login Sucesso! 🚀",
@@ -93,6 +111,9 @@ export const useDeepLinks = ({ addToast }: UseDeepLinksProps) => {
                                 setTimeout(() => window.location.reload(), 1000);
                             } catch (error: any) {
                                 console.error('[Deep Link] Session creation failed:', error);
+                                // If error 401, it might mean the secret is expired OR we are already logged in (context dependent)
+                                // But if we are already logged in, the previous check should have caught it.
+                                // If secret is invalid, we really failed.
                                 addToast({
                                     title: "Erro no Login",
                                     message: error.message || "Falha ao criar sessão.",

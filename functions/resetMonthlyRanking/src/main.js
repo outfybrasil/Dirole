@@ -8,23 +8,28 @@ module.exports = async (context) => {
     const client = new sdk.Client();
     const databases = new sdk.Databases(client);
 
-    // Use environment variables provided by Appwrite
-    client
-        .setEndpoint(process.env.APPWRITE_FUNCTION_ENDPOINT)
-        .setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID)
-        .setKey(process.env.APPWRITE_FUNCTION_API_KEY);
+    // 1. Endpoint Setup with Override Support
+    let endpoint = process.env.OVERRIDE_ENDPOINT;
+    if (!endpoint) endpoint = process.env.APPWRITE_FUNCTION_ENDPOINT;
+    if (!endpoint) endpoint = 'https://cloud.appwrite.io/v1';
 
-    const databaseId = 'dirole_main';
+    client.setEndpoint(endpoint);
+
+    if (process.env.APPWRITE_FUNCTION_PROJECT_ID) {
+        client.setProject(process.env.APPWRITE_FUNCTION_PROJECT_ID);
+    }
+    if (process.env.APPWRITE_FUNCTION_API_KEY) {
+        client.setKey(process.env.APPWRITE_FUNCTION_API_KEY);
+    }
+
+    const databaseId = process.env.DATABASE_ID || '697cfe870008e83e4e81';
     const collectionId = 'profiles';
 
     context.log('--- DIROLE SEASON RESET STARTED ---');
+    context.log(`Endpoint: ${endpoint}`);
+    context.log(`Database ID: ${databaseId}`);
 
     try {
-        let cursor = null;
-        let totalUpdated = 0;
-        let totalDeleted = 0;
-        let processed = 0;
-
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const cutoffDate = thirtyDaysAgo.toISOString();
@@ -33,6 +38,9 @@ module.exports = async (context) => {
 
         // --- STEP 1: RESET USER POINTS ---
         context.log('Step 1: Resetting user points...');
+        let cursor = null;
+        let totalUpdated = 0;
+        let processed = 0;
 
         do {
             const queries = [sdk.Query.limit(50)];
@@ -42,7 +50,6 @@ module.exports = async (context) => {
 
             for (const doc of response.documents) {
                 processed++;
-                // Reset points but keep XP/Level (lifetime progress)
                 if (doc.points !== 0) {
                     await databases.updateDocument(databaseId, collectionId, doc.$id, {
                         points: 0
@@ -63,57 +70,61 @@ module.exports = async (context) => {
         // --- STEP 2: CLEANUP OLD INVITES (>30 days) ---
         context.log('Step 2: Cleaning up old invites...');
         let inviteDeleted = 0;
-        let inviteCursor = null;
 
-        do {
+        while (true) {
             const queries = [
                 sdk.Query.limit(100),
                 sdk.Query.lessThan('$createdAt', cutoffDate)
             ];
-            if (inviteCursor) queries.push(sdk.Query.cursorAfter(inviteCursor));
 
             const response = await databases.listDocuments(databaseId, 'invites', queries);
 
-            for (const doc of response.documents) {
-                await databases.deleteDocument(databaseId, 'invites', doc.$id);
-                inviteDeleted++;
-            }
+            if (response.documents.length === 0) break;
 
-            if (response.documents.length > 0) {
-                inviteCursor = response.documents[response.documents.length - 1].$id;
-            } else {
-                inviteCursor = null;
-            }
-        } while (inviteCursor);
+            const deletePromises = response.documents.map(async (doc) => {
+                try {
+                    await databases.deleteDocument(databaseId, 'invites', doc.$id);
+                    return true;
+                } catch (e) {
+                    return false;
+                }
+            });
+
+            const results = await Promise.all(deletePromises);
+            inviteDeleted += results.filter(r => r).length;
+            context.log(`Step 2 Batch: Deleted ${results.length} invites`);
+        }
 
         context.log(`✅ Step 2 Success: Deleted ${inviteDeleted} old invites.`);
 
         // --- STEP 3: CLEANUP CLOSED REPORTS (>30 days) ---
         context.log('Step 3: Cleaning up old closed reports...');
         let reportsDeleted = 0;
-        let reportCursor = null;
 
-        do {
+        while (true) {
             const queries = [
                 sdk.Query.limit(100),
                 sdk.Query.equal('status', 'closed'),
                 sdk.Query.lessThan('$createdAt', cutoffDate)
             ];
-            if (reportCursor) queries.push(sdk.Query.cursorAfter(reportCursor));
 
             const response = await databases.listDocuments(databaseId, 'reports', queries);
 
-            for (const doc of response.documents) {
-                await databases.deleteDocument(databaseId, 'reports', doc.$id);
-                reportsDeleted++;
-            }
+            if (response.documents.length === 0) break;
 
-            if (response.documents.length > 0) {
-                reportCursor = response.documents[response.documents.length - 1].$id;
-            } else {
-                reportCursor = null;
-            }
-        } while (reportCursor);
+            const deletePromises = response.documents.map(async (doc) => {
+                try {
+                    await databases.deleteDocument(databaseId, 'reports', doc.$id);
+                    return true;
+                } catch (e) {
+                    return false;
+                }
+            });
+
+            const results = await Promise.all(deletePromises);
+            reportsDeleted += results.filter(r => r).length;
+            context.log(`Step 3 Batch: Deleted ${results.length} reports`);
+        }
 
         context.log(`✅ Step 3 Success: Deleted ${reportsDeleted} closed reports.`);
 

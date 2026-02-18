@@ -548,7 +548,7 @@ function App() {
                   theme={mapTheme}
                 />
               </Suspense>
-              <button onClick={() => setMapTheme(mapTheme === 'dark' ? 'light' : 'dark')} className={`w-10 h-10 rounded-full shadow-lg flex items-center justify-center transition-all transform active:scale-95 border border-white/20 ${mapTheme === 'dark' ? 'bg-black/80 text-white backdrop-blur-md' : 'bg-white/90 text-slate-900 backdrop-blur-md'}`}>
+              <button onClick={() => setMapTheme(mapTheme === 'dark' ? 'light' : 'dark')} className={`absolute bottom-4 left-4 z-[50] w-10 h-10 rounded-full shadow-lg flex items-center justify-center transition-all transform active:scale-95 border border-white/20 ${mapTheme === 'dark' ? 'bg-black/80 text-white backdrop-blur-md' : 'bg-white/90 text-slate-900 backdrop-blur-md'}`}>
                 <i className={`fas ${mapTheme === 'dark' ? 'fa-sun' : 'fa-moon'} text-xs`}></i>
               </button>
             </div>

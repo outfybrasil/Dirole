@@ -488,6 +488,19 @@
             "timeout": 30,
             "enabled": true,
             "logging": true
+        },
+        {
+            "$id": "deleteExpiredStories",
+            "name": "Delete Expired Stories",
+            "runtime": "node-18.0",
+            "path": "functions/deleteExpiredStories",
+            "entrypoint": "src/main.js",
+            "execute": [],
+            "events": [],
+            "schedule": "0 * * * *",
+            "timeout": 30,
+            "enabled": true,
+            "logging": true
         }
     ]
 }
