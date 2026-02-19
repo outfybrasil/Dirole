@@ -31,6 +31,7 @@ import { PWAInstallBanner } from '../components/PWAInstallBanner';
 import { AuthFlow } from '../components/AuthFlow';
 import UserAvatar from '../components/UserAvatar';
 import { SearchBar } from '../components/SearchBar';
+import { RateAppModal } from '../components/RateAppModal';
 
 import { Location, Filters, User, MapBounds } from '../types';
 import { getNearbyRoles, getUserProfile, toggleFavorite, syncUserProfile, triggerHaptic, requestNotificationPermission, sendLocalNotification, searchLocations, getUserById, APPWRITE_DATABASE_ID, getPendingFriendRequests } from '../services/mockService';
@@ -80,10 +81,55 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
     const [isDataModalOpen, setIsDataModalOpen] = useState(false);
     const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
     const [showOnboarding, setShowOnboarding] = useState(false);
+    const [isRateModalOpen, setIsRateModalOpen] = useState(false);
+
+    // --- REVIEW REQUEST LOGIC ---
+    const checkReviewRequest = useCallback(() => {
+        try {
+            const hasRated = localStorage.getItem('dirole_has_rated');
+            if (hasRated === 'true') return;
+
+            const lastAsked = localStorage.getItem('dirole_last_review_request');
+            if (lastAsked) {
+                const daysSince = (Date.now() - parseInt(lastAsked)) / (1000 * 60 * 60 * 24);
+                if (daysSince < 3) return; // Don't ask if asked in last 3 days
+            }
+
+            const actionCount = parseInt(localStorage.getItem('dirole_action_count') || '0');
+            const newCount = actionCount + 1;
+            localStorage.setItem('dirole_action_count', newCount.toString());
+
+            if (newCount >= 3) {
+                setTimeout(() => setIsRateModalOpen(true), 2000); // Small delay for better UX
+            }
+        } catch (e) {
+            console.warn("Review check failed", e);
+        }
+    }, []);
+
+    const handleRateApp = () => {
+        localStorage.setItem('dirole_has_rated', 'true');
+        window.open('https://play.google.com/store/apps/details?id=com.dirole.app', '_system');
+        setIsRateModalOpen(false);
+    };
+
+    const handleRateFeedback = () => {
+        // Mark as "rated" to not ask again, but open report/feedback
+        localStorage.setItem('dirole_last_review_request', Date.now().toString()); // Ask again later maybe?
+        setIsRateModalOpen(false);
+        setReportTarget({ id: 'app_feedback', type: 'location', name: 'Feedback do App' }); // Dummy target
+        setIsReportModalOpen(true);
+    };
+
+    const handleRateDismiss = () => {
+        localStorage.setItem('dirole_last_review_request', Date.now().toString());
+        setIsRateModalOpen(false);
+    };
     const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
     const [storyLocation, setStoryLocation] = useState<Location | null>(null);
     const [reportTarget, setReportTarget] = useState<{ id: string, type: 'location' | 'review' | 'photo' | 'user', name?: string } | null>(null);
     const [scannedUser, setScannedUser] = useState<any>(null);
+    const [detailsRefreshTrigger, setDetailsRefreshTrigger] = useState(0);
 
     // --- FRIENDS MODAL STATE ---
     const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
@@ -373,6 +419,27 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
         startY.current = 0;
     };
 
+    // --- MEMOIZED HANDLERS (Performance) ---
+    const handleOpenDetails = useCallback((loc: Location) => {
+        triggerHaptic();
+        setSelectedLocation(loc);
+        setIsDetailsModalOpen(true);
+    }, []);
+
+    const handleCheckIn = useCallback((loc: Location) => {
+        triggerHaptic();
+        setSelectedLocation(loc);
+        setIsReviewModalOpen(true);
+    }, []);
+
+    const handleToggleFavorite = useCallback(async (id: string) => {
+        const user = await toggleFavorite(id);
+        if (user) {
+            setCurrentUser(user);
+            checkReviewRequest();
+        }
+    }, [checkReviewRequest]);
+
     // --- RENDER ---
     if (showSplash || isAuthChecking || !currentUser || isEmailUnverified) {
         return (
@@ -400,7 +467,7 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
                 {toasts.map(toast => <InAppToast key={toast.id} toast={toast} onClose={removeToast} />)}
             </div>
 
-            <header className="bg-[#0f0518]/80 backdrop-blur-xl z-[60] px-6 py-4 pt-[max(1rem,env(safe-area-inset-top))] border-b border-white/5 flex justify-center sticky top-0 shrink-0">
+            <header className="bg-[#0f0518]/80 backdrop-blur-md z-[60] px-6 py-4 pt-[max(1rem,env(safe-area-inset-top))] border-b border-white/5 flex justify-center sticky top-0 shrink-0">
                 <div className="w-full max-w-7xl flex justify-between items-center">
                     <div className="flex items-center gap-4 group">
                         <div className="w-14 h-14 flex items-center justify-center overflow-hidden drop-shadow-[0_0_12px_rgba(139,92,246,0.25)] group-hover:scale-105 transition-transform">
@@ -436,7 +503,8 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
                 </div>
             </header>
 
-            <div ref={scrollContainerRef} className="flex-1 relative w-full h-full min-h-0 overflow-y-auto overflow-x-hidden scroll-smooth pb-32" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+            {/* REMOVED pb-32 HERE: Only applied if activeTab === 'list' handled inside list view or conditionally here */}
+            <div ref={scrollContainerRef} className={`flex-1 relative w-full h-full min-h-0 overflow-y-auto overflow-x-hidden scroll-smooth ${activeTab === 'list' ? 'pb-32' : 'pb-0'}`} onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
                 <div className="absolute left-0 right-0 flex justify-center pointer-events-none z-[60]" style={{ top: -60, transform: `translateY(${pullY}px)`, transition: isRefreshing ? 'transform 0.2s ease-out' : 'transform 0s' }}>
                     <div className="bg-slate-800 rounded-full p-2 shadow-lg border border-white/10 flex items-center justify-center w-10 h-10"><i className={`fas fa-sync-alt text-dirole-primary ${isRefreshing || pullY > REFRESH_THRESHOLD ? 'animate-spin' : ''}`} style={{ transform: `rotate(${pullY * 2}deg)` }}></i></div>
                 </div>
@@ -456,7 +524,7 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
                         </div>
 
                         {/* DESKTOP SIDEBAR */}
-                        <div className={`hidden md:flex flex-col border-r border-white/5 bg-[#0f0518]/90 backdrop-blur-3xl transition-all duration-500 ease-in-out relative ${isSidebarCollapsed ? 'w-0 opacity-0 -translate-x-full' : 'w-[450px] opacity-100 translate-x-0'}`}>
+                        <div className={`hidden md:flex flex-col border-r border-white/5 bg-[#0f0518]/90 backdrop-blur-xl transition-all duration-500 ease-in-out relative ${isSidebarCollapsed ? 'w-0 opacity-0 -translate-x-full' : 'w-[450px] opacity-100 translate-x-0'}`}>
                             <div className="absolute top-1/2 -right-4 translate-y-[-50%] z-[300]">
                                 <button
                                     onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
@@ -482,10 +550,10 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
                                     <Suspense fallback={<div className="p-4 text-center"><i className="fas fa-spinner animate-spin"></i></div>}>
                                         <ListView
                                             locations={filteredLocations}
-                                            onCheckIn={(loc) => { triggerHaptic(); setSelectedLocation(loc); setIsReviewModalOpen(true); }}
+                                            onCheckIn={handleCheckIn}
                                             favorites={currentUser?.favorites || []}
-                                            onToggleFavorite={id => toggleFavorite(id).then(user => user && setCurrentUser(user))}
-                                            onOpenDetails={(loc) => { triggerHaptic(); setSelectedLocation(loc); setIsDetailsModalOpen(true); }}
+                                            onToggleFavorite={handleToggleFavorite}
+                                            onOpenDetails={handleOpenDetails}
                                             isLoading={locations.length === 0 && isLoading}
                                             isSidebar={true}
                                         />
@@ -498,7 +566,7 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
                         {isSidebarCollapsed && (
                             <button
                                 onClick={() => setIsSidebarCollapsed(false)}
-                                className="hidden md:flex absolute top-4 left-4 z-[400] w-12 h-12 bg-white/10 backdrop-blur-xl border border-white/10 rounded-2xl items-center justify-center text-white hover:bg-white/20 transition-all shadow-2xl group animate-fade-in"
+                                className="hidden md:flex absolute top-4 left-4 z-[400] w-12 h-12 bg-white/10 backdrop-blur-lg border border-white/10 rounded-2xl items-center justify-center text-white hover:bg-white/20 transition-all shadow-2xl group animate-fade-in"
                             >
                                 <i className="fas fa-bars text-sm group-hover:rotate-90 transition-transform"></i>
                             </button>
@@ -512,7 +580,7 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
                                     userLocation={userLocation}
                                     userAccuracy={userAccuracy}
                                     mapCenter={mapTarget}
-                                    onOpenDetails={(loc) => { triggerHaptic(); setSelectedLocation(loc); setIsDetailsModalOpen(true); }}
+                                    onOpenDetails={handleOpenDetails}
                                     onRegionChange={handleRegionChange}
                                     searchRadius={filters.maxDistance}
                                     searchOrigin={searchOrigin}
@@ -533,10 +601,10 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
                             <Suspense fallback={<div className="p-4 text-center"><i className="fas fa-spinner animate-spin"></i></div>}>
                                 <ListView
                                     locations={filteredLocations}
-                                    onCheckIn={(loc) => { triggerHaptic(); setSelectedLocation(loc); setIsReviewModalOpen(true); }}
+                                    onCheckIn={handleCheckIn}
                                     favorites={currentUser.favorites || []}
-                                    onToggleFavorite={id => toggleFavorite(id).then(user => user && setCurrentUser(user))}
-                                    onOpenDetails={(loc) => { triggerHaptic(); setSelectedLocation(loc); setIsDetailsModalOpen(true); }}
+                                    onToggleFavorite={handleToggleFavorite}
+                                    onOpenDetails={handleOpenDetails}
                                     isLoading={locations.length === 0 && isLoading}
                                 />
                             </Suspense>
@@ -607,7 +675,7 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
                 </>
             )}
 
-            <nav className="bottom-nav fixed bottom-0 left-0 right-0 bg-[#0f0518]/80 backdrop-blur-xl border-t border-white/5 z-50 px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
+            <nav className="bottom-nav fixed bottom-0 left-0 right-0 bg-[#0f0518]/90 backdrop-blur-md border-t border-white/5 z-50 px-6 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-10px_40px_rgba(0,0,0,0.5)]">
                 <div className="max-w-md mx-auto grid grid-cols-3 gap-1">
                     {['map', 'list', 'rank'].map((tab: any) => (
                         <button key={tab} onClick={() => { triggerHaptic(); setActiveTab(tab); }} className={`flex flex-col items-center justify-center space-y-1 transition-all py-1 ${activeTab === tab ? 'text-dirole-primary' : 'text-slate-500 hover:text-slate-300'}`}>
@@ -624,8 +692,8 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
                 {
                     selectedLocation && (
                         <>
-                            {isReviewModalOpen && <ReviewModal location={selectedLocation} currentUser={currentUser} isOpen={isReviewModalOpen} onClose={() => setIsReviewModalOpen(false)} onSuccess={() => { setShowConfetti(true); setTimeout(() => setShowConfetti(false), 4000); const up = getUserProfile(); if (up) setCurrentUser(up); if (searchOrigin) fetchData(searchOrigin.lat, searchOrigin.lng); }} onLogout={handleLogout} userLocation={userLocation} />}
-                            {isDetailsModalOpen && <LocationDetailsModal location={selectedLocation} isOpen={isDetailsModalOpen} onClose={() => setIsDetailsModalOpen(false)} onCheckIn={(loc) => { triggerHaptic(); setSelectedLocation(loc); setIsReviewModalOpen(true); }} onClaim={(loc) => { setSelectedLocation(loc); setIsClaimModalOpen(true); }} onReport={(id, type, name) => { setReportTarget({ id, type, name }); setIsReportModalOpen(true); }} onInvite={(loc) => { setSelectedLocation(loc); setIsInviteModalOpen(true); setIsDetailsModalOpen(false); }} onPostStory={(loc) => { triggerHaptic(); setStoryLocation(loc); setIsStoryCameraOpen(true); }} onShowToast={(title, message, type) => addToast({ title, message, type: type as any })} userLocation={userLocation} />}
+                            {isReviewModalOpen && <ReviewModal location={selectedLocation} currentUser={currentUser} isOpen={isReviewModalOpen} onClose={() => setIsReviewModalOpen(false)} onSuccess={() => { setShowConfetti(true); setTimeout(() => setShowConfetti(false), 4000); const up = getUserProfile(); if (up) setCurrentUser(up); if (searchOrigin) fetchData(searchOrigin.lat, searchOrigin.lng); checkReviewRequest(); }} onLogout={handleLogout} userLocation={userLocation} />}
+                            {isDetailsModalOpen && <LocationDetailsModal location={selectedLocation} isOpen={isDetailsModalOpen} onClose={() => setIsDetailsModalOpen(false)} onCheckIn={handleCheckIn} onClaim={(loc) => { setSelectedLocation(loc); setIsClaimModalOpen(true); }} onReport={(id, type, name) => { setReportTarget({ id, type, name }); setIsReportModalOpen(true); }} onInvite={(loc) => { setSelectedLocation(loc); setIsInviteModalOpen(true); setIsDetailsModalOpen(false); }} onPostStory={(loc) => { triggerHaptic(); setStoryLocation(loc); setIsStoryCameraOpen(true); }} onShowToast={(title, message, type) => addToast({ title, message, type: type as any })} userLocation={userLocation} refreshTrigger={detailsRefreshTrigger} />}
                             {isClaimModalOpen && <ClaimBusinessModal location={selectedLocation} currentUser={currentUser} isOpen={isClaimModalOpen} onClose={() => setIsClaimModalOpen(false)} onSuccess={() => { setShowConfetti(true); setTimeout(() => setShowConfetti(false), 3000); const center = currentMapCenter || userLocation || INITIAL_CENTER; fetchData(center.lat, center.lng); }} />}
                             {isInviteModalOpen && <InviteFriendsModal isOpen={isInviteModalOpen} onClose={() => setIsInviteModalOpen(false)} currentUser={currentUser} location={selectedLocation} onSuccess={() => { setShowConfetti(true); setTimeout(() => setShowConfetti(false), 3000); }} />}
                         </>
@@ -645,7 +713,14 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
 
                 {isFriendsModalOpen && <FriendsModal isOpen={isFriendsModalOpen} onClose={() => { setIsFriendsModalOpen(false); setScannedUser(null); setFriendsModalView('default'); }} currentUser={currentUser} initialTab={friendsModalTab} initialView={friendsModalView} scannedUser={scannedUser} onLogout={handleLogout} onOpenScanner={() => { setIsFriendsModalOpen(false); setTimeout(() => setIsQRScannerOpen(true), 300); }} onShowToast={(title, message, type) => addToast({ title, message, type: type as any })} />}
 
-                {isStoryCameraOpen && storyLocation && <StoryCamera isOpen={isStoryCameraOpen} locationId={storyLocation.id} locationName={storyLocation.name} onClose={() => setIsStoryCameraOpen(false)} onStoryPosted={() => { setIsStoryCameraOpen(false); setStoryLocation(null); addToast({ title: "Story Postado! 📸", message: "Seu story ficará visível por 6 horas.", type: 'success' }); }} />}
+                {isStoryCameraOpen && storyLocation && <StoryCamera isOpen={isStoryCameraOpen} locationId={storyLocation.id} locationName={storyLocation.name} onClose={() => setIsStoryCameraOpen(false)} onStoryPosted={() => { setIsStoryCameraOpen(false); setStoryLocation(null); setDetailsRefreshTrigger(Date.now()); addToast({ title: "Story Postado! 📸", message: "Seu story ficará visível por 6 horas.", type: 'success' }); checkReviewRequest(); }} />}
+
+                <RateAppModal
+                    isOpen={isRateModalOpen}
+                    onClose={handleRateDismiss}
+                    onRate={handleRateApp}
+                    onFeedback={handleRateFeedback}
+                />
             </Suspense>
         </div >
     );

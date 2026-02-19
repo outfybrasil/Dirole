@@ -1626,7 +1626,16 @@ export const getReviewsForLocation = async (locationId: string): Promise<Review[
             ]
         );
 
-        return response.documents.map((r: any) => ({
+        // Filter reviews client-side to only show last 24h as requested
+        const oneDayAgo = new Date();
+        oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+
+        const filteredDocs = response.documents.filter((r: any) => {
+            const createdAt = new Date(r.$createdAt);
+            return createdAt > oneDayAgo;
+        });
+
+        return filteredDocs.map((r: any) => ({
             id: r.$id,
             locationId: r.locationId,
             userId: r.userId,

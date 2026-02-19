@@ -87,7 +87,7 @@ export const StoryCamera: React.FC<StoryCameraProps> = ({
             const success = await createStory(
                 currentUser.id,
                 currentUser.name,
-                currentUser.nickname || currentUser.name,
+                currentUser.nickname || currentUser.name.split(' ')[0],
                 currentUser.avatar,
                 locationId,
                 locationName,

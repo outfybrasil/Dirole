@@ -117,6 +117,7 @@ const MapEventHandler = ({ onRegionChange }: { onRegionChange?: (c: { lat: numbe
   return null;
 }
 
+const EMPTY_OBJ = {};
 export const MapView = React.memo<MapViewProps>(({
   locations,
   userLocation,
@@ -127,7 +128,7 @@ export const MapView = React.memo<MapViewProps>(({
   searchRadius = 1,
   searchOrigin,
   theme = 'dark',
-  storyCounts = {}
+  storyCounts = EMPTY_OBJ
 }) => {
 
   // Memoize markers to prevent re-render of thousands of DOM nodes

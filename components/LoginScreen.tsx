@@ -164,7 +164,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, isModa
         return (
             <div className={`${isModal ? 'relative w-full h-full bg-[#0f0518] rounded-[2.5rem] overflow-hidden' : 'fixed inset-0 z-[9999] bg-[#0f0518] overflow-y-auto'}`}>
                 {/* Background Fixo/Absoluto */}
-                <div className={`absolute inset-0 bg-gradient-to-br from-purple-900/20 via-black to-blue-900/20 pointer-events-none`}></div>
+                <div className={`${isModal ? 'absolute' : 'fixed'} inset-0 bg-gradient-to-br from-purple-900/20 via-black to-blue-900/20 pointer-events-none`}></div>
 
                 <div className="min-h-full w-full flex flex-col items-center justify-center p-6 relative z-10">
                     <div className="w-full max-w-sm bg-white/5 border border-white/10 rounded-3xl p-8 text-center animate-slide-up shadow-2xl backdrop-blur-md">
@@ -218,7 +218,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, isModa
             <PrivacyPolicyModal isOpen={isPrivacyOpen} onClose={() => setIsPrivacyOpen(false)} />
 
             {/* Background Gradient */}
-            <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-black to-blue-900 pointer-events-none h-full min-h-full"></div>
+            <div className={`${isModal ? 'absolute' : 'fixed'} inset-0 bg-gradient-to-br from-purple-900 via-black to-blue-900 pointer-events-none`}></div>
 
             {/* Wrapper de Conteúdo */}
             <div className={`${isModal ? 'flex flex-col items-center justify-center p-8 sm:p-12 pb-16 min-h-[500px]' : 'min-h-full w-full flex flex-col items-center justify-center p-6 sm:p-10'} relative z-10`}>

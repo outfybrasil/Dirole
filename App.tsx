@@ -3,6 +3,7 @@ import { MobileLayout } from './layouts/MobileLayout';
 import { User } from './types';
 import { getCurrentSession } from './services/authService';
 import { getUserProfile, syncUserProfile } from './services/mockService';
+import { OfflineBanner } from './components/OfflineBanner';
 
 function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -48,7 +49,12 @@ function App() {
 
   // Native / Mobile View
   // We pass 'user' if we have it, otherwise MobileLayout handles the AuthFlow
-  return <MobileLayout preloadedUser={user} />;
+  return (
+    <>
+      <OfflineBanner />
+      <MobileLayout preloadedUser={user} />
+    </>
+  );
 }
 
 export default App;

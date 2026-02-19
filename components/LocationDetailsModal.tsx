@@ -14,7 +14,9 @@ interface LocationDetailsModalProps {
     onInvite?: (loc: Location) => void;
     onPostStory?: (loc: Location) => void;
     onShowToast?: (title: string, message: string, type: 'success' | 'error' | 'info') => void;
+
     userLocation: { lat: number; lng: number } | null;
+    refreshTrigger?: number;
 }
 
 type TabType = 'overview' | 'agenda' | 'gallery' | 'stories';
@@ -29,7 +31,8 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
     onInvite,
     onPostStory,
     onShowToast,
-    userLocation
+    userLocation,
+    refreshTrigger = 0
 }) => {
     const [activeTab, setActiveTab] = useState<TabType>('overview');
     const [hasVoted, setHasVoted] = useState(false);
@@ -101,7 +104,7 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
 
             return () => clearTimeout(safetyTimer);
         }
-    }, [isOpen, location]);
+    }, [isOpen, location, refreshTrigger]);
 
     if (!isOpen || !location) return null;
 
@@ -600,13 +603,15 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
                         VISÃO GERAL
                         {activeTab === 'overview' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-dirole-primary to-dirole-secondary shadow-[0_0_15px_#8b5cf6]"></div>}
                     </button>
-                    <button
-                        onClick={() => setActiveTab('agenda')}
-                        className={`py-4 relative transition-colors tracking-wide ${activeTab === 'agenda' ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}
-                    >
-                        AGENDA
-                        {activeTab === 'agenda' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-dirole-primary to-dirole-secondary shadow-[0_0_15px_#8b5cf6]"></div>}
-                    </button>
+                    {location.isOfficial && (
+                        <button
+                            onClick={() => setActiveTab('agenda')}
+                            className={`py-4 relative transition-colors tracking-wide ${activeTab === 'agenda' ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                        >
+                            AGENDA
+                            {activeTab === 'agenda' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-dirole-primary to-dirole-secondary shadow-[0_0_15px_#8b5cf6]"></div>}
+                        </button>
+                    )}
                     <button
                         onClick={() => setActiveTab('gallery')}
                         className={`py-4 relative transition-colors tracking-wide ${activeTab === 'gallery' ? 'text-white' : 'text-slate-500 hover:text-slate-300'}`}
@@ -623,65 +628,81 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto px-6 pb-32 pt-6 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto px-6 pb-56 pt-6 custom-scrollbar">
                     {activeTab === 'overview' && renderOverview()}
-                    {activeTab === 'agenda' && renderAgenda()}
+                    {activeTab === 'agenda' && location.isOfficial && renderAgenda()}
                     {activeTab === 'gallery' && renderGallery()}
                     {activeTab === 'stories' && renderStories()}
                 </div>
 
                 {/* Floating Bottom Bar */}
-                <div className="absolute bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-[#0f0518] via-[#0f0518] to-transparent z-50">
-                    <div className="flex gap-3 mb-3">
-                        <a
-                            href={uberLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={() => triggerHaptic()}
-                            className="flex-1 bg-slate-900/80 backdrop-blur text-white border border-white/10 font-bold py-4 rounded-2xl active:scale-95 transition-all hover:bg-slate-800 flex items-center justify-center gap-2 group"
-                        >
-                            <span className="text-lg group-hover:-translate-y-1 transition-transform">🚗</span>
-                            <span className="text-sm">Uber</span>
-                        </a>
-                        <button
-                            onClick={handleShare}
-                            className="flex-1 bg-slate-900/80 backdrop-blur text-white border border-white/10 font-bold py-4 rounded-2xl active:scale-95 transition-all hover:bg-slate-800 flex items-center justify-center gap-2 group"
-                        >
-                            <span className="text-lg group-hover:-translate-y-1 transition-transform">🔗</span>
-                            <span className="text-sm">Compartilhar</span>
-                        </button>
-                        <button
-                            onClick={() => { if (onInvite) onInvite(location); }}
-                            className="flex-1 bg-slate-900/80 backdrop-blur text-white border border-white/10 font-bold py-4 rounded-2xl active:scale-95 transition-all hover:bg-slate-800 flex items-center justify-center gap-2 group"
-                        >
-                            <span className="text-lg group-hover:-translate-y-1 transition-transform">✉️</span>
-                            <span className="text-sm">Convidar</span>
-                        </button>
-                    </div>
-
-                    {/* Story Button - Second Row */}
-                    {onPostStory && (
-                        <div className="mb-3">
-                            <button
-                                onClick={() => { triggerHaptic(); onPostStory(location); }}
-                                disabled={isTooFar}
-                                className={`w-full ${isTooFar ? 'bg-slate-800 text-slate-500 border-white/5 cursor-not-allowed grayscale' : 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-[0_5px_20px_rgba(168,85,247,0.3)] hover:shadow-[0_5px_30px_rgba(168,85,247,0.5)]'} font-black py-4 rounded-2xl active:scale-95 transition-all flex items-center justify-center gap-2 border border-white/10`}
+                {/* Floating Bottom Bar - SUPER OTIMIZADO */}
+                <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-[#0f0518] via-[#0f0518] to-transparent z-50">
+                    <div className="flex flex-col gap-2">
+                        {/* Row 1: Quick Actions (Icons Only / Brand Logos) */}
+                        <div className="grid grid-cols-4 gap-2">
+                            <a
+                                href={uberLink}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() => triggerHaptic()}
+                                className="h-14 bg-black border border-white/10 rounded-xl flex items-center justify-center active:scale-95 transition-all hover:bg-slate-900 group relative overflow-hidden"
                             >
-                                <i className="fas fa-camera"></i> {isTooFar ? 'LONGE DEMAIS' : 'POSTAR STORY'}
+                                <svg role="img" viewBox="0 0 24 24" className="w-8 h-8 fill-white group-hover:scale-110 transition-transform" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M0 7.97v4.958c0 1.867 1.302 3.101 3 3.101.826 0 1.562-.316 2.094-.87v.736H6.27V7.97H5.082v4.888c0 1.257-.85 2.106-1.947 2.106-1.11 0-1.946-.827-1.946-2.106V7.971H0zm7.44 0v7.925h1.13v-.725c.521.532 1.257.86 2.06.86a3.006 3.006 0 0 0 3.034-3.01 3.01 3.01 0 0 0-3.033-3.024 2.86 2.86 0 0 0-2.049.861V7.971H7.439zm9.869 2.038c-1.687 0-2.965 1.37-2.965 3 0 1.72 1.334 3.01 3.066 3.01 1.053 0 1.913-.463 2.49-1.233l-.826-.611c-.43.577-.996.847-1.664.847-.973 0-1.753-.7-1.912-1.64h4.697v-.373c0-1.72-1.222-3-2.886-3zm6.295.068c-.634 0-1.098.294-1.381.758v-.713h-1.131v5.774h1.142V12.61c0-.894.544-1.47 1.291-1.47H24v-1.065h-.396zm-6.319.928c.85 0 1.564.588 1.756 1.47H15.52c.203-.882.916-1.47 1.765-1.47zm-6.732.012c1.086 0 1.98.883 1.98 2.004a1.993 1.993 0 0 1-1.98 2.001A1.989 1.989 0 0 1 8.56 13.02a1.99 1.99 0 0 1 1.992-2.004z" />
+                                </svg>
+                            </a>
+                            <a
+                                href={`taxis99://call?end_lat=${location.latitude}&end_lng=${location.longitude}&end_name=${encodeURIComponent(location.name)}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() => triggerHaptic()}
+                                className="h-14 bg-[#FFDA00] border border-yellow-500/50 rounded-xl flex items-center justify-center active:scale-95 transition-all hover:bg-yellow-400 text-black group overflow-hidden"
+                            >
+                                <span className="text-xl font-black tracking-tighter group-hover:scale-110 transition-transform">99</span>
+                            </a>
+                            <button
+                                onClick={handleShare}
+                                className="h-14 bg-slate-800/80 backdrop-blur border border-white/10 rounded-xl flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all hover:bg-slate-800 text-white"
+                            >
+                                <i className="fas fa-share-alt text-lg"></i>
+                                <span className="text-[8px] font-bold uppercase text-slate-400">Enviar</span>
+                            </button>
+                            <button
+                                onClick={() => { if (onInvite) onInvite(location); }}
+                                className="h-14 bg-slate-800/80 backdrop-blur border border-white/10 rounded-xl flex flex-col items-center justify-center gap-0.5 active:scale-95 transition-all hover:bg-slate-800 text-white"
+                            >
+                                <i className="fas fa-user-plus text-lg"></i>
+                                <span className="text-[8px] font-bold uppercase text-slate-400">Convidar</span>
                             </button>
                         </div>
-                    )}
 
-                    <button
-                        onClick={() => { triggerHaptic(); onClose(); onCheckIn(location); }}
-                        disabled={isTooFar}
-                        className={`w-full ${isTooFar ? 'bg-slate-800 text-slate-500 border-white/5 cursor-not-allowed grayscale shadow-none' : 'bg-gradient-to-r from-dirole-primary to-dirole-secondary text-white shadow-[0_5px_20px_rgba(139,92,246,0.3)] hover:shadow-[0_5px_30px_rgba(139,92,246,0.5)]'} font-black py-4 rounded-2xl active:scale-95 transition-all flex items-center justify-center gap-2 border border-white/10`}
-                    >
-                        <i className="fas fa-edit"></i> {isTooFar ? 'LONGE DEMAIS' : 'CHECK-IN DETALHADO'}
-                    </button>
+                        {/* Row 2: Main Actions (Compact) */}
+                        <div className="flex gap-2">
+                            {onPostStory && (
+                                <button
+                                    onClick={() => { triggerHaptic(); onPostStory(location); }}
+                                    disabled={isTooFar}
+                                    className={`flex-1 ${isTooFar ? 'bg-slate-800 text-slate-500 border-white/5 cursor-not-allowed grayscale' : 'bg-gradient-to-r from-purple-600 to-pink-600 text-white shadow-lg'} font-black py-3.5 rounded-xl active:scale-95 transition-all flex items-center justify-center gap-2 border border-white/10 text-[10px] uppercase tracking-wider`}
+                                >
+                                    <i className="fas fa-camera text-sm"></i>
+                                    {isTooFar ? 'Longe' : 'Postar Story'}
+                                </button>
+                            )}
+
+                            <button
+                                onClick={() => { triggerHaptic(); onClose(); onCheckIn(location); }}
+                                disabled={isTooFar}
+                                className={`flex-[1.5] ${isTooFar ? 'bg-slate-800 text-slate-500 border-white/5 cursor-not-allowed grayscale shadow-none' : 'bg-gradient-to-r from-dirole-primary to-dirole-secondary text-white shadow-lg'} font-black py-3.5 rounded-xl active:scale-95 transition-all flex items-center justify-center gap-2 border border-white/10 text-[10px] uppercase tracking-wider`}
+                            >
+                                <i className="fas fa-edit text-sm"></i>
+                                {isTooFar ? 'Longe demais' : 'Check-in Detalhado'}
+                            </button>
+                        </div>
+                    </div>
                     {isTooFar && (
-                        <p className="text-center text-[10px] font-black text-red-500/80 uppercase tracking-[0.2em] mt-3 animate-pulse">
-                            📍 Fora de alcance ({Math.round(distance || 0)}m / Limite 300m)
+                        <p className="text-center text-[9px] font-black text-red-500/80 uppercase tracking-widest mt-2">
+                            Fora de alcance ({Math.round(distance || 0)}m)
                         </p>
                     )}
                 </div>
