@@ -53,8 +53,6 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({ location, currentUser,
 
     setIsSubmitting(true);
 
-    setIsSubmitting(true);
-
     // GEOFENCING CHECK (Extra safety)
     if (isTooFar) {
       alert(`Você está muito longe para fazer check-in! 📍\nDistância atual: ${Math.round(distance || 0)}m`);
