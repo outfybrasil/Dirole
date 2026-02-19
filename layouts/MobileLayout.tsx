@@ -299,14 +299,7 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
         };
     }, []);
 
-    // --- SEARCH HERE BTN VISIBILITY ---
-    const shouldShowSearchHere = useMemo(() => {
-        if (!currentMapCenter || !searchOrigin) return false;
-        const latDiff = Math.abs(currentMapCenter.lat - searchOrigin.lat);
-        const lngDiff = Math.abs(currentMapCenter.lng - searchOrigin.lng);
-        // Slightly more sensitive trigger for search here: 0.015 instead of 0.02
-        return latDiff > 0.015 || lngDiff > 0.015;
-    }, [currentMapCenter, searchOrigin]);
+
 
     const handleRegionChange = useCallback((center: { lat: number; lng: number }, bounds: MapBounds) => {
         setCurrentMapCenter(center);
@@ -657,21 +650,12 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
                             <button onClick={() => { triggerHaptic(); setShowFilters(true); }} className={`w-12 h-12 rounded-xl bg-slate-800 text-white shadow-2xl flex items-center justify-center transition-all border border-white/20 active:scale-95 pointer-events-auto`}>
                                 <i className="fas fa-sliders-h text-lg"></i>
                             </button>
-                            <button onClick={handleForceLocationRefresh} className="w-12 h-12 rounded-xl bg-slate-800 text-white shadow-2xl flex items-center justify-center border border-white/20 active:scale-95 pointer-events-auto">
-                                <i className="fas fa-location-arrow text-sm"></i>
+                            <button onClick={() => { triggerHaptic(); const lat = currentMapCenter?.lat || userLocation?.lat || INITIAL_CENTER.lat; const lng = currentMapCenter?.lng || userLocation?.lng || INITIAL_CENTER.lng; fetchData(lat, lng, currentMapBounds.current || undefined); }} className="w-12 h-12 rounded-xl bg-slate-800 text-white shadow-2xl flex items-center justify-center border border-white/20 active:scale-95 pointer-events-auto">
+                                <i className={`fas fa-sync-alt text-sm ${isLoading ? 'animate-spin' : ''}`}></i>
                             </button>
                         </div>
                     )}
 
-                    {/* RE-SEARCH AREA BUTTON (Hidden when filtering) */}
-                    {shouldShowSearchHere && !isRefreshing && !showFilters && (
-                        <div className="fixed bottom-28 left-1/2 -translate-x-1/2 z-[90] pointer-events-none animate-slide-up mb-[env(safe-area-inset-bottom)]">
-                            <button onClick={() => { triggerHaptic(); if (currentMapCenter) fetchData(currentMapCenter.lat, currentMapCenter.lng, currentMapBounds.current || undefined); }} disabled={isLoading} className="px-6 py-3 rounded-full bg-white text-black font-black text-[10px] shadow-2xl active:scale-95 transition-all pointer-events-auto flex items-center gap-2 uppercase tracking-widest leading-none">
-                                <i className={`fas fa-redo ${isLoading ? 'animate-spin' : ''}`}></i>
-                                Atualizar Mapa
-                            </button>
-                        </div>
-                    )}
                 </>
             )}
 
