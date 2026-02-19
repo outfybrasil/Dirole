@@ -1,6 +1,6 @@
 import React from 'react';
 import { LoginScreen } from './LoginScreen';
-import { LandingPage } from './LandingPage';
+
 import { VerificationPendingScreen } from './VerificationPendingScreen';
 import { InAppToast, ToastData } from './InAppToast';
 
@@ -62,11 +62,7 @@ export const AuthFlow: React.FC<AuthFlowProps> = ({
     if (!currentUser) {
         return (
             <div className="fixed inset-0 h-[100dvh] w-full bg-[#0f0518] overflow-y-auto safe-scroll">
-                {showLogin ? (
-                    <LoginScreen onLoginSuccess={setCurrentUser} />
-                ) : (
-                    <LandingPage onEnter={() => setShowLogin(true)} />
-                )}
+                <LoginScreen onLoginSuccess={setCurrentUser} />
                 <div className="fixed top-[max(1rem,env(safe-area-inset-top))] left-4 right-4 z-[9999] pointer-events-none flex flex-col items-center">
                     {toasts.map(toast => (
                         <InAppToast key={toast.id} toast={toast} onClose={removeToast} />
