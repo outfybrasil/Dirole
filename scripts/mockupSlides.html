@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dirole Instagram Slides</title>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Montserrat:wght@400;600;800;900&display=swap"
+        rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #000;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .slide {
+            width: 1080px;
+            height: 1350px;
+            position: relative;
+            overflow: hidden;
+            background: #0a0118;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 40px;
+        }
+
+        /* Background glow */
+        .slide::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.25) 0%, rgba(139, 92, 246, 0.05) 50%, transparent 80%);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+
+        /* Grid lines on background */
+        .slide::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(139, 92, 246, 0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(139, 92, 246, 0.04) 1px, transparent 1px);
+            background-size: 60px 60px;
+            pointer-events: none;
+        }
+
+        .label-top {
+            position: absolute;
+            top: 220px;
+            /* Moved much closer to center */
+            left: 0;
+            right: 0;
+            text-align: center;
+            z-index: 10;
+        }
+
+        .label-top .tag {
+            display: inline-block;
+            background: rgba(139, 92, 246, 0.15);
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            color: #a78bfa;
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            padding: 8px 24px;
+            border-radius: 100px;
+        }
+
+        .phone-wrapper {
+            position: relative;
+            z-index: 5;
+            margin: 20px 0;
+        }
+
+        .phone-frame {
+            width: 300px;
+            /* Much smaller phone */
+            height: 620px;
+            background: linear-gradient(145deg, #1a1a2e, #0d0d1a);
+            border-radius: 40px;
+            border: 3px solid rgba(255, 255, 255, 0.14);
+            box-shadow:
+                0 0 0 1px rgba(139, 92, 246, 0.25),
+                0 30px 80px rgba(0, 0, 0, 0.9),
+                0 0 60px rgba(139, 92, 246, 0.18),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Notch */
+        .phone-frame::before {
+            content: '';
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 28px;
+            background: #0d0d1a;
+            border-radius: 18px;
+            z-index: 20;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+        }
+
+        .phone-screen {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: top;
+            border-radius: 32px;
+        }
+
+        /* Reflection shimmer */
+        .phone-frame .shimmer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 200px;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 100%);
+            border-radius: 32px 32px 0 0;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .label-bottom {
+            position: absolute;
+            bottom: 220px;
+            /* Moved much closer to center */
+            left: 0;
+            right: 0;
+            text-align: center;
+            z-index: 10;
+            padding: 0 80px;
+        }
+
+        .label-bottom h2 {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 52px;
+            color: #fff;
+            letter-spacing: 0.05em;
+            line-height: 1.1;
+            text-shadow: 0 0 30px rgba(139, 92, 246, 0.5);
+        }
+
+        .label-bottom p {
+            font-size: 18px;
+            color: #a78bfa;
+            font-weight: 600;
+            margin-top: 8px;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+        }
+
+        /* Decorative glow circles */
+        .deco-circle {
+            position: absolute;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        /* Floating icons */
+        .float-icon {
+            position: absolute;
+            z-index: 4;
+            font-size: 28px;
+            opacity: 0.4;
+        }
+
+        /* Specific for Cover/CTA */
+        .slide-hero h1 {
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 900;
+            font-size: 160px;
+            color: #fff;
+            text-shadow: 0 0 40px rgba(139, 92, 246, 0.6);
+            letter-spacing: -0.02em;
+        }
+
+        .slide-hero .sub-title {
+            font-family: 'Bebas Neue', sans-serif;
+            font-size: 64px;
+            color: #ec4899;
+            text-shadow: 0 0 20px rgba(236, 72, 153, 0.5);
+            letter-spacing: 0.1em;
+            margin-top: -20px;
+        }
+
+        .grid-floor {
+            position: absolute;
+            bottom: -100px;
+            left: -50%;
+            width: 200%;
+            height: 600px;
+            background-image:
+                linear-gradient(rgba(139, 92, 246, 0.2) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(139, 92, 246, 0.2) 1px, transparent 1px);
+            background-size: 50px 50px;
+            transform: perspective(500px) rotateX(60deg);
+            mask-image: linear-gradient(to top, rgba(0, 0, 0, 1) 20%, transparent 80%);
+        }
+
+        .btn-pill {
+            background: linear-gradient(to right, #8b5cf6, #ec4899);
+            color: #fff;
+            font-weight: 900;
+            font-size: 32px;
+            padding: 20px 60px;
+            border-radius: 100px;
+            text-transform: uppercase;
+            box-shadow: 0 0 40px rgba(139, 92, 246, 0.4);
+            margin: 40px 0;
+            font-family: 'Montserrat', sans-serif;
+        }
+
+        .spotlight {
+            position: absolute;
+            top: -200px;
+            width: 1000px;
+            height: 1000px;
+            background: radial-gradient(circle, rgba(139, 92, 246, 0.15) 0%, transparent 70%);
+            border-radius: 50%;
+            filter: blur(80px);
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- SLIDE 1: CAPA -->
+    <div class="slide" id="slide-capa">
+        <div class="spotlight"></div>
+        <div class="grid-floor"></div>
+
+        <div class="slide-hero" style="text-align: center; z-index: 10;">
+            <h1>DIROLE</h1>
+            <div class="sub-title">O RADAR DA NOITE</div>
+        </div>
+
+        <!-- Floating Pins -->
+        <div
+            style="position: absolute; bottom: 450px; left: 300px; color: #8b5cf6; font-size: 40px; filter: drop-shadow(0 0 10px #8b5cf6); transform: scale(1.2);">
+            📍</div>
+        <div
+            style="position: absolute; bottom: 480px; right: 280px; color: #8b5cf6; font-size: 40px; filter: drop-shadow(0 0 10px #8b5cf6); transform: scale(1);">
+            📍</div>
+        <div
+            style="position: absolute; bottom: 380px; left: 50%; color: #8b5cf6; font-size: 40px; filter: drop-shadow(0 0 10px #8b5cf6); transform: translateX(-50%) scale(0.8);">
+            📍</div>
+    </div>
+
+    <!-- SLIDE 2: MAPA -->
+    <div class="slide" id="slide-mapa">
+        <div class="deco-circle"
+            style="width:400px;height:400px;top:-100px;right:-100px;background:radial-gradient(circle,rgba(139,92,246,0.12),transparent 70%)">
+        </div>
+        <div class="deco-circle"
+            style="width:300px;height:300px;bottom:-80px;left:-80px;background:radial-gradient(circle,rgba(236,72,153,0.08),transparent 70%)">
+        </div>
+
+        <div class="label-top">
+            <div class="tag">📍 mapa ao vivo</div>
+        </div>
+
+        <div class="phone-wrapper">
+            <div class="phone-frame">
+                <div class="shimmer"></div>
+                <img class="phone-screen" src="../screenshots/instagram/1_Mapa Principal.png" alt="Mapa" />
+            </div>
+            <!-- glow under phone -->
+            <div
+                style="position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);width:240px;height:30px;background:rgba(139,92,246,0.3);filter:blur(20px);border-radius:50%;">
+            </div>
+        </div>
+
+        <div class="label-bottom">
+            <h2>ONDE O ROLÊ<br>TÁ BOMBANDO</h2>
+            <p>Veja em tempo real perto de você</p>
+        </div>
+    </div>
+
+    <!-- SLIDE 3: LISTA -->
+    <div class="slide" id="slide-lista">
+        <div class="deco-circle"
+            style="width:400px;height:400px;top:-100px;left:-100px;background:radial-gradient(circle,rgba(139,92,246,0.12),transparent 70%)">
+        </div>
+        <div class="deco-circle"
+            style="width:300px;height:300px;bottom:-80px;right:-80px;background:radial-gradient(circle,rgba(236,72,153,0.08),transparent 70%)">
+        </div>
+
+        <div class="label-top">
+            <div class="tag">⭐ avaliações reais</div>
+        </div>
+
+        <div class="phone-wrapper">
+            <div class="phone-frame">
+                <div class="shimmer"></div>
+                <img class="phone-screen" src="../screenshots/instagram/2_Listas de Locais.png" alt="Lista" />
+            </div>
+            <div
+                style="position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);width:240px;height:30px;background:rgba(139,92,246,0.3);filter:blur(20px);border-radius:50%;">
+            </div>
+        </div>
+
+        <div class="label-bottom">
+            <h2>OS MELHORES<br>LOCAIS</h2>
+            <p>Filtrados por vibe e avaliação</p>
+        </div>
+    </div>
+
+    <!-- SLIDE 4: RANKING -->
+    <div class="slide" id="slide-ranking">
+        <div class="deco-circle"
+            style="width:350px;height:350px;top:-80px;right:-80px;background:radial-gradient(circle,rgba(245,158,11,0.08),transparent 70%)">
+        </div>
+        <div class="deco-circle"
+            style="width:350px;height:350px;bottom:-80px;left:-80px;background:radial-gradient(circle,rgba(139,92,246,0.1),transparent 70%)">
+        </div>
+
+        <div class="label-top">
+            <div class="tag">🏆 ranking de curtição</div>
+        </div>
+
+        <div class="phone-wrapper">
+            <div class="phone-frame">
+                <div class="shimmer"></div>
+                <img class="phone-screen" src="../screenshots/instagram/3_Ranking de Usuarios.png" alt="Ranking" />
+            </div>
+            <div
+                style="position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);width:240px;height:30px;background:rgba(245,158,11,0.2);filter:blur(20px);border-radius:50%;">
+            </div>
+        </div>
+
+        <div class="label-bottom">
+            <h2>QUEM MANDA<br>NO ROLÊ</h2>
+            <p>Sobe no ranking curtindo ao vivo</p>
+        </div>
+    </div>
+
+    <!-- SLIDE 5: PERFIL -->
+    <div class="slide" id="slide-perfil">
+        <div class="deco-circle"
+            style="width:400px;height:400px;top:-100px;left:-100px;background:radial-gradient(circle,rgba(236,72,153,0.1),transparent 70%)">
+        </div>
+        <div class="deco-circle"
+            style="width:300px;height:300px;bottom:-80px;right:-80px;background:radial-gradient(circle,rgba(139,92,246,0.1),transparent 70%)">
+        </div>
+
+        <div class="label-top">
+            <div class="tag">👤 seu perfil</div>
+        </div>
+
+        <div class="phone-wrapper">
+            <div class="phone-frame">
+                <div class="shimmer"></div>
+                <img class="phone-screen" src="../screenshots/instagram/4_Modal_perfil.png" alt="Perfil" />
+            </div>
+            <div
+                style="position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);width:240px;height:30px;background:rgba(236,72,153,0.2);filter:blur(20px);border-radius:50%;">
+            </div>
+        </div>
+
+        <div class="label-bottom">
+            <h2>SEU NÍVEL<br>NA NOITE</h2>
+            <p>XP, conquistas e histórico de rolês</p>
+        </div>
+    </div>
+
+    <!-- SLIDE 6: FILTROS -->
+    <div class="slide" id="slide-filtros">
+        <div class="deco-circle"
+            style="width:400px;height:400px;top:-100px;right:-100px;background:radial-gradient(circle,rgba(139,92,246,0.12),transparent 70%)">
+        </div>
+        <div class="deco-circle"
+            style="width:300px;height:300px;bottom:-80px;left:-80px;background:radial-gradient(circle,rgba(16,185,129,0.06),transparent 70%)">
+        </div>
+
+        <div class="label-top">
+            <div class="tag">🎚️ filtros inteligentes</div>
+        </div>
+
+        <div class="phone-wrapper">
+            <div class="phone-frame">
+                <div class="shimmer"></div>
+                <img class="phone-screen" src="../screenshots/instagram/5_Gaveta_Filtros.png" alt="Filtros" />
+            </div>
+            <div
+                style="position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);width:240px;height:30px;background:rgba(139,92,246,0.3);filter:blur(20px);border-radius:50%;">
+            </div>
+        </div>
+
+        <div class="label-bottom">
+            <h2>FILTRA DO<br>SEU JEITO</h2>
+            <p>Por vibe, preço, distância e mais</p>
+        </div>
+    </div>
+
+    <!-- SLIDE 7: CTA -->
+    <div class="slide" id="slide-cta">
+        <div class="spotlight"></div>
+
+        <div class="label-top" style="top: 150px;">
+            <h2 style="font-family: 'Bebas Neue', sans-serif; font-size: 100px; color: #fff; line-height: 0.9;">QUER
+                TESTAR?</h2>
+            <p style="font-size: 24px; color: #fff; margin-top: 10px; font-weight: 400; letter-spacing: 0.2em;">A VERSÃO
+                WEB JÁ ESTÁ DISPONÍVEL</p>
+        </div>
+
+        <div class="phone-wrapper" style="margin-top: 50px;">
+            <div
+                style="width: 280px; height: 280px; background: rgba(139,92,246,0.1); border: 2px solid rgba(139,92,246,0.3); border-radius: 60px; display: flex; align-items: center; justify-content: center; box-shadow: 0 0 60px rgba(139,92,246,0.2);">
+                <div
+                    style="width: 180px; height: 180px; background: linear-gradient(135deg, #8b5cf6, #ec4899); border-radius: 40px; display: flex; align-items: center; justify-content: center; font-size: 90px; color: #fff; box-shadow: 0 0 40px rgba(139,92,246,0.5);">
+                    🌡️
+                </div>
+            </div>
+            <div
+                style="position:absolute; bottom: -40px; left: 50%; transform: translateX(-50%); width: 300px; height: 100px; background: radial-gradient(ellipse at center, rgba(139,92,246,0.4), transparent 70%); filter: blur(20px);">
+            </div>
+        </div>
+
+        <div style="z-index: 10; text-align: center; margin-top: 40px;">
+            <div class="btn-pill">ACESSAR GRÁTIS</div>
+            <p
+                style="color: #fff; font-size: 28px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; margin-top: 20px;">
+                LINK NA BIO <span style="font-size: 32px">↑</span>
+            </p>
+        </div>
+    </div>
+
+</body>
+
+</html>

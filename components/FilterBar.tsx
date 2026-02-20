@@ -58,7 +58,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onChange, onSearc
       minCrowd: undefined,
       maxCrowd: undefined,
       types: [],
-      maxDistance: 20,
+      maxDistance: 1,
       onlyOpen: false
     });
   };
@@ -146,7 +146,7 @@ export const FilterBar: React.FC<FilterBarProps> = ({ filters, onChange, onSearc
           <input
             type="range"
             min="1"
-            max="100"
+            max="5"
             step="1"
             value={filters.maxDistance}
             onChange={(e) => onChange({ ...filters, maxDistance: Number(e.target.value) })}

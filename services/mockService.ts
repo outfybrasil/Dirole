@@ -21,7 +21,11 @@ let locationCache: {
     data: Location[];
 } | null = null;
 const CACHE_STALE_MS = 60000; // 1 minute
-const CACHE_DISTANCE_THRESHOLD = 0.05; // ~50m
+const CACHE_DISTANCE_THRESHOLD = 50; // ~50m (in meters, as calculateDistance returns meters)
+const MIN_SEARCH_RADIUS_KM = 1;
+const MAX_SEARCH_RADIUS_KM = 5;
+
+// Helper to calculate distance between two coordinates in km (Moved to line 1013)
 
 export const uploadFile = async (file: File): Promise<string> => {
     try {
@@ -996,8 +1000,8 @@ export const getPendingFriendRequests = async (userId: string): Promise<FriendUs
 // --- REAL DATA SERVICE ---
 
 export const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371e3;
-    const φ1 = lat1 * Math.PI / 180;
+    const R = 6371e3; // metres
+    const φ1 = lat1 * Math.PI / 180; // φ, λ in radians
     const φ2 = lat2 * Math.PI / 180;
     const Δφ = (lat2 - lat1) * Math.PI / 180;
     const Δλ = (lon2 - lon1) * Math.PI / 180;
@@ -1006,7 +1010,8 @@ export const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2
         Math.cos(φ1) * Math.cos(φ2) *
         Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
+
+    return R * c; // in metres
 };
 
 // OPEN STREET MAP / PHOTON FETCHING
@@ -1340,6 +1345,45 @@ export const searchLocations = async (query: string, userLat: number, userLng: n
     return merged.sort((a, b) => (a.distance || 0) - (b.distance || 0));
 };
 
+export const getLocationsByUser = async (userId: string): Promise<Location[]> => {
+    try {
+        const response = await databases.listDocuments(
+            APPWRITE_DATABASE_ID,
+            'locations',
+            [Query.equal('owner_id', userId)]
+        );
+
+        return response.documents.map((row: any) => {
+            const stats = row.stats ? JSON.parse(row.stats) : { avgCrowd: 0, avgVibe: 0, avgPrice: 0, reviewCount: 0 };
+            const { isOpen, hours } = determineOpenStatus(row.type as LocationType);
+            return {
+                id: row.$id,
+                name: row.name || row.nome || 'Sem Nome',
+                address: row.address || row.endereco || '',
+                type: row.type as LocationType,
+                latitude: row.lat || row.latitude || 0,
+                longitude: row.lng || row.longitude || 0,
+                imageUrl: row.image_url || row.imageUrl || '',
+                verified: row.verified || false,
+                votesForVerification: row.votes_for_verification || 0,
+                isOfficial: row.is_official || false,
+                ownerId: row.owner_id || '',
+                officialDescription: row.official_description || '',
+                instagram: row.instagram || '',
+                whatsapp: row.whatsapp || '',
+                stats: stats,
+                isOpen,
+                openingHours: hours,
+                reviews: [],
+                distance: 0
+            };
+        });
+    } catch (e: any) {
+        console.error("[Appwrite] getLocationsByUser failed:", e.message);
+        return [];
+    }
+};
+
 const generateFallbackLocations = (centerLat: number, centerLng: number, count: number = 10): Location[] => {
     const types = [LocationType.BAR, LocationType.BALADA, LocationType.PUB, LocationType.RESTAURANTE];
     const names = [
@@ -1384,7 +1428,7 @@ export const getNearbyRoles = async (lat: number, lng: number, bounds?: MapBound
         const dist = calculateDistance(lat, lng, locationCache.lat, locationCache.lng);
         const isFresh = Date.now() - locationCache.timestamp < CACHE_STALE_MS;
         if (dist < CACHE_DISTANCE_THRESHOLD && isFresh) {
-            console.log(`[Cache] Using cached locations (${Math.round(dist * 1000)}m shift)`);
+            console.log(`[Cache] Using cached locations (${Math.round(dist)}m shift)`);
             return locationCache.data.map(loc => ({
                 ...loc,
                 distance: Math.round(calculateDistance(lat, lng, loc.latitude, loc.longitude))
@@ -1397,11 +1441,27 @@ export const getNearbyRoles = async (lat: number, lng: number, bounds?: MapBound
 
         const queries = [Query.limit(100)];
         if (bounds) {
-            // Buffer of ~1km toNorth/South (0.01 degree is approx 1.1km)
-            queries.push(Query.greaterThan('lat', bounds.south - 0.01));
-            queries.push(Query.lessThan('lat', bounds.north + 0.01));
-            queries.push(Query.greaterThan('lng', bounds.west - 0.01));
-            queries.push(Query.lessThan('lng', bounds.east + 0.01));
+            // Calculate center of bounds
+            const centerLat = (bounds.north + bounds.south) / 2;
+            const centerLng = (bounds.east + bounds.west) / 2;
+
+            // Calculate current radius of the view in degrees (approx)
+            const latDiff = Math.abs(bounds.north - bounds.south) / 2;
+            const lngDiff = Math.abs(bounds.east - bounds.west) / 2;
+
+            // Convert degrees to approximate km (1 degree ~ 111km)
+            const currentRadiusKm = latDiff * 111;
+
+            // Clamp radius between 1km and 5km
+            const searchRadiusKm = Math.max(MIN_SEARCH_RADIUS_KM, Math.min(MAX_SEARCH_RADIUS_KM, currentRadiusKm));
+            const searchRadiusDeg = searchRadiusKm / 111;
+
+            console.log(`[Appwrite] Radius Limited Search: Center[${centerLat}, ${centerLng}], Radius: ${searchRadiusKm.toFixed(2)}km`);
+
+            queries.push(Query.greaterThan('lat', centerLat - searchRadiusDeg));
+            queries.push(Query.lessThan('lat', centerLat + searchRadiusDeg));
+            queries.push(Query.greaterThan('lng', centerLng - searchRadiusDeg));
+            queries.push(Query.lessThan('lng', centerLng + searchRadiusDeg));
         }
 
         const response = await databases.listDocuments(APPWRITE_DATABASE_ID, 'locations', queries);
@@ -1590,25 +1650,47 @@ export const checkVerification = async (locationId: string, userId: string): Pro
     }
 };
 
-export const claimBusiness = async (locationId: string, ownerId: string, details: any): Promise<boolean> => {
+export const requestBusinessClaim = async (locationId: string, userId: string, details: any): Promise<boolean> => {
+    try {
+        await databases.createDocument(
+            APPWRITE_DATABASE_ID,
+            'business_claims',
+            ID.unique(),
+            {
+                location_id: locationId,
+                user_id: userId,
+                status: 'pending',
+                cnpj: details.cnpj || '',
+                whatsapp: details.whatsapp || '',
+                instagram: details.instagram || '',
+                description: details.description || '',
+            }
+        );
+        triggerHaptic([50, 100, 50]);
+        return true;
+    } catch (e: any) {
+        console.error("[Appwrite] requestBusinessClaim failed:", e.message);
+        return false;
+    }
+};
+
+export const updateLocationDetails = async (locationId: string, updates: Partial<Location>): Promise<boolean> => {
     try {
         await databases.updateDocument(
             APPWRITE_DATABASE_ID,
             'locations',
             locationId,
             {
-                is_official: true,
-                verified: true,
-                owner_id: ownerId,
-                official_description: details.description || '',
-                instagram: details.instagram || '',
-                whatsapp: details.whatsapp || ''
+                official_description: updates.officialDescription,
+                instagram: updates.instagram,
+                whatsapp: updates.whatsapp,
+                isOpen: updates.isOpen
             }
         );
         triggerHaptic([50, 100, 50]);
         return true;
     } catch (e: any) {
-        console.error("[Appwrite] claimBusiness failed:", e.message);
+        console.error("[Appwrite] updateLocationDetails failed:", e.message);
         return false;
     }
 };
@@ -1696,7 +1778,10 @@ export const submitReview = async (review: Review, locationContext?: Location): 
         }
     }
 
-    // 2. CHECK FOR EXISTING REVIEW
+    // 2. CHECK FOR EXISTING REVIEW IN LAST 24H
+    const oneDayAgo = new Date();
+    oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+
     try {
         const existing = await databases.listDocuments(
             APPWRITE_DATABASE_ID,
@@ -1704,11 +1789,12 @@ export const submitReview = async (review: Review, locationContext?: Location): 
             [
                 Query.equal('locationId', finalLocationId),
                 Query.equal('userId', review.userId),
+                Query.greaterThan('$createdAt', oneDayAgo.toISOString()),
                 Query.limit(1)
             ]
         );
         if (existing.total > 0) {
-            console.warn("[SubmitReview] User already reviewed this location.");
+            console.warn("[SubmitReview] User already reviewed this location in the last 24h.");
             return true; // Return true as if successful, but don't duplicate
         }
     } catch (e) {

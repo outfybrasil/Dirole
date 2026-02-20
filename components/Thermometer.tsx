@@ -68,7 +68,7 @@ export const Thermometer: React.FC<ThermometerProps> = ({ stats, compact = false
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-8 divide-x divide-white/5 relative z-10 pt-2">
+      <div className="grid grid-cols-2 gap-4 sm:gap-8 divide-x divide-white/5 relative z-10 pt-2">
 
         {/* Lotação */}
         <div className="flex flex-col items-center justify-center">
@@ -93,10 +93,10 @@ export const Thermometer: React.FC<ThermometerProps> = ({ stats, compact = false
         </div>
 
         {/* Vibe */}
-        <div className="flex flex-col items-center justify-center pl-8">
+        <div className="flex flex-col items-center justify-center pl-4 sm:pl-8">
           <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-4">Vibe</span>
-          <div className="group">
-            <span className="text-5xl drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)] transition-transform group-hover:scale-110 duration-500 block">
+          <div className="group w-full flex justify-center overflow-visible">
+            <span className="text-4xl drop-shadow-[0_10px_10px_rgba(0,0,0,0.5)] transition-transform group-hover:scale-110 duration-500 whitespace-nowrap">
               {staleInfo.isStale && avgVibe === 0 ? '😶' : getVibeIcon(avgVibe)}
             </span>
           </div>

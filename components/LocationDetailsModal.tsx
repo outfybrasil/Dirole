@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Location, Review, LocationEvent, GalleryItem, Story } from '../types';
 import { Thermometer } from './Thermometer';
-import { verifyLocation, triggerHaptic, getReviewsForLocation, getEventsForLocation, getGalleryForLocation, blockUser, submitReview, getUserProfile, checkVerification, calculateDistance, getStoriesByLocation, markStoryAsViewed } from '../services/mockService';
+import { verifyLocation, triggerHaptic, getReviewsForLocation, getEventsForLocation, getGalleryForLocation, blockUser, submitReview, getUserProfile, checkVerification, calculateDistance, getStoriesByLocation, markStoryAsViewed, updateLocationDetails } from '../services/mockService';
 import { StoryViewer } from './StoryViewer';
 
 interface LocationDetailsModalProps {
@@ -19,7 +19,7 @@ interface LocationDetailsModalProps {
     refreshTrigger?: number;
 }
 
-type TabType = 'overview' | 'agenda' | 'gallery' | 'stories';
+type TabType = 'overview' | 'agenda' | 'gallery' | 'stories' | 'owner';
 
 export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
     location,
@@ -43,6 +43,16 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
     const [isStoryViewerOpen, setIsStoryViewerOpen] = useState(false);
     const [loadingData, setLoadingData] = useState(false);
 
+    // Owner edits
+    const [editDesc, setEditDesc] = useState(location?.officialDescription || '');
+    const [editInsta, setEditInsta] = useState(location?.instagram || '');
+    const [editWpp, setEditWpp] = useState(location?.whatsapp || '');
+    const [editIsOpen, setEditIsOpen] = useState(location ? location.isOpen : true);
+    const [isSavingOwner, setIsSavingOwner] = useState(false);
+
+    const currentUser = getUserProfile();
+    const isOwner = currentUser?.id === location?.ownerId;
+
     // Quick Vote State
     const [isVoting, setIsVoting] = useState(false);
 
@@ -63,6 +73,11 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
             setLoadingData(true);
             setActiveTab('overview');
             setHasVoted(false); // Reset vote state on open
+
+            setEditDesc(location.officialDescription || '');
+            setEditInsta(location.instagram || '');
+            setEditWpp(location.whatsapp || '');
+            setEditIsOpen(location.isOpen);
 
             // Safety timeout: stop loading after 8s no matter what
             const safetyTimer = setTimeout(() => {
@@ -300,9 +315,13 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
                             </a>
                         )}
                         {location.whatsapp && (
-                            <a href="#" className="text-xs font-bold text-white bg-white/10 px-3 py-1.5 rounded-lg flex items-center gap-2 hover:bg-white/20 transition-colors">
+                            <button onClick={() => {
+                                const waNumber = location.whatsapp!.replace(/\D/g, '');
+                                const finalNumber = waNumber.startsWith('55') ? waNumber : `55${waNumber}`;
+                                window.open(`https://wa.me/${finalNumber}`, '_blank');
+                            }} className="text-xs font-bold text-white bg-white/10 px-3 py-1.5 rounded-lg flex items-center gap-2 hover:bg-white/20 transition-colors">
                                 <i className="fab fa-whatsapp text-green-500"></i> Contato
-                            </a>
+                            </button>
                         )}
                     </div>
                 </div>
@@ -555,6 +574,119 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
         </div>
     );
 
+    const handleSaveOwnerChanges = async () => {
+        setIsSavingOwner(true);
+        try {
+            const success = await updateLocationDetails(location.id, {
+                officialDescription: editDesc,
+                instagram: editInsta,
+                whatsapp: editWpp,
+                isOpen: editIsOpen
+            });
+            if (success && onShowToast) {
+                onShowToast("Sucesso", "Informações atualizadas!", "success");
+            }
+        } finally {
+            setIsSavingOwner(false);
+        }
+    };
+
+    const renderOwnerDashboard = () => (
+        <div className="space-y-6 animate-fade-in pt-2 pb-6">
+            <div className="bg-gradient-to-br from-yellow-500/10 to-yellow-600/5 border border-yellow-500/30 rounded-2xl p-5 shadow-lg">
+                <div className="flex items-center gap-3 mb-4 border-b border-yellow-500/20 pb-4">
+                    <div className="w-12 h-12 bg-yellow-500/20 text-yellow-500 rounded-full flex items-center justify-center text-xl shadow-inner">
+                        <i className="fas fa-crown"></i>
+                    </div>
+                    <div>
+                        <h3 className="text-white font-black text-lg uppercase tracking-wider">Painel do Proprietário</h3>
+                        <p className="text-[10px] font-bold text-yellow-500/80 uppercase tracking-widest">Acesso Exclusivo</p>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div className="bg-black/30 rounded-xl p-3 border border-white/5">
+                        <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Visualizações de Rolês</span>
+                        <div className="text-xl font-black text-white flex items-center gap-2">
+                            {location.stats.reviewCount * 3 + 12}
+                            <span className="text-[10px] text-green-500"><i className="fas fa-arrow-up"></i> Hoje</span>
+                        </div>
+                    </div>
+                    <div className="bg-black/30 rounded-xl p-3 border border-white/5">
+                        <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Avaliação Média</span>
+                        <div className="text-xl font-black text-white flex items-center gap-2">
+                            {location.stats.reviewCount > 0 ? ((location.stats.avgVibe + location.stats.avgCrowd) / 2).toFixed(1) : '-'} / 3.0
+                            <span className="text-yellow-500 text-sm"><i className="fas fa-star"></i></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-4">
+                    <h4 className="text-xs font-black text-slate-300 uppercase tracking-[0.2em]">Editar Informações Públicas</h4>
+
+                    <div>
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Descrição Oficial (Mostrada na Visão Geral)</label>
+                        <textarea
+                            value={editDesc}
+                            onChange={(e) => setEditDesc(e.target.value)}
+                            rows={3}
+                            placeholder="Descreva seu estabelecimento..."
+                            className="w-full bg-black/30 border border-white/10 rounded-xl p-4 text-sm text-white placeholder-slate-700 focus:outline-none focus:border-yellow-500 transition-colors resize-none"
+                        ></textarea>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">Instagram (@)</label>
+                            <input
+                                type="text"
+                                value={editInsta}
+                                onChange={(e) => setEditInsta(e.target.value)}
+                                placeholder="SEUBAR"
+                                className="w-full bg-black/30 border border-white/10 rounded-xl p-3 text-sm text-white placeholder-slate-700 focus:outline-none focus:border-yellow-500 transition-colors"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 ml-1">WhatsApp</label>
+                            <input
+                                type="text"
+                                value={editWpp}
+                                onChange={(e) => setEditWpp(e.target.value)}
+                                placeholder="(41) 99999-9999"
+                                className="w-full bg-black/30 border border-white/10 rounded-xl p-3 text-sm text-white placeholder-slate-700 focus:outline-none focus:border-yellow-500 transition-colors"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex items-center justify-between bg-black/30 border border-white/10 rounded-xl p-4">
+                        <div>
+                            <span className="block text-sm font-bold text-white uppercase tracking-wider">Status do Local</span>
+                            <span className="text-[10px] font-medium text-slate-500">Forçar aberto/fechado agora</span>
+                        </div>
+                        <button
+                            onClick={() => { triggerHaptic(); setEditIsOpen(!editIsOpen); }}
+                            className={`w-14 h-8 rounded-full transition-all relative ${editIsOpen ? 'bg-green-500' : 'bg-red-500'}`}
+                        >
+                            <div className={`w-6 h-6 bg-white rounded-full shadow-lg absolute top-1 transition-all ${editIsOpen ? 'left-7' : 'left-1'}`}></div>
+                        </button>
+                    </div>
+
+                    <button
+                        onClick={() => { triggerHaptic(); handleSaveOwnerChanges(); }}
+                        disabled={isSavingOwner}
+                        className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-black uppercase tracking-[0.2em] py-4 rounded-xl transition-all shadow-lg active:scale-95 text-xs flex items-center justify-center gap-2 mt-4"
+                    >
+                        {isSavingOwner ? (
+                            <><div className="w-3 h-3 border-2 border-black/30 border-t-black rounded-full animate-spin"></div> SALVANDO...</>
+                        ) : (
+                            <><i className="fas fa-save"></i> SALVAR ALTERAÇÕES</>
+                        )}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+
     return (
         <div className="fixed inset-0 z-[500] flex items-end sm:items-center justify-center pointer-events-none sm:p-4">
             <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] pointer-events-auto transition-opacity duration-500" onClick={onClose}></div>
@@ -603,6 +735,15 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
                         VISÃO GERAL
                         {activeTab === 'overview' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-dirole-primary to-dirole-secondary shadow-[0_0_15px_#8b5cf6]"></div>}
                     </button>
+                    {isOwner && (
+                        <button
+                            onClick={() => setActiveTab('owner')}
+                            className={`py-4 relative transition-colors tracking-wide font-black ${activeTab === 'owner' ? 'text-yellow-500' : 'text-slate-500 hover:text-yellow-500/50'}`}
+                        >
+                            PAINEL
+                            {activeTab === 'owner' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-yellow-500 shadow-[0_0_15px_#eab308]"></div>}
+                        </button>
+                    )}
                     {location.isOfficial && (
                         <button
                             onClick={() => setActiveTab('agenda')}
@@ -630,6 +771,7 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
 
                 <div className="flex-1 overflow-y-auto px-6 pb-56 pt-6 custom-scrollbar">
                     {activeTab === 'overview' && renderOverview()}
+                    {activeTab === 'owner' && isOwner && renderOwnerDashboard()}
                     {activeTab === 'agenda' && location.isOfficial && renderAgenda()}
                     {activeTab === 'gallery' && renderGallery()}
                     {activeTab === 'stories' && renderStories()}
@@ -653,10 +795,18 @@ export const LocationDetailsModal: React.FC<LocationDetailsModalProps> = ({
                                 </svg>
                             </a>
                             <a
-                                href={`taxis99://call?end_lat=${location.latitude}&end_lng=${location.longitude}&end_name=${encodeURIComponent(location.name)}`}
+                                href={`https://99app.com/route?end_lat=${location.latitude}&end_lng=${location.longitude}&end_name=${encodeURIComponent(location.name)}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                onClick={() => triggerHaptic()}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    triggerHaptic();
+                                    window.open(`taxis99://call?end_lat=${location.latitude}&end_lng=${location.longitude}&end_name=${encodeURIComponent(location.name)}`, '_system');
+                                    // Fallback if app not installed
+                                    setTimeout(() => {
+                                        window.open(`https://99app.com/route?end_lat=${location.latitude}&end_lng=${location.longitude}&end_name=${encodeURIComponent(location.name)}`, '_blank');
+                                    }, 500);
+                                }}
                                 className="h-14 bg-[#FFDA00] border border-yellow-500/50 rounded-xl flex items-center justify-center active:scale-95 transition-all hover:bg-yellow-400 text-black group overflow-hidden"
                             >
                                 <span className="text-xl font-black tracking-tighter group-hover:scale-110 transition-transform">99</span>

@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Location, User } from '../types';
-import { claimBusiness } from '../services/mockService';
+import { requestBusinessClaim } from '../services/mockService';
 
 interface ClaimBusinessModalProps {
   location: Location;
@@ -32,10 +32,11 @@ export const ClaimBusinessModal: React.FC<ClaimBusinessModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      await claimBusiness(location.id, currentUser.id, {
+      await requestBusinessClaim(location.id, currentUser.id, {
         description,
         instagram,
-        whatsapp
+        whatsapp,
+        cnpj
       });
       onSuccess();
       onClose();

@@ -21,6 +21,7 @@ const PrivacyPolicyModal = React.lazy(() => import('../components/PrivacyPolicyM
 const DataPrivacyModal = React.lazy(() => import('../components/DataPrivacyModal').then(module => ({ default: module.DataPrivacyModal })));
 const StoryCamera = React.lazy(() => import('../components/StoryCamera').then(module => ({ default: module.StoryCamera })));
 const OnboardingModal = React.lazy(() => import('../components/OnboardingModal').then(module => ({ default: module.OnboardingModal })));
+const OwnerListModal = React.lazy(() => import('../components/OwnerListModal'));
 
 // Keep lightweight/critical components eager
 import { ActivityTicker } from '../components/ActivityTicker';
@@ -35,12 +36,13 @@ import { RateAppModal } from '../components/RateAppModal';
 
 import { Location, Filters, User, MapBounds } from '../types';
 import { getNearbyRoles, getUserProfile, toggleFavorite, syncUserProfile, triggerHaptic, requestNotificationPermission, sendLocalNotification, searchLocations, getUserById, APPWRITE_DATABASE_ID, getPendingFriendRequests } from '../services/mockService';
-import { INITIAL_CENTER } from '../constants';
+import { DEFAULT_LOCATION_IMAGES, INITIAL_CENTER, LEVEL_THRESHOLDS } from '../constants';
 import { getCurrentSession, signOut } from '../services/authService';
 
 import { useDeepLinks } from '../hooks/useDeepLinks';
 import { useLocationTracking } from '../hooks/useLocationTracking';
 import { useAppwriteRealtime } from '../hooks/useAppwriteRealtime';
+import { App } from '@capacitor/app';
 
 interface MobileLayoutProps {
     preloadedUser?: User | null;
@@ -82,6 +84,61 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
     const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [isRateModalOpen, setIsRateModalOpen] = useState(false);
+    const [isOwnerListOpen, setIsOwnerListOpen] = useState(false);
+
+    // --- FRIENDS MODAL STATE ---
+    const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
+    const [friendsModalTab, setFriendsModalTab] = useState<'my_friends' | 'requests' | 'search'>('my_friends');
+    const [friendsModalView, setFriendsModalView] = useState<'default' | 'qr'>('default');
+
+    // --- UI STATE ---
+    const [showFilters, setShowFilters] = useState(false);
+
+    // --- HARDWARE BACK BUTTON HANDLING ---
+    const handleBack = useCallback(() => {
+        // Priority order for closing modals
+        if (isDetailsModalOpen) { setIsDetailsModalOpen(false); return; }
+        if (isProfileModalOpen) { setIsProfileModalOpen(false); return; }
+        if (isFriendsModalOpen) { setIsFriendsModalOpen(false); return; }
+        if (isNotificationsModalOpen) { setIsNotificationsModalOpen(false); return; }
+        if (isQRScannerOpen) { setIsQRScannerOpen(false); return; }
+        if (showFilters) { setShowFilters(false); return; }
+        if (isAddModalOpen) { setIsAddModalOpen(false); return; }
+        if (isReviewModalOpen) { setIsReviewModalOpen(false); return; }
+        if (isStoryCameraOpen) { setIsStoryCameraOpen(false); return; }
+        if (isClaimModalOpen) { setIsClaimModalOpen(false); return; }
+        if (isReportModalOpen) { setIsReportModalOpen(false); return; }
+        if (isInviteModalOpen) { setIsInviteModalOpen(false); return; }
+        if (isDataModalOpen) { setIsDataModalOpen(false); return; }
+        if (isPrivacyModalOpen) { setIsPrivacyModalOpen(false); return; }
+        if (showOnboarding) { setShowOnboarding(false); return; }
+        if (isRateModalOpen) { setIsRateModalOpen(false); return; }
+        if (isOwnerListOpen) { setIsOwnerListOpen(false); return; }
+        if (showLogin) { setShowLogin(false); return; }
+
+        // If no modal is open and on a different tab, go back to map
+        if (activeTab !== 'map') {
+            setActiveTab('map');
+            return;
+        }
+
+        // Default: browser go back or exit
+        window.history.back();
+    }, [
+        isDetailsModalOpen, isProfileModalOpen, isFriendsModalOpen, isNotificationsModalOpen,
+        isQRScannerOpen, showFilters, isAddModalOpen, isReviewModalOpen, isStoryCameraOpen,
+        isClaimModalOpen, isReportModalOpen, isInviteModalOpen, isDataModalOpen, isPrivacyModalOpen,
+        showOnboarding, isRateModalOpen, isOwnerListOpen, showLogin, activeTab
+    ]);
+
+    useEffect(() => {
+        const backListener = App.addListener('backButton', () => {
+            handleBack();
+        });
+        return () => {
+            backListener.then(l => l.remove());
+        };
+    }, [handleBack]);
 
     // --- REVIEW REQUEST LOGIC ---
     const checkReviewRequest = useCallback(() => {
@@ -131,13 +188,6 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
     const [scannedUser, setScannedUser] = useState<any>(null);
     const [detailsRefreshTrigger, setDetailsRefreshTrigger] = useState(0);
 
-    // --- FRIENDS MODAL STATE ---
-    const [isFriendsModalOpen, setIsFriendsModalOpen] = useState(false);
-    const [friendsModalTab, setFriendsModalTab] = useState<'my_friends' | 'requests' | 'search'>('my_friends');
-    const [friendsModalView, setFriendsModalView] = useState<'default' | 'qr'>('default');
-
-    // --- UI STATE ---
-    const [showFilters, setShowFilters] = useState(false);
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
     const [showConfetti, setShowConfetti] = useState(false);
     const [toasts, setToasts] = useState<ToastData[]>([]);
@@ -147,7 +197,7 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
         minVibe: false,
         lowCost: false,
         types: [],
-        maxDistance: 3,
+        maxDistance: 1,
         onlyOpen: false
     });
 
@@ -386,13 +436,13 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
     };
 
     const handleTouchStart = (e: React.TouchEvent) => {
-        if (activeTab !== 'list' && activeTab !== 'map') return;
+        if (activeTab !== 'list') return;
         if (scrollContainerRef.current && scrollContainerRef.current.scrollTop > 0) return;
         startY.current = e.touches[0].clientY;
     };
 
     const handleTouchMove = (e: React.TouchEvent) => {
-        if (activeTab !== 'list' && activeTab !== 'map') return;
+        if (activeTab !== 'list') return;
         if (scrollContainerRef.current && scrollContainerRef.current.scrollTop > 0) return;
         if (startY.current === 0) return;
         const currentY = e.touches[0].clientY;
@@ -433,6 +483,18 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
         }
     }, [checkReviewRequest]);
 
+    // --- XP & LEVEL CALC ---
+    const currentLevelThreshold = currentUser ? LEVEL_THRESHOLDS.find((t: any) => t.level === currentUser.level) || LEVEL_THRESHOLDS[0] : LEVEL_THRESHOLDS[0];
+    const nextLevelThreshold = currentUser ? LEVEL_THRESHOLDS.find((t: any) => t.level === currentUser.level + 1) : null;
+
+    const xpProgress = useMemo(() => {
+        if (!currentUser) return 0;
+        if (!nextLevelThreshold) return 100; // Max level
+        const xpInLevel = currentUser.xp - currentLevelThreshold.xp;
+        const xpNeeded = nextLevelThreshold.xp - currentLevelThreshold.xp;
+        return Math.min(100, Math.max(0, (xpInLevel / xpNeeded) * 100));
+    }, [currentUser, currentLevelThreshold, nextLevelThreshold]);
+
     // --- RENDER ---
     if (showSplash || isAuthChecking || !currentUser || isEmailUnverified) {
         return (
@@ -460,39 +522,44 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
                 {toasts.map(toast => <InAppToast key={toast.id} toast={toast} onClose={removeToast} />)}
             </div>
 
-            <header className="bg-[#0f0518]/80 backdrop-blur-md z-[60] px-6 py-4 pt-[max(1rem,env(safe-area-inset-top))] border-b border-white/5 flex justify-center sticky top-0 shrink-0">
-                <div className="w-full max-w-7xl flex justify-between items-center">
-                    <div className="flex items-center gap-4 group">
-                        <div className="w-14 h-14 flex items-center justify-center overflow-hidden drop-shadow-[0_0_12px_rgba(139,92,246,0.25)] group-hover:scale-105 transition-transform">
-                            <img src="/og-image.png" className="w-14 h-14 object-contain" alt="Logo" />
+            <header className="bg-[#0f0518]/90 backdrop-blur-xl z-[60] pb-4 pt-[calc(env(safe-area-inset-top,40px)+4rem)] border-b border-white/5 flex justify-center sticky top-0 shrink-0 relative overflow-hidden" style={{ marginTop: '10px' }}>
+                <div className="w-full max-w-7xl flex justify-between items-center px-6 mt-2 antialiased">
+                    <div className="flex items-center gap-4 active:scale-95 transition-transform cursor-pointer" onClick={() => setActiveTab('map')}>
+                        <div className="flex items-center justify-center shrink-0">
+                            <img src="/logo-cropped.png" className="w-10 h-10 object-contain drop-shadow-[0_0_15px_rgba(139,92,246,0.3)]" alt="Logo" />
                         </div>
-                        <div className="flex flex-col -space-y-1">
-                            <h1 className="text-4xl font-[1000] italic tracking-tighter text-white leading-none drop-shadow-[0_0_10px_rgba(255,255,255,0.2)]">DIROLE</h1>
-                            <div className="flex items-center gap-1.5 mt-1">
-                                <span className="w-1 h-1 rounded-full bg-dirole-primary animate-pulse"></span>
-                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.4em] leading-none">Social Thermometer</p>
-                            </div>
-                        </div>
+                        <h1 className="text-3xl font-[1000] italic tracking-tighter text-white leading-none drop-shadow-[0_4px_12px_rgba(0,0,0,0.5)]">DIROLE</h1>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        <div className="flex items-center bg-white/5 backdrop-blur-md rounded-full border border-white/10 p-1 pr-4 gap-3 hover:bg-white/10 transition-all shadow-xl group cursor-pointer" onClick={() => { triggerHaptic(); setIsProfileModalOpen(true); }}>
-                            <div className="relative">
-                                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-dirole-primary to-dirole-secondary p-[2px] shadow-lg group-hover:rotate-12 transition-transform">
-                                    <UserAvatar avatar={currentUser.avatar} size="sm" className="border-none bg-transparent" />
+                    <div className="flex items-center gap-4">
+                        {/* PROFILE BUTTON - BOLINHA COM RESPIRO */}
+                        <div className="w-12 h-12 flex items-center justify-center bg-white/5 backdrop-blur-md rounded-full border border-white/10 hover:bg-white/10 transition-all shadow-xl active:scale-90 cursor-pointer" onClick={() => { triggerHaptic(); setIsProfileModalOpen(true); }}>
+                            <div className="relative w-10 h-10 shrink-0">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-dirole-primary via-purple-500 to-dirole-secondary p-[2px] shadow-[0_0_15px_rgba(139,92,246,0.2)]">
+                                    <UserAvatar avatar={currentUser.avatar} size="xs" className="border-none bg-slate-900 w-full h-full" />
                                 </div>
-                                {notificationCount > 0 && <span className="absolute -top-1 -right-1 w-5 h-5 bg-dirole-primary text-white text-[9px] font-black rounded-full flex items-center justify-center border-2 border-[#0f0518] shadow-lg animate-bounce z-10">{notificationCount > 9 ? '9+' : notificationCount}</span>}
-                            </div>
-                            <div className="flex flex-col items-start">
-                                <span className="text-[11px] font-black text-white leading-none tracking-tight">{currentUser.nickname || currentUser.name.split(' ')[0]}</span>
-                                <span className="text-[9px] font-black text-dirole-secondary/80 leading-none mt-1 uppercase tracking-tighter">Nível {currentUser.level}</span>
+                                <div className="absolute -bottom-1 -right-1 bg-[#0f0518] rounded-full p-[2px] shadow-lg">
+                                    <div className="w-5 h-5 rounded-full bg-slate-800 flex items-center justify-center border border-white/20 shadow-inner">
+                                        <span className="text-[10px] font-black text-white leading-none tracking-tighter">{currentUser.level}</span>
+                                    </div>
+                                </div>
+                                {notificationCount > 0 && <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-600 text-white text-[9px] font-black rounded-full flex items-center justify-center border-2 border-[#0f0518] shadow-lg z-10">{notificationCount}</span>}
                             </div>
                         </div>
 
-                        <button onClick={() => { triggerHaptic(); setFriendsModalView('qr'); setFriendsModalTab('my_friends'); setIsFriendsModalOpen(true); }} className="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center border border-white/10 hover:bg-white/10 active:scale-95 transition-all shadow-lg backdrop-blur-md group">
-                            <i className="fas fa-qrcode text-white/70 group-hover:text-white text-sm transition-colors"></i>
+                        {/* QR CODE BUTTON - BOLINHA IGUAL */}
+                        <button onClick={() => { triggerHaptic(); setFriendsModalView('qr'); setFriendsModalTab('my_friends'); setIsFriendsModalOpen(true); }} className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center border border-white/10 hover:bg-white/10 active:scale-90 transition-all shadow-xl backdrop-blur-md group">
+                            <i className="fas fa-qrcode text-white/70 group-hover:text-white text-xl transition-all group-hover:scale-110"></i>
                         </button>
                     </div>
+                </div>
+
+                {/* XP PROGRESS BAR */}
+                <div className="absolute bottom-0 left-0 right-0 h-[2px] bg-white/5">
+                    <div
+                        className="h-full bg-gradient-to-r from-dirole-primary via-purple-500 to-dirole-secondary transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(139,92,246,0.5)]"
+                        style={{ width: `${xpProgress}%` }}
+                    ></div>
                 </div>
             </header>
 
@@ -511,10 +578,7 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
 
                 {(activeTab === 'map' || activeTab === 'list') && (
                     <div className={`flex-1 flex flex-col md:flex-row h-full overflow-hidden relative ${activeTab === 'list' ? 'hidden md:flex' : 'flex'}`}>
-                        {/* SEARCH OVERLAY (MOBILE ONLY) */}
-                        <div className="absolute top-4 left-0 right-0 z-[400] pointer-events-none px-4 md:hidden">
-                            <SearchBar onSearch={handleTextSearch} className="pointer-events-auto" />
-                        </div>
+
 
                         {/* DESKTOP SIDEBAR */}
                         <div className={`hidden md:flex flex-col border-r border-white/5 bg-[#0f0518]/90 backdrop-blur-xl transition-all duration-500 ease-in-out relative ${isSidebarCollapsed ? 'w-0 opacity-0 -translate-x-full' : 'w-[450px] opacity-100 translate-x-0'}`}>
@@ -626,20 +690,22 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
                     )}
 
                     {/* MOBILE BOTTOM DRAWER */}
-                    <div className={`
-                        z-[900] transition-all duration-500 ease-in-out md:hidden
-                        ${showFilters ? 'translate-y-0 opacity-100' : 'translate-y-full opacity-0'}
-                        fixed bottom-0 left-0 right-0 h-[75vh]
-                        bg-[#1a0b2e] rounded-t-[2.5rem]
-                        shadow-[0_-20px_60px_rgba(0,0,0,1)] border-t border-white/20
-                    `}>
-                        <div className="w-12 h-1.5 bg-white/30 rounded-full mx-auto mt-4 mb-2"></div>
-                        <div className="flex-1 overflow-y-auto sidebar-scroll h-full pb-10">
-                            <Suspense fallback={<div className="p-4 text-center text-slate-500">Loading Filters...</div>}>
-                                <FilterBar filters={filters} onChange={setFilters} onSearch={handleTextSearch} onClose={() => setShowFilters(false)} />
-                            </Suspense>
+                    {showFilters && (
+                        <div className={`
+                            z-[900] transition-transform duration-300 ease-out md:hidden
+                            translate-y-0
+                            fixed bottom-0 left-0 right-0 h-[75vh]
+                            bg-[#1a0b2e] rounded-t-[2.5rem]
+                            shadow-[0_-20px_60px_rgba(0,0,0,1)] border-t border-white/20
+                        `}>
+                            <div className="w-12 h-1.5 bg-white/30 rounded-full mx-auto mt-4 mb-2"></div>
+                            <div className="flex-1 overflow-y-auto sidebar-scroll h-full pb-10">
+                                <Suspense fallback={<div className="p-4 text-center text-slate-500">Loading Filters...</div>}>
+                                    <FilterBar filters={filters} onChange={setFilters} onSearch={handleTextSearch} onClose={() => setShowFilters(false)} />
+                                </Suspense>
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* MAP CONTROLS CLUSTER (Hidden when filtering) */}
                     {!showFilters && (
@@ -655,7 +721,6 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
                             </button>
                         </div>
                     )}
-
                 </>
             )}
 
@@ -684,6 +749,7 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
                     )
                 }
 
+                {isOwnerListOpen && <OwnerListModal isOpen={isOwnerListOpen} onClose={() => setIsOwnerListOpen(false)} currentUser={currentUser} onOpenLocation={(loc) => { setIsOwnerListOpen(false); handleOpenDetails(loc); }} />}
                 {isReportModalOpen && reportTarget && <ReportModal isOpen={isReportModalOpen} onClose={() => setIsReportModalOpen(false)} targetId={reportTarget.id} targetType={reportTarget.type} targetName={reportTarget.name} currentUser={currentUser} />}
                 {isPrivacyModalOpen && <PrivacyPolicyModal isOpen={isPrivacyModalOpen} onClose={() => setIsPrivacyModalOpen(false)} />}
                 {isDataModalOpen && <DataPrivacyModal isOpen={isDataModalOpen} onClose={() => setIsDataModalOpen(false)} currentUser={currentUser} />}
@@ -693,7 +759,7 @@ export function MobileLayout({ preloadedUser }: MobileLayoutProps) {
 
                 {isAddModalOpen && <AddLocationModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onSuccess={() => { if (searchOrigin) fetchData(searchOrigin.lat, searchOrigin.lng); }} userLat={userLocation?.lat || INITIAL_CENTER.lat} userLng={userLocation?.lng || INITIAL_CENTER.lng} currentUser={currentUser} />}
 
-                {isProfileModalOpen && <ProfileModal isOpen={isProfileModalOpen} currentUser={currentUser} onSave={(u) => { setCurrentUser(u); setIsProfileModalOpen(false); }} onClose={() => setIsProfileModalOpen(false)} onOpenPrivacy={() => setIsPrivacyModalOpen(true)} onOpenData={() => setIsDataModalOpen(true)} onOpenFriends={(tab) => { triggerHaptic(); setFriendsModalTab(tab); setIsProfileModalOpen(false); setIsFriendsModalOpen(true); }} onLogout={handleLogout} onShowToast={(message, type) => addToast({ title: type === 'error' ? 'Erro' : 'Sucesso', message, type: type as any })} />}
+                {isProfileModalOpen && <ProfileModal isOpen={isProfileModalOpen} currentUser={currentUser} onSave={(u) => { setCurrentUser(u); setIsProfileModalOpen(false); checkReviewRequest(); }} onClose={() => setIsProfileModalOpen(false)} onOpenPrivacy={() => { setIsProfileModalOpen(false); setIsPrivacyModalOpen(true); }} onOpenData={() => { setIsProfileModalOpen(false); setIsDataModalOpen(true); }} onOpenFriends={(tab) => { triggerHaptic(); setFriendsModalTab(tab); setFriendsModalView('default'); setIsProfileModalOpen(false); setIsFriendsModalOpen(true); }} onOpenOwnerList={() => { triggerHaptic(); setIsProfileModalOpen(false); setIsOwnerListOpen(true); }} onLogout={handleLogout} onShowToast={(message, type) => addToast({ title: type === 'error' ? 'Erro' : 'Sucesso', message, type: type as any })} />}
 
                 {isFriendsModalOpen && <FriendsModal isOpen={isFriendsModalOpen} onClose={() => { setIsFriendsModalOpen(false); setScannedUser(null); setFriendsModalView('default'); }} currentUser={currentUser} initialTab={friendsModalTab} initialView={friendsModalView} scannedUser={scannedUser} onLogout={handleLogout} onOpenScanner={() => { setIsFriendsModalOpen(false); setTimeout(() => setIsQRScannerOpen(true), 300); }} onShowToast={(title, message, type) => addToast({ title, message, type: type as any })} />}
 

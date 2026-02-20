@@ -15,6 +15,7 @@ interface ProfileModalProps {
     onOpenPrivacy: () => void;
     onOpenData?: () => void;
     onOpenFriends: (tab: 'my_friends' | 'requests' | 'search') => void;
+    onOpenOwnerList?: () => void;
     onLogout?: () => void;
     onShowToast?: (message: string, type: 'success' | 'error' | 'info') => void;
 }
@@ -29,6 +30,7 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
     onOpenPrivacy,
     onOpenData,
     onOpenFriends,
+    onOpenOwnerList,
     onLogout,
     onShowToast
 }) => {
@@ -360,6 +362,25 @@ export const ProfileModal: React.FC<ProfileModalProps> = ({
                                                     <span className="text-sm font-black text-white uppercase tracking-widest">Explorar</span>
                                                 </div>
                                             </button>
+
+                                            {/* Painel Owner Button */}
+                                            {!isGuest && (
+                                                <button
+                                                    onClick={() => { if (onOpenOwnerList) onOpenOwnerList(); }}
+                                                    className="col-span-2 group relative h-32 bg-gradient-to-br from-yellow-500/20 to-transparent border border-yellow-500/20 rounded-[2rem] p-6 flex items-center gap-6 hover:bg-white/5 transition-all shadow-xl overflow-hidden"
+                                                >
+                                                    <div className="absolute -right-10 -top-10 w-32 h-32 bg-yellow-500/10 rounded-full blur-3xl group-hover:bg-yellow-500/20 transition-all"></div>
+                                                    <div className="w-14 h-14 rounded-2xl bg-yellow-500/20 flex shrink-0 items-center justify-center text-yellow-500 text-2xl shadow-[0_0_20px_rgba(234,179,8,0.2)]">
+                                                        <i className="fas fa-crown"></i>
+                                                    </div>
+                                                    <div className="text-left flex-1 relative z-10">
+                                                        <p className="text-[10px] font-black text-yellow-500 uppercase tracking-[0.2em] mb-1">Exclusivo</p>
+                                                        <span className="text-sm font-black text-white uppercase tracking-widest block">Meu Negócio</span>
+                                                        <p className="text-[9px] text-slate-400 font-bold mt-1 leading-tight">Painel de gerenciamento para proprietários</p>
+                                                    </div>
+                                                    <i className="fas fa-chevron-right text-yellow-500/50 group-hover:text-yellow-500 relative z-10"></i>
+                                                </button>
+                                            )}
                                         </div>
 
                                         {/* Troféus Section */}
